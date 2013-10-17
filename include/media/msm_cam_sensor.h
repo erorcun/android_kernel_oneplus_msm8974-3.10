@@ -53,6 +53,12 @@
 #define MAX_AF_ITERATIONS 3
 #define MAX_NUMBER_OF_STEPS 47
 
+enum flash_type {
+	LED_FLASH = 1,
+	STROBE_FLASH,
+	GPIO_FLASH
+};
+
 enum msm_camera_i2c_reg_addr_type {
 	MSM_CAMERA_I2C_BYTE_ADDR = 1,
 	MSM_CAMERA_I2C_WORD_ADDR,
