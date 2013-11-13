@@ -51,6 +51,7 @@
 #define MAX_EEPROM_NAME 32
 
 #define MAX_AF_ITERATIONS 3
+#define MAX_NUMBER_OF_STEPS 47
 
 enum msm_camera_i2c_reg_addr_type {
 	MSM_CAMERA_I2C_BYTE_ADDR = 1,
@@ -438,6 +439,7 @@ enum msm_actuator_cfg_type_t {
 	CFG_GET_ACTUATOR_INFO,
 	CFG_SET_ACTUATOR_INFO,
 	CFG_SET_DEFAULT_FOCUS,
+	CFG_SET_POSITION,
 	CFG_MOVE_FOCUS,
 	CFG_ACTUATOR_POWERDOWN,
 };
@@ -537,6 +539,13 @@ enum af_camera_name {
 	ACTUATOR_WEB_CAM_2,
 };
 
+
+struct msm_actuator_set_position_t {
+	uint16_t number_of_steps;
+	uint16_t pos[MAX_NUMBER_OF_STEPS];
+	uint16_t delay[MAX_NUMBER_OF_STEPS];
+};
+
 struct msm_actuator_cfg_data {
 	int cfgtype;
 	uint8_t is_af_supported;
@@ -544,6 +553,7 @@ struct msm_actuator_cfg_data {
 		struct msm_actuator_move_params_t move;
 		struct msm_actuator_set_info_t set_info;
 		struct msm_actuator_get_info_t get_info;
+		struct msm_actuator_set_position_t setpos;
 		enum af_camera_name cam_name;
 	} cfg;
 };
