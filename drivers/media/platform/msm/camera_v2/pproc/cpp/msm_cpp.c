@@ -1715,6 +1715,11 @@ long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 		struct msm_queue_cmd *event_qcmd;
 		struct msm_cpp_frame_info_t *process_frame;
 		event_qcmd = msm_dequeue(queue, list_eventdata);
+		if (!event_qcmd) {
+			pr_err("no queue cmd available");
+			mutex_unlock(&cpp_dev->mutex);
+			return -EINVAL;
+		}
 		process_frame = event_qcmd->command;
 		CPP_DBG("fid %d\n", process_frame->frame_id);
 		if (copy_to_user((void __user *)ioctl_ptr->ioctl_ptr,
