@@ -12,6 +12,7 @@ config ARCH_MSM8974
 	select MSM_GPIOMUX
 	select PM_DEVFREQ
 	select MSM_DEVFREQ_CPUBW
+	select DEVFREQ_SIMPLE_DEV
 	select MSM_PIL
 	select MSM_SPM_V2
 	select MSM_L2_SPM
@@ -69,6 +70,7 @@ config ARCH_APQ8084
 	select KRAIT_REGULATOR
 	select PM_DEVFREQ
 	select MSM_DEVFREQ_CPUBW
+	select DEVFREQ_SIMPLE_DEV
 	select MSM_PIL
 	select ENABLE_VMALLOC_SAVINGS
 	select MSM_ULTRASOUND_B
@@ -149,6 +151,7 @@ config ARCH_FSM9900
 	select HAVE_ARM_ARCH_TIMER
 	select MSM_GPIOMUX
 	select PM_DEVFREQ
+	select DEVFREQ_SIMPLE_DEV
 	select MSM_PIL
 	select MSM_NATIVE_RESTART
 	select REGULATOR
