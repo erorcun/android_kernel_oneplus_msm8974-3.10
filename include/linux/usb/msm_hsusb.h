@@ -483,6 +483,7 @@ struct msm_otg {
 #endif
 	int ui_enabled;
 	bool pm_done;
+	struct qpnp_vadc_chip	*vadc_dev;
 };
 
 struct ci13xxx_platform_data {
