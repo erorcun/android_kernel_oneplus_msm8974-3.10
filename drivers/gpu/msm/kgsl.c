@@ -65,6 +65,11 @@
  */
 static struct kmem_cache *memobjs_cache;
 
+#ifdef CONFIG_ARM_LPAE
+#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(64)
+#else
+#define KGSL_DMA_BIT_MASK	DMA_BIT_MASK(32)
+#endif
 
 static char *ksgl_mmu_type;
 module_param_named(mmutype, ksgl_mmu_type, charp, 0);
@@ -4396,6 +4401,11 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 		KGSL_DRV_ERR(device, "kgsl_mmu_init failed %d\n", status);
 		goto error_dest_work_q;
 	}
+
+	/* Check to see if our device can perform DMA correctly */
+	status = dma_set_coherent_mask(&pdev->dev, KGSL_DMA_BIT_MASK);
+	if (status)
+		goto error_close_mmu;
 
 	status = kgsl_allocate_global(device, &device->memstore,
 		KGSL_MEMSTORE_SIZE, 0);
