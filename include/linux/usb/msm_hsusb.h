@@ -240,6 +240,7 @@ enum usb_vdd_value {
  *		mode with controller in device mode.
  * @bool disable_retention_with_vdd_min: Indicates whether to enable
 		allowing VDDmin without putting PHY into retention.
+ * @usb_id_gpio: Gpio used for USB ID detection.
  */
 struct msm_otg_platform_data {
 	int *phy_init_seq;
@@ -272,6 +273,7 @@ struct msm_otg_platform_data {
 	bool rw_during_lpm_workaround;
 	bool enable_ahb2ahb_bypass;
 	bool disable_retention_with_vdd_min;
+	int usb_id_gpio;
 };
 
 /* phy related flags */
@@ -363,6 +365,7 @@ struct msm_otg_platform_data {
 	     This handles the race case when PM resume thread returns before
 	     the charger detection starts. When USB is disconnected and in lpm
 	     pm_done is set to true.
+ * @ext_id_irq: IRQ for ID interrupt.
  */
 struct msm_otg {
 	struct usb_phy phy;
@@ -406,7 +409,7 @@ struct msm_otg {
 	int async_int;
 	unsigned cur_power;
 	struct delayed_work chg_work;
-	struct delayed_work pmic_id_status_work;
+	struct delayed_work id_status_work;
 	struct delayed_work suspend_work;
 	enum usb_chg_state chg_state;
 	enum usb_chg_type chg_type;
@@ -487,6 +490,7 @@ struct msm_otg {
 	int ui_enabled;
 	bool pm_done;
 	struct qpnp_vadc_chip	*vadc_dev;
+	int ext_id_irq;
 };
 
 struct ci13xxx_platform_data {
