@@ -3117,8 +3117,6 @@ static irqreturn_t dwc3_thread_interrupt(int irq, void *_dwc)
 
 	start_time = ktime_get();
 
-	dbg_event(0xFF, "IRQ Thread", 0);
-
 	spin_lock_irqsave(&dwc->lock, flags);
 
 	for (i = 0; i < dwc->num_event_buffers; i++) {
