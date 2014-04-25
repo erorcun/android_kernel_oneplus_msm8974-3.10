@@ -461,8 +461,9 @@ void msm_isp_calculate_framedrop(
 	}
 
 	framedrop_period = msm_isp_get_framedrop_period(
-	   stream_cfg_cmd->frame_skip_pattern);
-
+			stream_cfg_cmd->frame_skip_pattern);
+	stream_info->frame_skip_pattern =
+			stream_cfg_cmd->frame_skip_pattern;
 	if (stream_cfg_cmd->frame_skip_pattern == SKIP_ALL)
 		stream_info->framedrop_pattern = 0x0;
 	else
