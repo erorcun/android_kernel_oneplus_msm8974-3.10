@@ -618,8 +618,11 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl,
 				usecs_to_jiffies(VSYNC_TIMEOUT_US));
 			WARN(rc <= 0, "timeout (%d) vsync interrupt on ctl=%d\n",
 				rc, ctl->num);
-			rc = 0;
+
 			video_vsync_irq_disable(ctl);
+			/* Do not configure fps on vsync timeout */
+			if (rc <= 0)
+				return rc;
 
 			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
 			spin_lock_irqsave(&ctx->dfps_lock, flags);
