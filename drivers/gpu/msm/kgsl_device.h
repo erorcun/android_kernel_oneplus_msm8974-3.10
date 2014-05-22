@@ -344,6 +344,7 @@ struct kgsl_device {
 
 	struct kgsl_event_group global_events;
 	struct kgsl_event_group iommu_events;
+	struct device *busmondev; /* pseudo dev for GPU BW voting governor */
 };
 
 
