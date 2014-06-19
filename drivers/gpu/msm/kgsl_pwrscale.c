@@ -227,6 +227,7 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 	level = pwr->active_pwrlevel;
 	pwr_level = &pwr->pwrlevels[level];
 
+	/* If the governor recommends a new frequency, update it here */
 	if (*freq != cur_freq) {
 		level = pwr->max_pwrlevel;
 		for (i = pwr->min_pwrlevel; i >= pwr->max_pwrlevel; i--)
@@ -234,32 +235,11 @@ int kgsl_devfreq_target(struct device *dev, unsigned long *freq, u32 flags)
 				level = i;
 				break;
 			}
+		if (level != pwr->active_pwrlevel)
+			kgsl_pwrctrl_pwrlevel_change(device, level);
 	}
 
-	/*
-	 * The power constraints need an entire interval to do their magic, so
-	 * skip changing the powerlevel if the time hasn't expired yet  and the
-	 * new level is less than the constraint
-	 */
-	if ((pwr->constraint.type != KGSL_CONSTRAINT_NONE) &&
-		(!time_after(jiffies, pwr->constraint.expires)))
-			*freq = cur_freq;
-	else {
-		/* Change the power level */
-		kgsl_pwrctrl_pwrlevel_change(device, level);
-		if (pwr->constraint.type != KGSL_CONSTRAINT_NONE) {
-			/* Trace the constraint being un-set by the driver */
-			trace_kgsl_constraint(device,
-				pwr->constraint.type,
-				level,
-				0);
-			/*Invalidate the constraint set */
-			pwr->constraint.type = KGSL_CONSTRAINT_NONE;
-		}
-		pwr->constraint.expires = 0;
-
-		*freq = kgsl_pwrctrl_active_freq(pwr);
-	}
+	*freq = kgsl_pwrctrl_active_freq(pwr);
 
 	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 	return 0;
