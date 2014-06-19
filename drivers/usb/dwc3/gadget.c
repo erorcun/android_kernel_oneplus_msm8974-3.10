@@ -614,7 +614,7 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 		dep->stream_capable = true;
 	}
 
-	if (usb_endpoint_xfer_isoc(desc))
+	if (!usb_endpoint_xfer_control(desc))
 		params.param1 |= DWC3_DEPCFG_XFER_IN_PROGRESS_EN;
 
 	/*
@@ -902,7 +902,8 @@ static void dwc3_gadget_ep_free_request(struct usb_ep *ep,
  */
 static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 		struct dwc3_request *req, dma_addr_t dma,
-		unsigned length, unsigned last, unsigned chain, unsigned node)
+		unsigned length, unsigned last, unsigned chain, unsigned node,
+		unsigned ioc)
 {
 	struct dwc3		*dwc = dep->dwc;
 	struct dwc3_trb		*trb;
@@ -953,6 +954,8 @@ update_trb:
 	case USB_ENDPOINT_XFER_BULK:
 	case USB_ENDPOINT_XFER_INT:
 		trb->ctrl = DWC3_TRBCTL_NORMAL;
+		if (ioc)
+			trb->ctrl |= DWC3_TRB_CTRL_IOC;
 		break;
 	default:
 		/*
@@ -1095,6 +1098,7 @@ static void dwc3_prepare_trbs(struct dwc3_ep *dep, bool starting)
 
 			for_each_sg(sg, s, request->num_mapped_sgs, i) {
 				unsigned chain = true;
+				unsigned	ioc = 0;
 
 				length = sg_dma_len(s);
 				dma = sg_dma_address(s);
@@ -1137,6 +1141,7 @@ static void dwc3_prepare_trbs(struct dwc3_ep *dep, bool starting)
 
 					if (trbs_left <= temp)
 						last_one = true;
+
 				}
 
 start_trb_queuing:
@@ -1147,8 +1152,12 @@ start_trb_queuing:
 				if (last_one)
 					chain = false;
 
+				if (!last_one && !chain &&
+					!request->no_interrupt)
+					ioc = 1;
+
 				dwc3_prepare_one_trb(dep, req, dma, length,
-						last_one, chain, i);
+						last_one, chain, i, ioc);
 
 				if (last_one)
 					break;
@@ -1182,7 +1191,7 @@ start_trb_queuing:
 				last_one = 1;
 
 			dwc3_prepare_one_trb(dep, req, dma, length,
-					last_one, false, 0);
+					last_one, false, 0, 0);
 
 			dbg_queue(dep->number, &req->request, 0);
 			if (last_one)
@@ -2487,12 +2496,6 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 		break;
 	case DWC3_DEPEVT_XFERINPROGRESS:
 		dep->dbg_ep_events.xferinprogress++;
-		if (!usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
-			dev_dbg(dwc->dev, "%s is not an Isochronous endpoint\n",
-					dep->name);
-			return;
-		}
-
 		dbg_event(dep->number, "XFRPROG", 0);
 		dwc3_endpoint_transfer_complete(dwc, dep, event, 0);
 		break;
