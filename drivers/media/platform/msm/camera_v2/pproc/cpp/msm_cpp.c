@@ -1334,6 +1334,18 @@ static int msm_cpp_cfg(struct cpp_device *cpp_dev,
 
 	new_frame->cpp_cmd_msg = cpp_frame_msg;
 
+	if (cpp_frame_msg == NULL ||
+		(new_frame->msg_len < MSM_CPP_MIN_FRAME_LENGTH)) {
+		pr_err("%s %d Length is not correct or frame message is missing\n",
+			__func__, __LINE__);
+		return -EINVAL;
+	}
+
+	if (cpp_frame_msg[new_frame->msg_len - 1] != MSM_CPP_MSG_ID_TRAILER) {
+		pr_err("%s %d Invalid frame message\n", __func__, __LINE__);
+		return -EINVAL;
+	}
+
 	in_phyaddr = msm_cpp_fetch_buffer_info(cpp_dev,
 		&new_frame->input_buffer_info,
 		((new_frame->input_buffer_info.identity >> 16) & 0xFFFF),
@@ -1416,6 +1428,12 @@ static int msm_cpp_cfg(struct cpp_device *cpp_dev,
 		(cpp_dev->hw_info.cpp_hw_version == CPP_HW_VERSION_1_1_1) ||
 		(cpp_dev->hw_info.cpp_hw_version == CPP_HW_VERSION_2_0_0))
 		fw_version_1_2_x = 2;
+
+	if ((stripe_base + num_stripes*27 + 1) != new_frame->msg_len) {
+		pr_err("Invalid frame message\n");
+		rc = -EINVAL;
+		goto ERROR3;
+	}
 
 	for (i = 0; i < num_stripes; i++) {
 		cpp_frame_msg[(133 + fw_version_1_2_x) + i * 27] +=
