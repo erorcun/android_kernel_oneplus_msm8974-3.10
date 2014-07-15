@@ -1433,6 +1433,23 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 		}
 	}
 
+	if (!mdwc->vbus_active && mdwc->otg_xceiv &&
+		mdwc->otg_xceiv->state == OTG_STATE_B_PERIPHERAL) {
+		/*
+		 * In some cases, the pm_runtime_suspend may be called by
+		 * usb_bam when there is pending lpm flag. However, if this is
+		 * done when cable was disconnected and otg state has not
+		 * yet changed to IDLE, then it means OTG state machine
+		 * is running and we race against it. So cancel LPM for now,
+		 * and OTG state machine will go for LPM later, after completing
+		 * transition to IDLE state.
+		*/
+		dev_dbg(mdwc->dev,
+			"%s: cable disconnected while not in idle otg state\n",
+			__func__);
+		return -EBUSY;
+	}
+
 	host_ss_active = dwc3_msm_read_reg(mdwc->base, USB3_PORTSC) & PORT_PE;
 
 	if (cancel_delayed_work_sync(&mdwc->chg_work))
