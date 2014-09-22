@@ -1371,6 +1371,7 @@
 		qcom,channel-id = <0>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <0>;
+		#pwm-cells = <2>;
 	};
 
 	pwm@b200 {
@@ -1381,6 +1382,7 @@
 		qcom,channel-id = <1>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <1>;
+		#pwm-cells = <2>;
 	};
 
 	pwm@b300 {
@@ -1391,6 +1393,7 @@
 		qcom,channel-id = <2>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <2>;
+		#pwm-cells = <2>;
 	};
 
 	pwm@b400 {
@@ -1401,6 +1404,7 @@
 		qcom,channel-id = <3>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <3>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_5: pwm@b500 {
@@ -1411,6 +1415,7 @@
 		qcom,channel-id = <4>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <4>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_6: pwm@b600 {
@@ -1421,6 +1426,7 @@
 		qcom,channel-id = <5>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <5>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_7: pwm@b700 {
@@ -1431,6 +1437,7 @@
 		qcom,channel-id = <6>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <6>;
+		#pwm-cells = <2>;
 	};
 
 	pwm@b800 {
@@ -1441,6 +1448,7 @@
 		qcom,channel-id = <7>;
 		qcom,supported-sizes = <6>, <7>, <9>;
 		qcom,ramp-index = <7>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_9: pwm@e400 {
@@ -1451,6 +1459,7 @@
 		qcom,channel-id = <8>;
 		qcom,supported-sizes = <7>, <8>;
 		qcom,ramp-index = <0>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_10: pwm@e500 {
@@ -1461,6 +1470,7 @@
 		qcom,channel-id = <9>;
 		qcom,supported-sizes = <7>, <8>;
 		qcom,ramp-index = <1>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_11: pwm@e600 {
@@ -1471,6 +1481,7 @@
 		qcom,channel-id = <10>;
 		qcom,supported-sizes = <7>, <8>;
 		qcom,ramp-index = <2>;
+		#pwm-cells = <2>;
 	};
 
 	pm8941_pwm_12: pwm@e700 {
@@ -1481,5 +1492,6 @@
 		qcom,channel-id = <11>;
 		qcom,supported-sizes = <7>, <8>;
 		qcom,ramp-index = <3>;
+		#pwm-cells = <2>;
 	};
 };

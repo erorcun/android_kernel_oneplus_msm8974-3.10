@@ -385,6 +385,7 @@
 			reg = <0x5100 0x100>;
 			status = "disabled";
 		};
+
 		msm8x16_wcd_codec@f000{
 			compatible = "qcom,wcd-spmi";
 			reg = <0xf000 0x100>;
