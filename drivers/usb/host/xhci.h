@@ -1,3 +1,4 @@
+
 /*
  * xHCI host controller driver
  *
@@ -1263,6 +1264,7 @@ struct xhci_td {
 
 	/* ZLP received in data stage of a control transfer */
 	bool			zlp_data;
+	bool			urb_length_set;
 };
 
 /* xHCI command default timeout value */
