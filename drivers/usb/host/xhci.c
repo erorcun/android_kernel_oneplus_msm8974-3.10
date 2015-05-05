@@ -35,6 +35,8 @@
 
 #define	PORT_WAKE_BITS	(PORT_WKOC_E | PORT_WKDISC_E | PORT_WKCONN_E)
 
+#define XHCI_INT_MODERATION_VAL 4000
+
 /* Some 0.95 hardware can't handle the chain bit on a Link TRB being cleared */
 static int link_quirk;
 module_param(link_quirk, int, S_IRUGO | S_IWUSR);
@@ -671,7 +673,7 @@ int xhci_run(struct usb_hcd *hcd)
 	xhci_dbg(xhci, "// Set the interrupt modulation register\n");
 	temp = xhci_readl(xhci, &xhci->ir_set->irq_control);
 	temp &= ~ER_IRQ_INTERVAL_MASK;
-	temp |= (u32) 160;
+	temp |= (u32) XHCI_INT_MODERATION_VAL;
 	xhci_writel(xhci, temp, &xhci->ir_set->irq_control);
 
 	/* Set the HCD state before we enable the irqs */
