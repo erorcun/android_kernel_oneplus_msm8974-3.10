@@ -61,7 +61,9 @@ obj-$(CONFIG_QPNP_BMS) += bms-batterydata.o bms-batterydata-desay.o
 obj-$(CONFIG_QPNP_BMS) += bms-batterydata-oem.o bms-batterydata-qrd-4v35-2000mah.o bms-batterydata-qrd-4v2-1300mah.o
 obj-$(CONFIG_ARCH_APQ8084) += board-8084.o board-8084-gpiomux.o
 obj-$(CONFIG_ARCH_APQ8084) += clock-8084.o clock-mdss-8974.o
+ifndef CONFIG_MACH_OPPO
 obj-$(CONFIG_ARCH_MSM8974) += board-8974.o board-8974-gpiomux.o
+endif
 obj-$(CONFIG_ARCH_MSM8974) += clock-rpm-8974.o clock-gcc-8974.o clock-mmss-8974.o clock-lpass-8974.o clock-mdss-8974.o
 obj-$(CONFIG_KRAIT_REGULATOR) += krait-regulator.o  krait-regulator-pmic.o
 obj-$(CONFIG_ARCH_MDM9630) += board-9630.o board-9630-gpiomux.o
@@ -126,6 +128,8 @@ obj-$(CONFIG_MSM_ENABLE_WDOG_DEBUG_CONTROL) += wdog_debug.o
 obj-$(CONFIG_MEMORY_HOLE_CARVEOUT) +=  msm_mem_hole.o
 
 obj-$(CONFIG_MSM_SMCMOD) += smcmod.o
+
+obj-$(CONFIG_MACH_OPPO) += oppo/
 
 obj-$(CONFIG_ARCH_MSM8974) += msm_mpmctr.o
 obj-$(CONFIG_MSM_CPR_REGULATOR) += cpr-regulator.o
