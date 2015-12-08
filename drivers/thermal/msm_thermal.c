@@ -2902,6 +2902,14 @@ static int probe_psm(struct device_node *node, struct msm_thermal_data *data,
 
 	psm_rails = NULL;
 
+	key = "qcom,disable-psm";
+	if (of_property_read_bool(node, key)) {
+		psm_probed = true;
+		psm_enabled = false;
+		psm_rails_cnt = 0;
+		return ret;
+	}
+
 	key = "qcom,pmic-sw-mode-temp";
 	ret = of_property_read_u32(node, key, &data->psm_temp_degC);
 	if (ret)
@@ -3036,6 +3044,13 @@ static int probe_gfx_phase_ctrl(struct device_node *node,
 	const char *tmp_str = NULL;
 	int ret = 0;
 
+	key = "qcom,disable-gfx-phase-ctrl";
+	if (of_property_read_bool(node, key)) {
+		gfx_crit_phase_ctrl_enabled = false;
+		gfx_warm_phase_ctrl_enabled = false;
+		return ret;
+	}
+
 	key = "qcom,gfx-sensor-id";
 	ret = of_property_read_u32(node, key,
 		&data->gfx_sensor);
@@ -3122,6 +3137,12 @@ static int probe_cx_phase_ctrl(struct device_node *node,
 	char *key = NULL;
 	const char *tmp_str;
 	int ret = 0;
+
+	key = "qcom,disable-cx-phase-ctrl";
+	if (of_property_read_bool(node, key)) {
+		cx_phase_ctrl_enabled = false;
+		return ret;
+	}
 
 	key = "qcom,rpm-phase-resource-type";
 	ret = of_property_read_string(node, key,
