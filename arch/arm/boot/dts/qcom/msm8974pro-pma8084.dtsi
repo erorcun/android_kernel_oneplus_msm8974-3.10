@@ -180,6 +180,7 @@
 		/delete-property/ qcom,pmic-sw-mode-temp;
 		/delete-property/ qcom,pmic-sw-mode-temp-hysteresis;
 		/delete-property/ qcom,pmic-sw-mode-regs;
+		qcom,disable-psm;
 	};
 
 	qcom,lpm-resources {

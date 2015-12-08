@@ -78,7 +78,7 @@
 
 		adsp_mem: adsp_region@0 {
 			linux,reserve-contiguous-region;
-			reg = <0 0x3F00000>;
+			reg = <0 0x4100000>;
 			label = "adsp_mem";
 		};
 
@@ -91,8 +91,8 @@
 		audio_mem: audio_region@0 {
 			linux,reserve-contiguous-region;
 			linux,reserve-region;
-			reg = <0 0x614000>;
-			lable = "audio_mem";
+			reg = <0 0xC04000>;
+			label = "audio_mem";
 		};
 	};
 
@@ -1765,12 +1765,15 @@
 		qcom,latency-level = "regular";
 	};
 
-	qcom,msm-pcm-routing {
-		compatible = "qcom,msm-pcm-routing";
+	qcom,msm-pcm-ultra-low-latency {
+		compatible = "qcom,msm-pcm-dsp";
+		qcom,msm-pcm-dsp-id = <2>;
+		qcom,msm-pcm-low-latency;
+		qcom,latency-level = "ultra";
 	};
 
-	qcom,msm-pcm-lpa {
-		compatible = "qcom,msm-pcm-lpa";
+	qcom,msm-pcm-routing {
+		compatible = "qcom,msm-pcm-routing";
 	};
 
 	qcom,msm-compr-dsp {
@@ -2052,6 +2055,7 @@
 		gpios = <&msmgpio 36 0>, <&msmgpio 37 0>, <&msmgpio 38 0>, <&msmgpio 39 0>, <&msmgpio 40 0>;
 		qcom,has-48mhz-xo;
 		qcom,has-pronto-hw;
+		qcom,wcnss-pm = <11 19 1200 1 1 6>;
 	};
 
 	qcom,ocmem@fdd00000 {
@@ -2358,6 +2362,8 @@
 		qcom,pmic-sw-mode-temp = <85>;
 		qcom,pmic-sw-mode-temp-hysteresis = <75>;
 		qcom,pmic-sw-mode-regs = "vdd-dig";
+		qcom,disable-cx-phase-ctrl;
+		qcom,disable-gfx-phase-ctrl;
 		vdd-dig-supply = <&pm8841_s2_floor_corner>;
 		vdd-gfx-supply = <&pm8841_s4_floor_corner>;
 
