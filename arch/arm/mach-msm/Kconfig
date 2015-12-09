@@ -684,6 +684,8 @@ config MSM_SMD_DEBUG
 	  Support for debugging the SMD for communication
 	  between the ARM9 and ARM11
 
+source "arch/arm/mach-msm/oppo/Kconfig"
+
 config MSM_SMP2P
 	bool "SMSM Point-to-Point (SMP2P)"
 	depends on MSM_SMD
