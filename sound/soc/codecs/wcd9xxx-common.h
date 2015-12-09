@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -43,6 +43,8 @@
 
 #define WCD9XXX_CLSAB_REQ_ENABLE  true
 #define WCD9XXX_CLSAB_REQ_DISABLE false
+
+#define WCD9XXX_NON_UHQA_MODE	0
 
 #define WCD9XXX_DMIC_SAMPLE_RATE_DIV_2    0x0
 #define WCD9XXX_DMIC_SAMPLE_RATE_DIV_3    0x1
@@ -126,64 +128,13 @@ enum wcd9xxx_buck_volt {
 	WCD9XXX_CDC_BUCK_MV_2P15 = 2150000,
 };
 
-struct mad_audio_header {
-	u32 reserved[3];
-	u32 num_reg_cfg;
-};
-
-struct mad_microphone_info {
-	uint8_t input_microphone;
-	uint8_t cycle_time;
-	uint8_t settle_time;
-	uint8_t padding;
-} __packed;
-
-struct mad_micbias_info {
-	uint8_t micbias;
-	uint8_t k_factor;
-	uint8_t external_bypass_capacitor;
-	uint8_t internal_biasing;
-	uint8_t cfilter;
-	uint8_t padding[3];
-} __packed;
-
-struct mad_rms_audio_beacon_info {
-	uint8_t rms_omit_samples;
-	uint8_t rms_comp_time;
-	uint8_t detection_mechanism;
-	uint8_t rms_diff_threshold;
-	uint8_t rms_threshold_lsb;
-	uint8_t rms_threshold_msb;
-	uint8_t padding[2];
-	uint8_t iir_coefficients[36];
-} __packed;
-
-struct mad_rms_ultrasound_info {
-	uint8_t rms_comp_time;
-	uint8_t detection_mechanism;
-	uint8_t rms_diff_threshold;
-	uint8_t rms_threshold_lsb;
-	uint8_t rms_threshold_msb;
-	uint8_t padding[3];
-	uint8_t iir_coefficients[36];
-} __packed;
-
-struct mad_audio_cal {
-	uint32_t version;
-	struct mad_microphone_info microphone_info;
-	struct mad_micbias_info micbias_info;
-	struct mad_rms_audio_beacon_info audio_info;
-	struct mad_rms_audio_beacon_info beacon_info;
-	struct mad_rms_ultrasound_info ultrasound_info;
-} __packed;
-
 extern void wcd9xxx_clsh_fsm(struct snd_soc_codec *codec,
 		struct wcd9xxx_clsh_cdc_data *cdc_clsh_d,
 		u8 req_state, bool req_type, u8 clsh_event);
 
 extern void wcd9xxx_enable_high_perf_mode(struct snd_soc_codec *codec,
 				struct wcd9xxx_clsh_cdc_data *clsh_d,
-				u8 req_state, bool req_type);
+				u8 uhqa_mode, u8 req_state, bool req_type);
 
 extern void wcd9xxx_clsh_init(struct wcd9xxx_clsh_cdc_data *clsh,
 			      struct wcd9xxx_resmgr *resmgr);
@@ -265,3 +216,4 @@ enum {
 };
 
 #endif
+

@@ -22,12 +22,9 @@
 #define SYNAPTICS_DS4 (1 << 0)
 #define SYNAPTICS_DS5 (1 << 1)
 #define SYNAPTICS_DSX_DRIVER_PRODUCT (SYNAPTICS_DS4 | SYNAPTICS_DS5)
-#define SYNAPTICS_DSX_DRIVER_VERSION 0x2001
+#define SYNAPTICS_DSX_DRIVER_VERSION 0x1016
 
 #include <linux/version.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 38))
 #define KERNEL_ABOVE_2_6_38
@@ -41,11 +38,10 @@
 
 #define PDT_PROPS (0X00EF)
 #define PDT_START (0x00E9)
-#define PDT_END (0x00D0)
+#define PDT_END (0x000A)
 #define PDT_ENTRY_SIZE (0x0006)
 #define PAGES_TO_SERVICE (10)
 #define PAGE_SELECT_LEN (2)
-#define ADDRESS_WORD_LEN (2)
 
 #define SYNAPTICS_RMI4_F01 (0x01)
 #define SYNAPTICS_RMI4_F11 (0x11)
@@ -54,7 +50,6 @@
 #define SYNAPTICS_RMI4_F34 (0x34)
 #define SYNAPTICS_RMI4_F51 (0x51)
 #define SYNAPTICS_RMI4_F54 (0x54)
-#define SYNAPTICS_RMI4_F55 (0x55)
 
 #define SYNAPTICS_RMI4_PRODUCT_INFO_SIZE 2
 #define SYNAPTICS_RMI4_DATE_CODE_SIZE 3
@@ -62,12 +57,6 @@
 #define SYNAPTICS_RMI4_BUILD_ID_SIZE 3
 
 #define F12_FINGERS_TO_SUPPORT 10
-#define F12_NO_OBJECT_STATUS 0x00
-#define F12_FINGER_STATUS 0x01
-#define F12_STYLUS_STATUS 0x02
-#define F12_PALM_STATUS 0x03
-#define F12_HOVERING_FINGER_STATUS 0x05
-#define F12_GLOVED_FINGER_STATUS 0x06
 
 #define MAX_NUMBER_OF_BUTTONS 4
 #define MAX_INTR_REGISTERS 4
@@ -82,18 +71,19 @@
 #define MASK_2BIT 0x03
 #define MASK_1BIT 0x01
 
-enum exp_fn {
-	RMI_DEV = 0,
-	RMI_F54,
-	RMI_FW_UPDATER,
-	RMI_PROXIMITY,
-	RMI_ACTIVE_PEN,
-	RMI_LAST,
-};
 
-struct synaptics_dsx_hw_interface {
-	const struct synaptics_dsx_board_data *board_data;
-	const struct synaptics_dsx_bus_access *bus_access;
+#define TP_VENDOR_WINTEK	1	//胜华
+#define TP_VENDOR_TPK		2	//TPK
+#define TP_VENDOR_TRULY		3	//信利
+#define TP_VENDOR_YOUNGFAST 4   //洋华
+
+#define TP_TYPE_MAX		2	//we only use wintek and tpk now.
+
+enum LCD_TYPE {
+	LCD_VENDOR_JDI,
+	LCD_VENDOR_TRULY,
+	LCD_VENDOR_SHARP,
+	LCD_TYPE_MAX
 };
 
 /*
@@ -191,9 +181,9 @@ struct synaptics_rmi4_device_info {
 
 /*
  * struct synaptics_rmi4_data - rmi4 device instance data
- * @pdev: pointer to platform device
+ * @i2c_client: pointer to associated i2c client
  * @input_dev: pointer to associated input device
- * @hw_if: pointer to hardware interface data
+ * @board: constant pointer to platform data
  * @rmi4_mod_info: device information
  * @regulator: pointer to associated regulator
  * @rmi4_io_ctrl_mutex: mutex for i2c i/o control
@@ -213,19 +203,18 @@ struct synaptics_rmi4_device_info {
  * @fingers_on_2d: flag to indicate presence of fingers in 2d area
  * @sensor_sleep: flag to indicate sleep state of sensor
  * @wait: wait queue for touch data polling in interrupt thread
+ * @i2c_read: pointer to i2c read function
+ * @i2c_write: pointer to i2c write function
  * @irq_enable: pointer to irq enable function
  */
 struct synaptics_rmi4_data {
-	struct platform_device *pdev;
+	struct i2c_client *i2c_client;
 	struct input_dev *input_dev;
-	const struct synaptics_dsx_hw_interface *hw_if;
+	const struct synaptics_dsx_platform_data *board;
 	struct synaptics_rmi4_device_info rmi4_mod_info;
 	struct regulator *regulator;
 	struct mutex rmi4_reset_mutex;
 	struct mutex rmi4_io_ctrl_mutex;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
-#endif
 	unsigned char current_page;
 	unsigned char button_0d_enabled;
 	unsigned char full_pm_cycle;
@@ -242,6 +231,8 @@ struct synaptics_rmi4_data {
 	unsigned short f01_cmd_base_addr;
 	unsigned short f01_ctrl_base_addr;
 	unsigned short f01_data_base_addr;
+	unsigned short holster_mode_control_addr;
+	unsigned short holster_mode_open_or_close;
 	unsigned int firmware_id;
 	int irq;
 	int sensor_max_x;
@@ -253,58 +244,79 @@ struct synaptics_rmi4_data {
 	bool sensor_sleep;
 	bool stay_awake;
 	bool staying_awake;
+	int (*i2c_read)(struct synaptics_rmi4_data *pdata, unsigned short addr,
+			unsigned char *data, unsigned short length);
+	int (*i2c_write)(struct synaptics_rmi4_data *pdata, unsigned short addr,
+			unsigned char *data, unsigned short length);
 	int (*irq_enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
-	int (*reset_device)(struct synaptics_rmi4_data *rmi4_data);
+	int (*reset_device)(struct synaptics_rmi4_data *rmi4_data,
+			unsigned short f01_cmd_base_addr);
+
+	uint32_t id_gpio;
+	uint32_t wakeup_gpio;
+	uint32_t id3_gpio;
+	uint32_t reset_gpio;
+	uint32_t irq_gpio;
+	struct kobject *properties_kobj;
+	uint32_t virtual_key_height;
+	uint32_t snap_top;
+	uint32_t snap_left;
+	uint32_t snap_right;
+	uint32_t snap_bottom;
+	uint32_t vk_prop_center_y;
+	uint32_t vk_prop_width;
+	uint32_t vk_prop_height;
+	uint32_t vendor_id;
+	uint32_t image_cid;
+	uint32_t device_cid;
+	unsigned short f54_query_base_addr;
+	unsigned short f54_cmd_base_addr;
+	unsigned short f54_ctrl_base_addr;
+	unsigned short f54_data_base_addr;
+	unsigned char gesturemode;
+	bool pwrrunning;
+	unsigned int old_status;
+	unsigned int reset_count; //for reset count
+	unsigned short points[2*7];
+	struct mutex ops_lock;
+	struct notifier_block fb_notif;
+	atomic_t syna_use_gesture;
+	atomic_t double_tap_enable;
+	atomic_t camera_enable;
+	atomic_t music_enable;
+	atomic_t flashlight_enable;
+	unsigned char glove_enable;  //glove mode
+	unsigned char pdoze_enable;  //pdoze mode
+	unsigned char smartcover_enable;  //smartcover mode
+	unsigned char pdoze_status;
+	atomic_t keypad_enable;
+	unsigned char bcontinue;
+	struct workqueue_struct *reportqueue;  //for work queue
+	struct work_struct reportwork;
 };
 
-struct synaptics_dsx_bus_access {
-	unsigned char type;
+enum exp_fn {
+	RMI_DEV = 0,
+	RMI_F54,
+	RMI_FW_UPDATER,
+	RMI_LAST,
+};
+
+struct synaptics_rmi4_exp_fn_ptr {
 	int (*read)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-		unsigned char *data, unsigned short length);
+			unsigned char *data, unsigned short length);
 	int (*write)(struct synaptics_rmi4_data *rmi4_data, unsigned short addr,
-		unsigned char *data, unsigned short length);
+			unsigned char *data, unsigned short length);
+	int (*enable)(struct synaptics_rmi4_data *rmi4_data, bool enable);
 };
 
-struct synaptics_rmi4_exp_fn {
-	enum exp_fn fn_type;
-	int (*init)(struct synaptics_rmi4_data *rmi4_data);
-	void (*remove)(struct synaptics_rmi4_data *rmi4_data);
-	void (*reset)(struct synaptics_rmi4_data *rmi4_data);
-	void (*reinit)(struct synaptics_rmi4_data *rmi4_data);
-	void (*early_suspend)(struct synaptics_rmi4_data *rmi4_data);
-	void (*suspend)(struct synaptics_rmi4_data *rmi4_data);
-	void (*resume)(struct synaptics_rmi4_data *rmi4_data);
-	void (*late_resume)(struct synaptics_rmi4_data *rmi4_data);
-	void (*attn)(struct synaptics_rmi4_data *rmi4_data,
-			unsigned char intr_mask);
-};
+void synaptics_rmi4_dsx_new_function(enum exp_fn fn_type, bool insert,
+		int (*func_init)(struct synaptics_rmi4_data *rmi4_data),
+		void (*func_remove)(struct synaptics_rmi4_data *rmi4_data),
+		void (*func_attn)(struct synaptics_rmi4_data *rmi4_data,
+				unsigned char intr_mask));
 
-int synaptics_rmi4_bus_init(void);
-
-void synaptics_rmi4_bus_exit(void);
-
-void synaptics_rmi4_new_function(struct synaptics_rmi4_exp_fn *exp_fn_module,
-		bool insert);
-
-int synaptics_fw_updater(unsigned char *fw_data);
-
-static inline int synaptics_rmi4_reg_read(
-		struct synaptics_rmi4_data *rmi4_data,
-		unsigned short addr,
-		unsigned char *data,
-		unsigned short len)
-{
-	return rmi4_data->hw_if->bus_access->read(rmi4_data, addr, data, len);
-}
-
-static inline int synaptics_rmi4_reg_write(
-		struct synaptics_rmi4_data *rmi4_data,
-		unsigned short addr,
-		unsigned char *data,
-		unsigned short len)
-{
-	return rmi4_data->hw_if->bus_access->write(rmi4_data, addr, data, len);
-}
+int synaptics_dsx_fw_updater(unsigned char *fw_data);
 
 static inline ssize_t synaptics_rmi4_show_error(struct device *dev,
 		struct device_attribute *attr, char *buf)

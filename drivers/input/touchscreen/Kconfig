@@ -505,6 +505,12 @@ config TOUCHSCREEN_TNETV107X
 	  To compile this driver as a module, choose M here: the
 	  module will be called tnetv107x-ts.
 
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI
+	tristate "Synaptics i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Synaptics RMI over I2C based touchscreens.
+
 config TOUCHSCREEN_SYNAPTICS_RMI4_I2C
 	tristate "Synaptics i2c touchscreen(ClearPad 3000)"
 	depends on I2C
@@ -1006,6 +1012,13 @@ config TOUCHSCREEN_GT9XX
 	  report 5 touches at a time.
 
           If unsure, say N.
+
+config TOUCHSCREEN_SYNAPTICS_S3508_I2C_RMI
+	tristate "Synaptics s3508 I2C touchscreen device"
+	depends on I2C
+	help
+	  This enables support for s3508 I2C RMI touchscreen devices.
+
 
 source "drivers/input/touchscreen/gt9xx/Kconfig"
 

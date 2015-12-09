@@ -44,12 +44,9 @@ enum mbhc_cal_type {
 };
 
 enum mbhc_impedance_detect_stages {
-	MBHC_ZDET_PRE_MEASURE,
-	MBHC_ZDET_POST_MEASURE,
-	MBHC_ZDET_GAIN_1,
-	MBHC_ZDET_GAIN_2,
-	MBHC_ZDET_RAMP_DISABLE,
-	MBHC_ZDET_PA_DISABLE,
+	PRE_MEAS,
+	POST_MEAS,
+	PA_DISABLE,
 };
 
 /* Data used by MBHC */
@@ -246,6 +243,7 @@ struct wcd9xxx_mbhc_config {
 	unsigned long micbias_enable_flags;
 	/* swap_gnd_mic returns true if extern GND/MIC swap switch toggled */
 	bool (*swap_gnd_mic) (struct snd_soc_codec *);
+	bool (*reset_gnd_mic) (struct snd_soc_card *);
 	unsigned long cs_enable_flags;
 	bool use_int_rbias;
 	bool do_recalibration;
@@ -284,19 +282,15 @@ struct wcd9xxx_mbhc_cb {
 	void (*enable_clock_gate) (struct snd_soc_codec *, bool);
 	int (*setup_zdet) (struct wcd9xxx_mbhc *,
 			   enum mbhc_impedance_detect_stages stage);
-	void (*compute_impedance) (struct wcd9xxx_mbhc *, s16 *, s16 *,
-				   uint32_t *, uint32_t *);
-	void (*zdet_error_approx) (struct wcd9xxx_mbhc *, uint32_t *,
-				    uint32_t *);
+	void (*compute_impedance) (s16 *, s16 *, uint32_t *, uint32_t *);
 	void (*enable_mbhc_txfe) (struct snd_soc_codec *, bool);
 	int (*enable_mb_source) (struct snd_soc_codec *, bool, bool);
 	void (*setup_int_rbias) (struct snd_soc_codec *, bool);
 	void (*pull_mb_to_vddio) (struct snd_soc_codec *, bool);
-	bool (*insert_rem_status) (struct snd_soc_codec *);
-	void (*micbias_pulldown_ctrl) (struct wcd9xxx_mbhc *, bool);
-	int (*codec_rco_ctrl) (struct snd_soc_codec *, bool);
+	int (*enable_hpmic_switch) (struct snd_soc_codec *, bool);
 	struct firmware_cal * (*get_hwdep_fw_cal) (struct snd_soc_codec *,
 				enum wcd_cal_type);
+
 };
 
 struct wcd9xxx_mbhc {
@@ -319,12 +313,13 @@ struct wcd9xxx_mbhc {
 	u8 hphlocp_cnt; /* headphone left ocp retry */
 	u8 hphrocp_cnt; /* headphone right ocp retry */
 
+	bool poll_swch_on;
 	/* Work to perform MBHC Firmware Read */
 	struct delayed_work mbhc_firmware_dwork;
 	const struct firmware *mbhc_fw;
-	struct firmware_cal *mbhc_cal;
 
 	struct delayed_work mbhc_insert_dwork;
+	struct firmware_cal *mbhc_cal;
 
 	u8 current_plug;
 	struct work_struct correct_plug_swch;
@@ -377,10 +372,15 @@ struct wcd9xxx_mbhc {
 	/* Holds codec specific interrupt mapping */
 	const struct wcd9xxx_mbhc_intr *intr_ids;
 
+	/* Indicates status of current source switch */
+	bool is_cs_enabled;
+
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_poke;
 	struct dentry *debugfs_mbhc;
 #endif
+
+	struct mutex mbhc_lock;
 };
 
 #define WCD9XXX_MBHC_CAL_SIZE(buttons, rload) ( \
@@ -456,3 +456,4 @@ void *wcd9xxx_mbhc_cal_btn_det_mp(
 int wcd9xxx_mbhc_get_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 			       uint32_t *zr);
 #endif /* __WCD9XXX_MBHC_H__ */
+

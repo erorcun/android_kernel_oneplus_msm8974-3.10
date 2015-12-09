@@ -52,7 +52,7 @@
 /* Number of return values needs to be checked for each
  * registration of Slimbus of I2C bus for each codec
  */
-#define NUM_WCD9XXX_REG_RET	9
+#define NUM_WCD9XXX_REG_RET	8
 
 #define SLIM_USR_MC_REPEAT_CHANGE_VALUE 0x0
 #define SLIM_REPEAT_WRITE_MAX_SLICE 16
@@ -258,7 +258,7 @@ static int wcd9xxx_slim_read_device(struct wcd9xxx *wcd9xxx, unsigned short reg,
 		mutex_unlock(&wcd9xxx->xfer_lock);
 		if (likely(ret == 0) || (--slim_read_tries == 0))
 			break;
-		usleep_range(5000, 5100);
+		usleep_range(5000, 5000);
 	}
 
 	if (ret)
@@ -360,7 +360,7 @@ static int wcd9xxx_slim_write_device(struct wcd9xxx *wcd9xxx,
 		mutex_unlock(&wcd9xxx->xfer_lock);
 		if (likely(ret == 0) || (--slim_write_tries == 0))
 			break;
-		usleep_range(5000, 5100);
+		usleep_range(5000, 5000);
 	}
 
 	if (ret)
@@ -396,12 +396,6 @@ static struct mfd_cell taiko_devs[] = {
 static struct mfd_cell tapan_devs[] = {
 	{
 		.name = "tapan_codec",
-	},
-};
-
-static struct mfd_cell tomtom_devs[] = {
-	{
-		.name = "tomtom_codec",
 	},
 };
 
@@ -452,59 +446,23 @@ static const struct wcd9xxx_codec_type wcd9xxx_codecs[] = {
 		ARRAY_SIZE(tapan_devs), TAPAN_NUM_IRQS, -1,
 		WCD9XXX_SLIM_SLAVE_ADDR_TYPE_TAIKO, 0x03
 	},
-	{
-		TOMTOM_MAJOR, cpu_to_le16(0x0), tomtom_devs,
-		ARRAY_SIZE(tomtom_devs), TOMTOM_NUM_IRQS, 1,
-		WCD9XXX_SLIM_SLAVE_ADDR_TYPE_TAIKO, 0x01
-	},
-	{
-		TOMTOM_MAJOR, cpu_to_le16(0x1), tomtom_devs,
-		ARRAY_SIZE(tomtom_devs), TOMTOM_NUM_IRQS, 2,
-		WCD9XXX_SLIM_SLAVE_ADDR_TYPE_TAIKO, 0x01
-	},
 };
 
 static void wcd9xxx_bring_up(struct wcd9xxx *wcd9xxx)
 {
-	struct wcd9xxx_pdata *pdata = wcd9xxx->dev->platform_data;
-	enum codec_variant cdc_var;
-
-	if (!pdata) {
-		dev_dbg(wcd9xxx->dev, "No platform data to get codec variant, falling back to default\n");
-		cdc_var = WCD9XXX;
-	} else
-		cdc_var = pdata->cdc_variant;
-
-	if (cdc_var == WCD9330) {
-		__wcd9xxx_reg_write(wcd9xxx, WCD9330_A_LEAKAGE_CTL, 0x4);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9330_A_CDC_CTL, 0);
-		usleep_range(5000, 5100);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9330_A_CDC_CTL, 0x1);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9330_A_LEAKAGE_CTL, 0x3);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9330_A_CDC_CTL, 0x3);
-	} else {
-		__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 0x4);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_CDC_CTL, 0);
-		usleep_range(5000, 5100);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_CDC_CTL, 3);
-		__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 3);
-	}
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 0x4);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_CDC_CTL, 0);
+	usleep_range(5000, 5000);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_CDC_CTL, 3);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 3);
 }
 
 static void wcd9xxx_bring_down(struct wcd9xxx *wcd9xxx)
 {
-	struct wcd9xxx_pdata *pdata = wcd9xxx->dev->platform_data;
-	unsigned short reg;
-
-	if (pdata && pdata->cdc_variant == WCD9330)
-		reg = WCD9330_A_LEAKAGE_CTL;
-	else
-		reg = WCD9XXX_A_LEAKAGE_CTL;
-
-	__wcd9xxx_reg_write(wcd9xxx, reg, 0x7);
-	__wcd9xxx_reg_write(wcd9xxx, reg, 0x6);
-	__wcd9xxx_reg_write(wcd9xxx, reg, 0xe);
-	__wcd9xxx_reg_write(wcd9xxx, reg, 0x8);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 0x7);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 0x6);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 0xe);
+	__wcd9xxx_reg_write(wcd9xxx, WCD9XXX_A_LEAKAGE_CTL, 0x8);
 }
 
 static int wcd9xxx_reset(struct wcd9xxx *wcd9xxx)
@@ -681,46 +639,6 @@ static const struct intr_data intr_tbl_v2[] = {
 	{WCD9XXX_IRQ_SPEAKER_CLIPPING, false},
 	{WCD9XXX_IRQ_VBAT_MONITOR_ATTACK, false},
 	{WCD9XXX_IRQ_VBAT_MONITOR_RELEASE, false},
-	{WCD9XXX_IRQ_RESERVED_2, false},
-};
-
-/*
- * Interrupt table for v3 corresponds to newer version
- * codecs (wcd9330)
- */
-static const struct intr_data intr_tbl_v3[] = {
-	{WCD9XXX_IRQ_SLIMBUS, false},
-	{WCD9XXX_IRQ_MBHC_INSERTION, true},
-	{WCD9XXX_IRQ_MBHC_POTENTIAL, true},
-	{WCD9XXX_IRQ_MBHC_RELEASE, true},
-	{WCD9XXX_IRQ_MBHC_PRESS, true},
-	{WCD9XXX_IRQ_MBHC_SHORT_TERM, true},
-	{WCD9XXX_IRQ_MBHC_REMOVAL, true},
-	{WCD9330_IRQ_MBHC_JACK_SWITCH, true},
-	{WCD9XXX_IRQ_BG_PRECHARGE, false},
-	{WCD9XXX_IRQ_PA1_STARTUP, false},
-	{WCD9XXX_IRQ_PA2_STARTUP, false},
-	{WCD9XXX_IRQ_PA3_STARTUP, false},
-	{WCD9XXX_IRQ_PA4_STARTUP, false},
-	{WCD9XXX_IRQ_PA5_STARTUP, false},
-	{WCD9XXX_IRQ_MICBIAS1_PRECHARGE, false},
-	{WCD9XXX_IRQ_MICBIAS2_PRECHARGE, false},
-	{WCD9XXX_IRQ_MICBIAS3_PRECHARGE, false},
-	{WCD9XXX_IRQ_HPH_PA_OCPL_FAULT, false},
-	{WCD9XXX_IRQ_HPH_PA_OCPR_FAULT, false},
-	{WCD9XXX_IRQ_EAR_PA_OCPL_FAULT, false},
-	{WCD9XXX_IRQ_HPH_L_PA_STARTUP, false},
-	{WCD9XXX_IRQ_HPH_R_PA_STARTUP, false},
-	{WCD9320_IRQ_EAR_PA_STARTUP, false},
-	{WCD9330_IRQ_SVASS_ERR_EXCEPTION, false},
-	{WCD9330_IRQ_SVASS_ENGINE, true},
-	{WCD9330_IRQ_MAD_AUDIO, false},
-	{WCD9330_IRQ_MAD_BEACON, false},
-	{WCD9330_IRQ_MAD_ULTRASOUND, false},
-	{WCD9330_IRQ_SPEAKER1_CLIPPING, false},
-	{WCD9330_IRQ_SPEAKER2_CLIPPING, false},
-	{WCD9330_IRQ_VBAT_MONITOR_ATTACK, false},
-	{WCD9330_IRQ_VBAT_MONITOR_RELEASE, false},
 };
 
 static int wcd9xxx_device_init(struct wcd9xxx *wcd9xxx)
@@ -752,9 +670,6 @@ static int wcd9xxx_device_init(struct wcd9xxx *wcd9xxx)
 		|| wcd9xxx->codec_type->id_major == SITAR_MAJOR) {
 		core_res->intr_table = intr_tbl_v1;
 		core_res->intr_table_size = ARRAY_SIZE(intr_tbl_v1);
-	} else if (wcd9xxx->codec_type->id_major == TOMTOM_MAJOR) {
-		core_res->intr_table = intr_tbl_v3;
-		core_res->intr_table_size = ARRAY_SIZE(intr_tbl_v3);
 	} else {
 		core_res->intr_table = intr_tbl_v2;
 		core_res->intr_table_size = ARRAY_SIZE(intr_tbl_v2);
@@ -837,7 +752,7 @@ static int get_parameters(char *buf, long int *param1, int num_of_par)
 			else
 				base = 10;
 
-			if (kstrtoul(token, base, &param1[cnt]) != 0)
+			if (strict_strtoul(token, base, &param1[cnt]) != 0)
 				return -EINVAL;
 
 			token = strsep(&buf, " ");
@@ -953,8 +868,8 @@ static int wcd9xxx_init_supplies(struct wcd9xxx *wcd9xxx,
 					    pdata->regulator[i].min_uV,
 					    pdata->regulator[i].max_uV);
 		if (ret) {
-			pr_err("%s: Setting regulator voltage failed for regulator %s err = %d\n",
-				__func__,
+			pr_err("%s: Setting regulator voltage failed for "
+				"regulator %s err = %d\n", __func__,
 				wcd9xxx->supplies[i].supply, ret);
 			goto err_get;
 		}
@@ -962,8 +877,8 @@ static int wcd9xxx_init_supplies(struct wcd9xxx *wcd9xxx,
 		ret = regulator_set_optimum_mode(wcd9xxx->supplies[i].consumer,
 						pdata->regulator[i].optimum_uA);
 		if (ret < 0) {
-			pr_err("%s: Setting regulator optimum mode failed for regulator %s err = %d\n",
-				__func__,
+			pr_err("%s: Setting regulator optimum mode failed for "
+				"regulator %s err = %d\n", __func__,
 				wcd9xxx->supplies[i].supply, ret);
 			goto err_get;
 		} else {
@@ -1012,20 +927,9 @@ static void wcd9xxx_disable_supplies(struct wcd9xxx *wcd9xxx,
 				     struct wcd9xxx_pdata *pdata)
 {
 	int i;
-	int rc;
 
-	for (i = 0; i < wcd9xxx->num_of_supplies; i++) {
-		if (pdata->regulator[i].ondemand)
-			continue;
-		rc = regulator_disable(wcd9xxx->supplies[i].consumer);
-		if (rc) {
-			pr_err("%s: Failed to disable %s\n", __func__,
-			       wcd9xxx->supplies[i].supply);
-		} else {
-			pr_debug("%s: Disabled regulator %s\n", __func__,
-				 wcd9xxx->supplies[i].supply);
-		}
-	}
+	regulator_bulk_disable(wcd9xxx->num_of_supplies,
+				    wcd9xxx->supplies);
 	for (i = 0; i < wcd9xxx->num_of_supplies; i++) {
 		if (regulator_count_voltages(wcd9xxx->supplies[i].consumer) <=
 		    0)
@@ -1260,7 +1164,7 @@ static int wcd9xxx_i2c_probe(struct i2c_client *client,
 			       __func__);
 			goto err_codec;
 		}
-		usleep_range(5, 10);
+		usleep_range(5, 5);
 
 		ret = wcd9xxx_reset(wcd9xxx);
 		if (ret) {
@@ -1540,7 +1444,6 @@ static struct wcd9xxx_pdata *wcd9xxx_populate_dt_pdata(struct device *dev)
 	const char *static_prop_name = "qcom,cdc-static-supplies";
 	const char *ond_prop_name = "qcom,cdc-on-demand-supplies";
 	const char *cp_supplies_name = "qcom,cdc-cp-supplies";
-	const char *cdc_name;
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
@@ -1648,22 +1551,6 @@ static struct wcd9xxx_pdata *wcd9xxx_populate_dt_pdata(struct device *dev)
 		}
 	}
 	pdata->dmic_sample_rate = dmic_sample_rate;
-
-	ret = of_property_read_string(dev->of_node,
-				"qcom,cdc-variant",
-				&cdc_name);
-	if (ret) {
-		dev_dbg(dev, "Property %s not found in node %s\n",
-				"qcom,cdc-variant",
-				dev->of_node->full_name);
-		pdata->cdc_variant = WCD9XXX;
-	} else {
-		if (!strcmp(cdc_name, "WCD9330"))
-			pdata->cdc_variant = WCD9330;
-		else
-			pdata->cdc_variant = WCD9XXX;
-	}
-
 	return pdata;
 err:
 	devm_kfree(dev, pdata);
@@ -1682,7 +1569,7 @@ static int wcd9xxx_slim_get_laddr(struct slim_device *sb,
 		if (!ret)
 			break;
 		/* Give SLIMBUS time to report present and be ready. */
-		usleep_range(1000, 1100);
+		usleep_range(1000, 1000);
 		pr_debug_ratelimited("%s: retyring get logical addr\n",
 				     __func__);
 	} while time_before(jiffies, timeout);
@@ -1757,7 +1644,7 @@ static int wcd9xxx_slim_probe(struct slim_device *slim)
 		       __func__);
 		goto err_codec;
 	}
-	usleep_range(5, 10);
+	usleep_range(5, 5);
 
 	ret = wcd9xxx_reset(wcd9xxx);
 	if (ret) {
@@ -1907,7 +1794,6 @@ static int wcd9xxx_slim_device_down(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
 
-	dev_info(wcd9xxx->dev, "%s: device down\n", __func__);
 	if (!wcd9xxx) {
 		pr_err("%s: wcd9xxx is NULL\n", __func__);
 		return -EINVAL;
@@ -2055,26 +1941,6 @@ static struct slim_driver tapan_slim_driver = {
 	.device_down = wcd9xxx_slim_device_down,
 };
 
-static const struct slim_device_id tomtom_slimtest_id[] = {
-	{"tomtom-slim-pgd", 0},
-	{}
-};
-
-static struct slim_driver tomtom_slim_driver = {
-	.driver = {
-		.name = "tomtom-slim",
-		.owner = THIS_MODULE,
-	},
-	.probe = wcd9xxx_slim_probe,
-	.remove = wcd9xxx_slim_remove,
-	.id_table = tomtom_slimtest_id,
-	.resume = wcd9xxx_slim_resume,
-	.suspend = wcd9xxx_slim_suspend,
-	.device_up = wcd9xxx_slim_device_up,
-	.reset_device = wcd9xxx_slim_device_reset,
-	.device_down = wcd9xxx_slim_device_down,
-};
-
 static struct i2c_device_id wcd9xxx_id_table[] = {
 	{"wcd9xxx-i2c", WCD9XXX_I2C_TOP_LEVEL},
 	{"wcd9xxx-i2c", WCD9XXX_I2C_ANALOG},
@@ -2099,7 +1965,7 @@ static struct i2c_driver tabla_i2c_driver = {
 	},
 	.id_table               =       tabla_id_table,
 	.probe                  =       wcd9xxx_i2c_probe,
-	.remove                 =       wcd9xxx_i2c_remove,
+	.remove                 =      wcd9xxx_i2c_remove,
 	.resume	= wcd9xxx_i2c_resume,
 	.suspend = wcd9xxx_i2c_suspend,
 };
@@ -2111,7 +1977,7 @@ static struct i2c_driver wcd9xxx_i2c_driver = {
 	},
 	.id_table               =       wcd9xxx_id_table,
 	.probe                  =       wcd9xxx_i2c_probe,
-	.remove                 =       wcd9xxx_i2c_remove,
+	.remove                 =      wcd9xxx_i2c_remove,
 	.resume	= wcd9xxx_i2c_resume,
 	.suspend = wcd9xxx_i2c_suspend,
 };
@@ -2156,10 +2022,6 @@ static int __init wcd9xxx_init(void)
 	if (ret[7])
 		pr_err("Failed to register tapan SB driver: %d\n", ret[7]);
 
-	ret[8] = slim_driver_register(&tomtom_slim_driver);
-	if (ret[8])
-		pr_err("Failed to register tomtom SB driver: %d\n", ret[8]);
-
 	for (i = 0; i < NUM_WCD9XXX_REG_RET; i++) {
 		if (ret[i])
 			return ret[i];
@@ -2177,3 +2039,4 @@ module_exit(wcd9xxx_exit);
 MODULE_DESCRIPTION("Codec core driver");
 MODULE_VERSION("1.0");
 MODULE_LICENSE("GPL v2");
+

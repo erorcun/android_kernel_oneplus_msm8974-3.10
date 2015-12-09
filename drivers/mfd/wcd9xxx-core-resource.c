@@ -195,3 +195,4 @@ void wcd9xxx_set_intf_type(enum wcd9xxx_intf_status intf_status)
 	wcd9xxx_intf = intf_status;
 }
 EXPORT_SYMBOL(wcd9xxx_set_intf_type);
+
