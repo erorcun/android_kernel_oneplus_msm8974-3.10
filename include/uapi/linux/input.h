@@ -474,6 +474,14 @@ struct input_keymap_entry {
 
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
 
+/* Oppo specific keycodes */
+#define KEY_GESTURE_CIRCLE	250
+#define KEY_GESTURE_SWIPE_DOWN	251
+#define KEY_GESTURE_V		252
+#define KEY_GESTURE_LTR		253
+#define KEY_GESTURE_GTR		254
+#define KEY_DOUBLE_TAP      255
+
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
 #define BTN_MISC		0x100
@@ -738,6 +746,7 @@ struct input_keymap_entry {
 
 #define KEY_BRIGHTNESS_MIN		0x250	/* Set Brightness to Minimum */
 #define KEY_BRIGHTNESS_MAX		0x251	/* Set Brightness to Maximum */
+
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
