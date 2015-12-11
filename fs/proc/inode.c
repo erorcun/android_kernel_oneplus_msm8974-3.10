@@ -184,6 +184,61 @@ void proc_entry_rundown(struct proc_dir_entry *de)
 	spin_unlock(&de->pde_unload_lock);
 }
 
+/* ->read_proc() users - legacy crap */
+static ssize_t
+proc_file_read(struct file *file, char __user *buf, size_t nbytes,
+	       loff_t *ppos)
+{
+	struct proc_dir_entry *pde = PDE(file_inode(file));
+	ssize_t rv = -EIO;
+	printk(KERN_INFO "legacy proc read-start.\n");
+	if (use_pde(pde)) {
+		rv = __proc_file_read(file, buf, nbytes, ppos);
+		unuse_pde(pde);
+	}
+	printk(KERN_INFO "legacy proc read-end.\n");
+	return rv;
+}
+
+static loff_t
+proc_file_lseek(struct file *file, loff_t offset, int orig)
+{
+	loff_t retval = -EINVAL;
+	switch (orig) {
+	case 1:
+		offset += file->f_pos;
+	/* fallthrough */
+	case 0:
+		if (offset < 0 || offset > MAX_NON_LFS)
+			break;
+		file->f_pos = retval = offset;
+	}
+	return retval;
+}
+
+static ssize_t
+proc_file_write(struct file *file, const char __user *buffer,
+		size_t count, loff_t *ppos)
+{
+	struct proc_dir_entry *pde = PDE(file_inode(file));
+	ssize_t rv = -EIO;
+	printk(KERN_INFO "legacy proc write-start.\n");
+	if (pde->write_proc) {
+		if (use_pde(pde)) {
+			rv = pde->write_proc(file, buffer, count, pde->data);
+			unuse_pde(pde);
+		}
+	}
+	printk(KERN_INFO "legacy proc write-end.\n");
+	return rv;
+}
+
+const struct file_operations proc_file_operations = {
+	.llseek		= proc_file_lseek,
+	.read		= proc_file_read,
+	.write		= proc_file_write,
+};
+
 static loff_t proc_reg_llseek(struct file *file, loff_t offset, int whence)
 {
 	struct proc_dir_entry *pde = PDE(file_inode(file));

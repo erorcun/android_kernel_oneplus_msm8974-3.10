@@ -29,6 +29,7 @@ struct mempolicy;
  * /proc file has a parent, but "subdir" is NULL for all
  * non-directory entries).
  */
+
 struct proc_dir_entry {
 	unsigned int low_ino;
 	umode_t mode;
@@ -40,6 +41,8 @@ struct proc_dir_entry {
 	const struct file_operations *proc_fops;
 	struct proc_dir_entry *next, *parent, *subdir;
 	void *data;
+	read_proc_t *read_proc;
+	write_proc_t *write_proc;
 	atomic_t count;		/* use count */
 	atomic_t in_use;	/* number of callers into module in progress; */
 			/* negative -> it's going away RSN */
@@ -175,6 +178,9 @@ typedef struct dentry *instantiate_t(struct inode *, struct dentry *,
 extern int proc_fill_cache(struct file *, void *, filldir_t, const char *, int,
 			   instantiate_t, struct task_struct *, const void *);
 
+ssize_t __proc_file_read(struct file *, char __user *, size_t, loff_t *);
+extern const struct file_operations proc_file_operations;
+
 /*
  * generic.c
  */
@@ -204,6 +210,7 @@ struct pde_opener {
 };
 
 extern const struct inode_operations proc_pid_link_inode_operations;
+extern const struct file_operations proc_reclaim_operations;
 
 extern void proc_init_inodecache(void);
 extern struct inode *proc_get_inode(struct super_block *, struct proc_dir_entry *);
