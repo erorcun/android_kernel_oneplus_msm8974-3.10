@@ -307,25 +307,22 @@
 		qcom,android-usb-swfi-latency = <1>;
 	};
 
-	qcom,rmtfs_sharedmem@8e580000 {
+	rmtfs_sharedmem {
 		compatible = "qcom,sharedmem-uio";
 		reg = <0x8e200000 0x160000>;
 		reg-names = "rmtfs";
-		qcom,client-id = <0x00000001>;
 	};
 
-	qcom,dsp_sharedmem@8e6e0000 {
+	dsp_sharedmem {
 		compatible = "qcom,sharedmem-uio";
 		reg = <0x8e360000 0x20000>;
 		reg-names = "rfsa_dsp";
-		qcom,client-id = <0x011013ec>;
 	};
 
-	qcom,mdm_sharedmem@8e6e0000 {
+	mdm_sharedmem {
 		compatible = "qcom,sharedmem-uio";
 		reg = <0x8e360000 0x20000>;
 		reg-names = "rfsa_mdm";
-		qcom,client-id = <0x011013ed>;
 	};
 
 	sdhc_1: sdhci@07824000 {

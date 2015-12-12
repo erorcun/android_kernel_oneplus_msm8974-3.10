@@ -410,11 +410,10 @@
 		qcom,l2-dump-size = <0x300000>;
 	};
 
-	qcom,rmtfs_sharedmem@30000000 {
+	rmtfs_sharedmem {
 		compatible = "qcom,sharedmem-uio";
 		reg = <0x30000000 0x00180000>;
 		reg-names = "rmtfs";
-		qcom,client-id = <0x00000001>;
 	};
 
 	qcom,ion {
