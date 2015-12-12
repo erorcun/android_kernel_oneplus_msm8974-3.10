@@ -1,5 +1,5 @@
-
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,18 +9,27 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
-#ifndef DT_PARSE
-#define DT_PARSE
-#include <linux/of.h>
-#include "msm_vidc_resources.h"
-void msm_vidc_free_platform_resources(
-		struct msm_vidc_platform_resources *res);
+#ifndef __VMEM_H__
+#define __VMEM_H__
 
-int read_hfi_type(struct platform_device *pdev);
+#ifdef CONFIG_MSM_VIDC_VMEM
 
-int read_platform_resources_from_dt(
-		struct msm_vidc_platform_resources *res);
+int vmem_allocate(size_t size, phys_addr_t *addr);
+void vmem_free(phys_addr_t to_free);
+
+#else
+
+int vmem_allocate(size_t size, phys_addr_t *addr)
+{
+	return -ENODEV;
+}
+
+void vmem_free(phys_addr_t to_free)
+{
+}
+
 #endif
+
+#endif /* __VMEM_H__ */
