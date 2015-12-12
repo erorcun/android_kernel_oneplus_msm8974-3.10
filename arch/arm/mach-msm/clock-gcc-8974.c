@@ -2391,7 +2391,7 @@ static struct clk_lookup msm_clocks_gcc_8974[] = {
 	CLK_LOOKUP_OF("core_clk", gcc_blsp1_qup4_spi_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp1_qup5_i2c_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp1_qup5_spi_apps_clk, ""),
-	CLK_LOOKUP_OF("core_clk", gcc_blsp1_qup6_i2c_apps_clk, ""),
+/*	CLK_LOOKUP_OF("core_clk", gcc_blsp1_qup6_i2c_apps_clk, ""), */
 	CLK_LOOKUP_OF("core_clk", gcc_blsp1_qup6_spi_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp1_uart1_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp1_uart2_apps_clk, "f991e000.serial"),
@@ -2408,8 +2408,10 @@ static struct clk_lookup msm_clocks_gcc_8974[] = {
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup1_spi_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup2_i2c_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup2_spi_apps_clk, ""),
+#ifndef CONFIG_MACH_OPPO
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup3_i2c_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup3_spi_apps_clk, ""),
+#endif
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup4_i2c_apps_clk, ""),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup5_i2c_apps_clk, "f9967000.i2c"),
 	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup4_spi_apps_clk, "f9966000.spi"),
@@ -2436,15 +2438,15 @@ static struct clk_lookup msm_clocks_gcc_8974[] = {
 	CLK_LOOKUP_OF("bus_clk",      gcc_ce2_axi_clk,     "qcedev.0"),
 	CLK_LOOKUP_OF("core_clk_src", ce2_clk_src,         "qcedev.0"),
 
-	CLK_LOOKUP_OF("core_clk", gcc_ce2_clk, "fd440000.qcom,qcrypto"),
-	CLK_LOOKUP_OF("iface_clk", gcc_ce2_ahb_clk, "fd440000.qcom,qcrypto"),
-	CLK_LOOKUP_OF("bus_clk", gcc_ce2_axi_clk, "fd440000.qcom,qcrypto"),
-	CLK_LOOKUP_OF("core_clk_src", ce2_clk_src, "fd440000.qcom,qcrypto"),
+	CLK_LOOKUP_OF("core_clk", gcc_ce2_clk, "fd440000.qcrypto"),
+	CLK_LOOKUP_OF("iface_clk", gcc_ce2_ahb_clk, "fd440000.qcrypto"),
+	CLK_LOOKUP_OF("bus_clk", gcc_ce2_axi_clk, "fd440000.qcrypto"),
+	CLK_LOOKUP_OF("core_clk_src", ce2_clk_src, "fd440000.qcrypto"),
 
-	CLK_LOOKUP_OF("core_clk", gcc_ce2_clk, "fd440000.qcom,qcrypto1"),
-	CLK_LOOKUP_OF("iface_clk", gcc_ce2_ahb_clk, "fd440000.qcom,qcrypto1"),
-	CLK_LOOKUP_OF("bus_clk", gcc_ce2_axi_clk, "fd440000.qcom,qcrypto1"),
-	CLK_LOOKUP_OF("core_clk_src", ce2_clk_src, "fd440000.qcom,qcrypto1"),
+	CLK_LOOKUP_OF("core_clk", gcc_ce2_clk, "fd440000.qcrypto1"),
+	CLK_LOOKUP_OF("iface_clk", gcc_ce2_ahb_clk, "fd440000.qcrypto1"),
+	CLK_LOOKUP_OF("bus_clk", gcc_ce2_axi_clk, "fd440000.qcrypto1"),
+	CLK_LOOKUP_OF("core_clk_src", ce2_clk_src, "fd440000.qcrypto1"),
 
 	CLK_LOOKUP_OF("core_clk",     gcc_ce1_clk,         "qseecom"),
 	CLK_LOOKUP_OF("iface_clk",    gcc_ce1_ahb_clk,     "qseecom"),
@@ -2519,6 +2521,10 @@ static struct clk_lookup msm_clocks_gcc_8974[] = {
 	CLK_LOOKUP_OF("iface_clk", gcc_blsp1_ahb_clk, "f9928000.i2c"),
 	CLK_LOOKUP_OF("core_clk",
 			gcc_blsp1_qup6_i2c_apps_clk, "f9928000.i2c"),
+#ifdef CONFIG_MACH_OPPO
+	CLK_LOOKUP_OF("core_clk", gcc_blsp2_qup3_i2c_apps_clk, "f9965000.spi"),
+	CLK_LOOKUP_OF("iface_clk", gcc_blsp2_ahb_clk, "f9965000.spi"),
+#endif
 
 	CLK_LOOKUP_OF("wcnss_debug", wcnss_m_clk, "fb000000.qcom,wcnss-wlan"),
 
