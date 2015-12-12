@@ -20,24 +20,22 @@
 #include <linux/debugfs.h>
 #include <linux/version.h>
 #include <linux/slab.h>
-#include <linux/qcom_iommu.h>
+#include <mach/board.h>
+#include <mach/iommu.h>
 #include <linux/msm_iommu_domains.h>
 #include <media/msm_vidc.h>
-#include "msm_vidc_common.h"
-#include "msm_vidc_debug.h"
 #include "msm_vidc_internal.h"
+#include "msm_vidc_debug.h"
+#include "vidc_hfi_api.h"
+#include "vidc_hfi_api.h"
 #include "msm_vidc_resources.h"
 #include "msm_vidc_res_parse.h"
-#include "venus_boot.h"
-#include "vidc_hfi_api.h"
-
 
 #define BASE_DEVICE_NUMBER 32
-#define EARLY_FIRMWARE_LOAD_DELAY 1000
 
 struct msm_vidc_drv *vidc_driver;
 
-uint32_t msm_vidc_pwr_collapse_delay = 10000;
+uint32_t msm_vidc_pwr_collapse_delay = 2000;
 
 static inline struct msm_vidc_inst *get_vidc_inst(struct file *filp, void *fh)
 {
@@ -53,7 +51,6 @@ static int msm_v4l2_open(struct file *filp)
 	struct msm_vidc_core *core = video_drvdata(filp);
 	struct msm_vidc_inst *vidc_inst;
 
-	trace_msm_v4l2_vidc_open_start("msm_v4l2_open start");
 	vidc_inst = msm_vidc_open(core->id, vid_dev->type);
 	if (!vidc_inst) {
 		dprintk(VIDC_ERR,
@@ -63,7 +60,6 @@ static int msm_v4l2_open(struct file *filp)
 	}
 	clear_bit(V4L2_FL_USES_V4L2_FH, &vdev->flags);
 	filp->private_data = &(vidc_inst->event_handler);
-	trace_msm_v4l2_vidc_open_end("msm_v4l2_open end");
 	return 0;
 }
 
@@ -71,8 +67,6 @@ static int msm_v4l2_close(struct file *filp)
 {
 	int rc = 0;
 	struct msm_vidc_inst *vidc_inst;
-
-	trace_msm_v4l2_vidc_close_start("msm_v4l2_close start");
 	vidc_inst = get_vidc_inst(filp, NULL);
 	rc = msm_vidc_release_buffers(vidc_inst,
 			V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
@@ -81,7 +75,6 @@ static int msm_v4l2_close(struct file *filp)
 			"Failed in %s for release output buffers\n", __func__);
 
 	rc = msm_vidc_close(vidc_inst);
-	trace_msm_v4l2_vidc_close_end("msm_v4l2_close end");
 	return rc;
 }
 
@@ -283,9 +276,6 @@ static const struct v4l2_file_operations msm_v4l2_vidc_fops = {
 	.release = msm_v4l2_close,
 	.ioctl = video_ioctl2,
 	.poll = msm_v4l2_poll,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl32 = v4l2_compat_ioctl32,
-#endif
 };
 
 void msm_vidc_release_video_device(struct video_device *pvdev)
@@ -311,11 +301,11 @@ static int read_platform_resources(struct msm_vidc_core *core,
 		/* Target supports DT, parse from it */
 		return read_platform_resources_from_dt(&core->resources);
 	} else {
-		dprintk(VIDC_ERR, "pdev node is NULL\n");
-		return -EINVAL;
+		/* Legacy board file usage */
+		return read_platform_resources_from_board(
+				&core->resources);
 	}
 }
-
 static int msm_vidc_initialize_core(struct platform_device *pdev,
 				struct msm_vidc_core *core)
 {
@@ -391,104 +381,6 @@ static ssize_t show_pwr_collapse_delay(struct device *dev,
 static DEVICE_ATTR(pwr_collapse_delay, 0644, show_pwr_collapse_delay,
 		store_pwr_collapse_delay);
 
-static ssize_t show_thermal_level(struct device *dev,
-		struct device_attribute *attr,
-		char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", vidc_driver->thermal_level);
-}
-
-static ssize_t store_thermal_level(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t count)
-{
-	int rc = 0, val = 0;
-
-	rc = kstrtoint(buf, 0, &val);
-	if (rc || val < 0) {
-		dprintk(VIDC_WARN,
-			"Invalid thermal level value: %s\n", buf);
-		return -EINVAL;
-	}
-	dprintk(VIDC_DBG, "Thermal level old %d new %d\n",
-			vidc_driver->thermal_level, val);
-
-	if (val == vidc_driver->thermal_level)
-		return count;
-	vidc_driver->thermal_level = val;
-
-	msm_comm_handle_thermal_event();
-	return count;
-}
-
-static DEVICE_ATTR(thermal_level, S_IRUGO | S_IWUSR, show_thermal_level,
-		store_thermal_level);
-
-static struct attribute *msm_vidc_core_attrs[] = {
-		&dev_attr_pwr_collapse_delay.attr,
-		&dev_attr_thermal_level.attr,
-		NULL
-};
-
-static struct attribute_group msm_vidc_core_attr_group = {
-		.attrs = msm_vidc_core_attrs,
-};
-
-struct fw_load_handler_data {
-	struct msm_vidc_core *core;
-	struct delayed_work work;
-};
-
-
-static void fw_load_handler(struct work_struct *work)
-{
-	struct msm_vidc_core *core = NULL;
-	struct fw_load_handler_data *handler = NULL;
-	int rc = 0;
-
-	handler = container_of(work, struct fw_load_handler_data,
-			work.work);
-	if (!handler || !handler->core) {
-		dprintk(VIDC_ERR, "%s - invalid work or core handle\n",
-				__func__);
-		goto exit;
-	}
-	core = handler->core;
-
-	rc = msm_comm_load_fw(core);
-	if (rc) {
-		dprintk(VIDC_ERR, "%s - failed to load fw\n", __func__);
-		goto exit;
-	}
-
-	rc = msm_comm_check_core_init(core);
-	if (rc) {
-		dprintk(VIDC_ERR, "%s - failed to init core\n", __func__);
-		goto exit;
-	}
-	dprintk(VIDC_DBG, "%s - firmware loaded successfully\n", __func__);
-
-exit:
-	kfree(handler);
-}
-
-static void load_firmware(struct msm_vidc_core *core)
-{
-	struct fw_load_handler_data *handler = NULL;
-
-	handler = kzalloc(sizeof(*handler), GFP_KERNEL);
-	if (!handler) {
-		dprintk(VIDC_ERR,
-			"%s - failed to allocate sys error handler\n",
-			__func__);
-		return;
-	}
-	handler->core = core;
-	INIT_DELAYED_WORK(&handler->work, fw_load_handler);
-	schedule_delayed_work(&handler->work,
-			msecs_to_jiffies(EARLY_FIRMWARE_LOAD_DELAY));
-}
-
 static int msm_vidc_probe(struct platform_device *pdev)
 {
 	int rc = 0;
@@ -508,10 +400,10 @@ static int msm_vidc_probe(struct platform_device *pdev)
 		dprintk(VIDC_ERR, "Failed to init core\n");
 		goto err_core_init;
 	}
-	rc = sysfs_create_group(&pdev->dev.kobj, &msm_vidc_core_attr_group);
+	rc = device_create_file(&pdev->dev, &dev_attr_pwr_collapse_delay);
 	if (rc) {
 		dprintk(VIDC_ERR,
-				"Failed to create attributes\n");
+				"Failed to create pwr_collapse_delay sysfs node");
 		goto err_core_init;
 	}
 	if (core->hfi_type == VIDC_HFI_Q6) {
@@ -585,21 +477,12 @@ static int msm_vidc_probe(struct platform_device *pdev)
 		mutex_lock(&vidc_driver->lock);
 		vidc_driver->num_cores--;
 		mutex_unlock(&vidc_driver->lock);
-		rc = PTR_ERR(core->device) ?: -EBADHANDLE;
+		rc = PTR_ERR(core->device);
 		if (rc != -EPROBE_DEFER)
 			dprintk(VIDC_ERR, "Failed to create HFI device\n");
 		else
 			dprintk(VIDC_DBG, "msm_vidc: request probe defer\n");
 		goto err_cores_exceeded;
-	}
-
-	if (core->resources.use_non_secure_pil) {
-		rc = venus_boot_init(&core->resources);
-		if (rc) {
-			dprintk(VIDC_ERR,
-				"Failed to init non-secure PIL %d\n", rc);
-			goto err_non_sec_pil_init;
-		}
 	}
 
 	mutex_lock(&vidc_driver->lock);
@@ -608,13 +491,8 @@ static int msm_vidc_probe(struct platform_device *pdev)
 	core->debugfs_root = msm_vidc_debugfs_init_core(
 		core, vidc_driver->debugfs_root);
 	pdev->dev.platform_data = core;
-
-	if (core->resources.early_fw_load)
-		load_firmware(core);
-
 	return rc;
-err_non_sec_pil_init:
-	vidc_hfi_deinitialize(core->hfi_type, core->device);
+
 err_cores_exceeded:
 	device_remove_file(&core->vdev[MSM_VIDC_ENCODER].vdev.dev,
 			&dev_attr_link_name);
@@ -628,7 +506,7 @@ err_dec_attr_link_name:
 err_dec_register:
 	v4l2_device_unregister(&core->v4l2_dev);
 err_v4l2_register:
-	sysfs_remove_group(&pdev->dev.kobj, &msm_vidc_core_attr_group);
+	device_remove_file(&pdev->dev, &dev_attr_pwr_collapse_delay);
 err_core_init:
 	kfree(core);
 err_no_mem:
@@ -651,9 +529,6 @@ static int msm_vidc_remove(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (core->resources.use_non_secure_pil)
-		venus_boot_deinit();
-
 	vidc_hfi_deinitialize(core->hfi_type, core->device);
 	device_remove_file(&core->vdev[MSM_VIDC_ENCODER].vdev.dev,
 				&dev_attr_link_name);
@@ -664,7 +539,6 @@ static int msm_vidc_remove(struct platform_device *pdev)
 	v4l2_device_unregister(&core->v4l2_dev);
 
 	msm_vidc_free_platform_resources(&core->resources);
-	sysfs_remove_group(&pdev->dev.kobj, &msm_vidc_core_attr_group);
 	kfree(core);
 	return rc;
 }
