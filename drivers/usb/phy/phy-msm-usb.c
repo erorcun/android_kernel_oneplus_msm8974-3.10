@@ -90,7 +90,7 @@ module_param(lpm_disconnect_thresh , uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(lpm_disconnect_thresh,
 	"Delay before entering LPM on USB disconnect");
 
-static bool floated_charger_enable;
+static bool floated_charger_enable = 1;
 module_param(floated_charger_enable , bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(floated_charger_enable,
 	"Whether to enable floated charger");
@@ -1430,12 +1430,12 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 			goto psy_error;
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
-	} else if (motg->cur_power > 0 && (mA == 0 || mA == 2)) {
+	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2) && (motg->chg_type == USB_INVALID_CHARGER)) {
 		/* Disable charging */
 		if (power_supply_set_online(psy, false))
 			goto psy_error;
-		/* Set max current limit */
-		if (power_supply_set_current_limit(psy, 0))
+		/* Set max current limit in uA */
+		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
 	} else {
 		if (power_supply_set_online(psy, true))
@@ -1649,6 +1649,10 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 	if (on) {
 		msm_otg_notify_host_mode(motg, on);
 		ret = regulator_enable(vbus_otg);
+		#ifdef VENDOR_EDIT/*dengnw@bsp.drv  for OTG delay  20141226*/
+		pr_err("oppo_otg able to enable vbus_otg\n");
+		msleep(500);
+		#endif
 		if (ret) {
 			pr_err("unable to enable vbus_otg\n");
 			return;
@@ -1656,6 +1660,13 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 		vbus_is_on = true;
 	} else {
 		ret = regulator_disable(vbus_otg);
+		#ifdef VENDOR_EDIT/*dengnw@bsp.drv  for OTG delay  20141226*/
+		if (ret) {
+			msleep(10);
+			ret = regulator_disable(vbus_otg);
+			msleep(5);
+		}
+		#endif
 		if (ret) {
 			pr_err("unable to disable vbus_otg\n");
 			return;
@@ -2725,12 +2736,12 @@ static void msm_otg_sm_work(struct work_struct *w)
 					/* fall through */
 				case USB_PROPRIETARY_CHARGER:
 					msm_otg_notify_charger(motg,
-							IDEV_CHG_MAX);
+							2000);
 					pm_runtime_put_sync(otg->phy->dev);
 					break;
 				case USB_FLOATED_CHARGER:
 					msm_otg_notify_charger(motg,
-							IDEV_CHG_MAX);
+							2000);
 					pm_runtime_put_noidle(otg->phy->dev);
 					pm_runtime_suspend(otg->phy->dev);
 					break;
@@ -3784,6 +3795,11 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = psy->type;
 		break;
+#ifdef CONFIG_MACH_OPPO
+	case POWER_SUPPLY_PROP_POWER_NOW:
+		val->intval = motg->power_now;
+		break;
+#endif
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = motg->usbin_health;
 		break;
@@ -3817,6 +3833,11 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		psy->type = val->intval;
 		break;
+#ifdef CONFIG_MACH_OPPO
+	case POWER_SUPPLY_PROP_POWER_NOW:
+		motg->power_now = val->intval;
+		break;
+#endif
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;
 		break;
@@ -3857,6 +3878,9 @@ static enum power_supply_property otg_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_TYPE,
+#ifdef CONFIG_MACH_OPPO
+	POWER_SUPPLY_PROP_POWER_NOW,
+#endif
 };
 
 const struct file_operations msm_otg_bus_fops = {

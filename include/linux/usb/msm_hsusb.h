@@ -478,6 +478,9 @@ struct msm_otg {
 	bool ext_chg_opened;
 	bool ext_chg_active;
 	struct completion ext_chg_wait;
+#ifdef CONFIG_MACH_OPPO
+	unsigned int		power_now;
+#endif
 	int ui_enabled;
 	bool pm_done;
 };
