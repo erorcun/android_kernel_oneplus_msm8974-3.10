@@ -1438,6 +1438,9 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 		/* Enable charging */
 		if (power_supply_set_online(psy, true))
 			goto psy_error;
+		if (motg->chg_type == USB_INVALID_CHARGER) {
+			power_supply_set_online(dotg->psy, false);
+		}
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
 	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2) && (motg->chg_type == USB_INVALID_CHARGER)) {
@@ -2808,11 +2811,16 @@ static void msm_otg_sm_work(struct work_struct *w)
 						OTG_STATE_B_PERIPHERAL;
 					break;
 				case USB_SDP_CHARGER:
+					/* hack to always power from SDP charger */
+					msm_otg_notify_charger(motg,
+							CONFIG_USB_GADGET_VBUS_DRAW);
 					msm_otg_start_peripheral(otg, 1);
 					otg->phy->state =
 						OTG_STATE_B_PERIPHERAL;
 					mod_timer(&motg->chg_check_timer,
 							CHG_RECHECK_DELAY);
+					power_supply_set_online(&motg->usb_psy, true);
+					power_supply_changed(&motg->usb_psy);
 					break;
 				default:
 					break;
