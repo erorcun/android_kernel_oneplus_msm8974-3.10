@@ -540,12 +540,7 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 #endif
 		power_supply_type = POWER_SUPPLY_TYPE_USB_DCP;
 	else
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
-		power_supply_type = POWER_SUPPLY_TYPE_BATTERY;
-#else
 		power_supply_type = POWER_SUPPLY_TYPE_UNKNOWN;
-#endif
 
 	power_supply_set_supply_type(dotg->psy, power_supply_type);
 
@@ -561,7 +556,7 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	if (dotg->charger->max_power == mA)
 		return 0;
 
-	dev_info(phy->dev, "Avail curr from USB = %u\n", mA);
+	dev_info(phy->dev, "Avail curr from USB = %u , old = %u , is USB = %u\n", mA, dotg->charger->max_power, power_supply_type == POWER_SUPPLY_TYPE_USB);
 
 	if (dotg->charger->max_power <= 2 && mA > 2) {
 		/* Enable charging */
@@ -800,10 +795,19 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					work = 1;
 					break;
 				case DWC3_SDP_CHARGER:
+#ifdef CONFIG_MACH_OPPO
+					/* hack to always power from SDP charger */
+					dwc3_otg_set_power(phy,
+							CONFIG_USB_GADGET_VBUS_DRAW);
+#endif
 					dwc3_otg_start_peripheral(&dotg->otg,
 									1);
 					phy->state = OTG_STATE_B_PERIPHERAL;
 					work = 1;
+#ifdef CONFIG_MACH_OPPO
+					power_supply_set_online(dotg->psy, true);
+					power_supply_changed(dotg->psy);
+#endif
 					break;
 				case DWC3_FLOATED_CHARGER:
 /* OPPO 2013-10-05 wangjc Modify begin for support non-standard charger */
