@@ -399,11 +399,11 @@ static inline int xhci_try_enable_msi(struct usb_hcd *hcd)
 static inline void xhci_cleanup_msix(struct xhci_hcd *xhci)
 {
 }
-
+/*
 static inline void xhci_msix_sync_irqs(struct xhci_hcd *xhci)
 {
 }
-
+*/
 #endif
 
 static void compliance_mode_recovery(unsigned long arg)
