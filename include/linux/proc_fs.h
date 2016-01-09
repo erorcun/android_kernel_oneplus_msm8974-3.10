@@ -7,11 +7,6 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 
-typedef	int (read_proc_t)(char *page, char **start, off_t off,
-			  int count, int *eof, void *data);
-typedef	int (write_proc_t)(struct file *file, const char __user *buffer,
-			   unsigned long count, void *data);
-
 struct proc_dir_entry;
 
 #ifdef CONFIG_PROC_FS
@@ -39,10 +34,6 @@ static inline struct proc_dir_entry *proc_create(
 	return proc_create_data(name, mode, parent, proc_fops, NULL);
 }
 
-extern struct proc_dir_entry *proc_create_legacy(const char *name,
-	umode_t mode, struct proc_dir_entry *base, 
-	read_proc_t *read_proc, write_proc_t *write_proc, void *data);
-
 extern void proc_set_size(struct proc_dir_entry *, loff_t);
 extern void proc_set_user(struct proc_dir_entry *, kuid_t, kgid_t);
 extern void *PDE_DATA(const struct inode *);
@@ -65,10 +56,6 @@ static inline struct proc_dir_entry *proc_mkdir_data(const char *name,
 	umode_t mode, struct proc_dir_entry *parent, void *data) { return NULL; }
 static inline struct proc_dir_entry *proc_mkdir_mode(const char *name,
 	umode_t mode, struct proc_dir_entry *parent) { return NULL; }
-static inline struct proc_dir_entry *proc_create_legacy(const char *name,
-	umode_t mode, struct proc_dir_entry *base, 
-	read_proc_t *read_proc, write_proc_t *write_proc, void * data) { return NULL; }
-
 #define proc_create(name, mode, parent, proc_fops) ({NULL;})
 #define proc_create_data(name, mode, parent, proc_fops, data) ({NULL;})
 
