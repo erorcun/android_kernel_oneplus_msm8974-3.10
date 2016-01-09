@@ -3827,11 +3827,6 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = psy->type;
 		break;
-#ifdef CONFIG_MACH_OPPO
-	case POWER_SUPPLY_PROP_POWER_NOW:
-		val->intval = motg->power_now;
-		break;
-#endif
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = motg->usbin_health;
 		break;
@@ -3868,11 +3863,6 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		psy->type = val->intval;
 		break;
-#ifdef CONFIG_MACH_OPPO
-	case POWER_SUPPLY_PROP_POWER_NOW:
-		motg->power_now = val->intval;
-		break;
-#endif
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;
 		break;
@@ -3913,9 +3903,6 @@ static enum power_supply_property otg_pm_power_props_usb[] = {
 	POWER_SUPPLY_PROP_CURRENT_MAX,
 	POWER_SUPPLY_PROP_SCOPE,
 	POWER_SUPPLY_PROP_TYPE,
-#ifdef CONFIG_MACH_OPPO
-	POWER_SUPPLY_PROP_POWER_NOW,
-#endif
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 };
 
