@@ -204,6 +204,9 @@ enum sdc_mpm_pin_state {
 #define NUM_TUNING_PHASES		16
 #define MAX_DRV_TYPES_SUPPORTED_HS200	3
 
+/* Timeout value to avoid infinite waiting for pwr_irq */
+#define MSM_PWR_IRQ_TIMEOUT_MS 5000
+
 static const u32 tuning_block_64[] = {
 	0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
 	0xDDFFDFFF, 0xFBFFFBFF, 0xFF7FFFBF, 0xEFBDF777,
@@ -959,6 +962,11 @@ static int sdhci_msm_hs400_dll_calibration(struct sdhci_host *host)
 	ret = msm_config_cm_dll_phase(host, msm_host->saved_tuning_phase);
 	if (ret)
 		goto out;
+
+	/* Write 1 to CMD_DAT_TRACK_SEL field in DLL_CONFIG */		
+	writel_relaxed((readl_relaxed(host->ioaddr + CORE_DLL_CONFIG)		
+				| CORE_CMD_DAT_TRACK_SEL),		
+				host->ioaddr + CORE_DLL_CONFIG);
 
 	if (msm_host->use_cdclp533)
 		/* Calibrate CDCLP533 DLL HW */
@@ -2612,8 +2620,10 @@ static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
 	 */
 	if (done)
 		init_completion(&msm_host->pwr_irq_completion);
-	else
-		wait_for_completion(&msm_host->pwr_irq_completion);
+	else if (!wait_for_completion_timeout(&msm_host->pwr_irq_completion,
+				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
+		__WARN_printf("%s: request(%d) timed out waiting for pwr_irq\n",
+							mmc_hostname(host->mmc), req_type);
 
 	pr_debug("%s: %s: request %d done\n", mmc_hostname(host->mmc),
 			__func__, req_type);
@@ -3370,6 +3380,10 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 	/* Reset the core and Enable SDHC mode */
 	core_memres = platform_get_resource_byname(pdev,
 				IORESOURCE_MEM, "core_mem");
+	if (!core_memres) {
+		dev_err(&pdev->dev, "Failed to get iomem resource\n");
+		goto vreg_deinit;
+	}
 	msm_host->core_mem = devm_ioremap(&pdev->dev, core_memres->start,
 					resource_size(core_memres));
 
