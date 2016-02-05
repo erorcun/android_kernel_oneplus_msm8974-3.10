@@ -80,19 +80,13 @@ static int vfe_probe(struct platform_device *pdev)
 	vfe_dev = kzalloc(sizeof(struct vfe_device), GFP_KERNEL);
 	if (!vfe_dev) {
 		pr_err("%s: no enough memory\n", __func__);
-		rc = -ENOMEM;
-		goto end;
+		return -ENOMEM;
 	}
 
 	if (pdev->dev.of_node) {
 		of_property_read_u32((&pdev->dev)->of_node,
 			"cell-index", &pdev->id);
 		match_dev = of_match_device(msm_vfe_dt_match, &pdev->dev);
-		if (!match_dev) {
-			pr_err("%s: No vfe hardware info\n", __func__);
-			rc = -EINVAL;
-			goto probe_fail;
-		}
 		vfe_dev->hw_info =
 			(struct msm_vfe_hardware_info *) match_dev->data;
 	} else {
@@ -102,8 +96,7 @@ static int vfe_probe(struct platform_device *pdev)
 
 	if (!vfe_dev->hw_info) {
 		pr_err("%s: No vfe hardware info\n", __func__);
-		rc = -EINVAL;
-		goto probe_fail;
+		return -EINVAL;
 	}
 	ISP_DBG("%s: device id = %d\n", __func__, pdev->id);
 
@@ -111,8 +104,8 @@ static int vfe_probe(struct platform_device *pdev)
 	rc = vfe_dev->hw_info->vfe_ops.core_ops.get_platform_data(vfe_dev);
 	if (rc < 0) {
 		pr_err("%s: failed to get platform resources\n", __func__);
-		rc = -ENOMEM;
-		goto probe_fail;
+		kfree(vfe_dev);
+		return -ENOMEM;
 	}
 
 	INIT_LIST_HEAD(&vfe_dev->tasklet_q);
@@ -141,7 +134,8 @@ static int vfe_probe(struct platform_device *pdev)
 	rc = msm_sd_register(&vfe_dev->subdev);
 	if (rc != 0) {
 		pr_err("%s: msm_sd_register error = %d\n", __func__, rc);
-		goto probe_fail;
+		kfree(vfe_dev);
+		goto end;
 	}
 
 	vfe_dev->buf_mgr = &vfe_buf_mgr;
@@ -151,40 +145,12 @@ static int vfe_probe(struct platform_device *pdev)
 		&vfe_vb2_ops, &vfe_layout);
 	if (rc < 0) {
 		pr_err("%s: Unable to create buffer manager\n", __func__);
-		rc = -EINVAL;
-		goto probe_fail;
+		kfree(vfe_dev);
+		return -EINVAL;
 	}
-	/* create secure context banks*/
-	if (vfe_dev->hw_info->num_iommu_secure_ctx) {
-		/*secure vfe layout*/
-		struct msm_iova_layout vfe_secure_layout = {
-			.partitions = &vfe_partition,
-			.npartitions = 1,
-			.client_name = "vfe_secure",
-			.domain_flags = 0,
-			.is_secure = MSM_IOMMU_DOMAIN_SECURE,
-		};
-		rc = msm_isp_create_secure_domain(vfe_dev->buf_mgr,
-			&vfe_secure_layout);
-		if (rc < 0) {
-			pr_err("%s: fail to create secure domain\n", __func__);
-			msm_sd_unregister(&vfe_dev->subdev);
-			rc = -EINVAL;
-			goto probe_fail;
-		}
-	}
-
 	vfe_dev->buf_mgr->ops->register_ctx(vfe_dev->buf_mgr,
-		&vfe_dev->iommu_ctx[0], &vfe_dev->iommu_secure_ctx[0],
-		vfe_dev->hw_info->num_iommu_ctx,
-		vfe_dev->hw_info->num_iommu_secure_ctx);
-
-	vfe_dev->buf_mgr->init_done = 1;
+		&vfe_dev->iommu_ctx[0], vfe_dev->hw_info->num_iommu_ctx);
 	vfe_dev->vfe_open_cnt = 0;
-	return rc;
-
-probe_fail:
-	kfree(vfe_dev);
 end:
 	return rc;
 }

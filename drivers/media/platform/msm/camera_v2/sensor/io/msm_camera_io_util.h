@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundataion. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundataion. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,7 +15,7 @@
 
 #include <linux/regulator/consumer.h>
 #include <linux/gpio.h>
-#include <soc/qcom/camera2.h>
+#include <mach/camera2.h>
 #include <media/msm_cam_sensor.h>
 
 #define NO_SET_RATE -1
@@ -28,8 +28,6 @@ u32 msm_camera_io_r_mb(void __iomem *addr);
 void msm_camera_io_dump(void __iomem *addr, int size);
 void msm_camera_io_memcpy(void __iomem *dest_addr,
 		void __iomem *src_addr, u32 len);
-void msm_camera_io_memcpy_mb(void __iomem *dest_addr,
-	void __iomem *src_addr, u32 len);
 int msm_cam_clk_sel_src(struct device *dev, struct msm_cam_clk_info *clk_info,
 		struct msm_cam_clk_info *clk_src_info, int num_clk);
 int msm_cam_clk_enable(struct device *dev, struct msm_cam_clk_info *clk_info,

@@ -101,7 +101,6 @@ enum ispif_cfg_type_t {
 	ISPIF_INIT,
 	ISPIF_CFG,
 	ISPIF_START_FRAME_BOUNDARY,
-	ISPIF_RESTART_FRAME_BOUNDARY,
 	ISPIF_STOP_FRAME_BOUNDARY,
 	ISPIF_STOP_IMMEDIATELY,
 	ISPIF_RELEASE,
@@ -123,3 +122,4 @@ struct ispif_cfg_data {
 	_IOWR('V', BASE_VIDIOC_PRIVATE, struct ispif_cfg_data)
 
 #endif /* MSM_CAM_ISPIF_H */
+

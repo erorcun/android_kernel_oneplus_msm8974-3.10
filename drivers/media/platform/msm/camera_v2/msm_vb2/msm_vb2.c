@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,10 +20,6 @@ static int msm_vb2_queue_setup(struct vb2_queue *q,
 	int i;
 	struct msm_v4l2_format_data *data = q->drv_priv;
 
-	if (!data) {
-		pr_err("%s: drv_priv NULL\n", __func__);
-		return -EINVAL;
-	}
 	if (data->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
 		if (WARN_ON(data->num_planes > VIDEO_MAX_PLANES))
 			return -EINVAL;
@@ -226,7 +222,6 @@ static int msm_vb2_put_buf(struct vb2_buffer *vb, int session_id,
 {
 	struct msm_stream *stream;
 	struct msm_vb2_buffer *msm_vb2;
-	struct vb2_buffer *vb2_buf = NULL;
 	int rc = 0;
 	unsigned long flags;
 	stream = msm_get_stream(session_id, stream_id);
@@ -235,17 +230,6 @@ static int msm_vb2_put_buf(struct vb2_buffer *vb, int session_id,
 
 	spin_lock_irqsave(&stream->stream_lock, flags);
 	if (vb) {
-		list_for_each_entry(msm_vb2, &(stream->queued_list), list) {
-			vb2_buf = &(msm_vb2->vb2_buf);
-			if (vb2_buf == vb)
-				break;
-		}
-		if (vb2_buf != vb) {
-			pr_err("VB buffer is INVALID vb=%p, ses_id=%d, str_id=%d\n",
-					vb, session_id, stream_id);
-			spin_unlock_irqrestore(&stream->stream_lock, flags);
-			return -EINVAL;
-		}
 		msm_vb2 =
 			container_of(vb, struct msm_vb2_buffer, vb2_buf);
 		if (msm_vb2->in_freeq) {
@@ -254,8 +238,7 @@ static int msm_vb2_put_buf(struct vb2_buffer *vb, int session_id,
 		} else
 			rc = -EINVAL;
 	} else {
-		pr_err(" VB buffer is null for ses_id=%d, str_id=%d\n",
-			    session_id, stream_id);
+		pr_err("%s: VB buffer is null\n", __func__);
 		rc = -EINVAL;
 	}
 	spin_unlock_irqrestore(&stream->stream_lock, flags);
@@ -268,7 +251,6 @@ static int msm_vb2_buf_done(struct vb2_buffer *vb, int session_id,
 	unsigned long flags;
 	struct msm_vb2_buffer *msm_vb2;
 	struct msm_stream *stream;
-	struct vb2_buffer *vb2_buf = NULL;
 	int rc = 0;
 
 	stream = msm_get_stream(session_id, stream_id);
@@ -276,17 +258,6 @@ static int msm_vb2_buf_done(struct vb2_buffer *vb, int session_id,
 		return 0;
 	spin_lock_irqsave(&stream->stream_lock, flags);
 	if (vb) {
-		list_for_each_entry(msm_vb2, &(stream->queued_list), list) {
-			vb2_buf = &(msm_vb2->vb2_buf);
-			if (vb2_buf == vb)
-				break;
-		}
-		if (vb2_buf != vb) {
-			pr_err("VB buffer is INVALID ses_id=%d, str_id=%d, vb=%p\n",
-				    session_id, stream_id, vb);
-			spin_unlock_irqrestore(&stream->stream_lock, flags);
-			return -EINVAL;
-		}
 		msm_vb2 =
 			container_of(vb, struct msm_vb2_buffer, vb2_buf);
 		/* put buf before buf done */
@@ -297,10 +268,10 @@ static int msm_vb2_buf_done(struct vb2_buffer *vb, int session_id,
 		} else
 			rc = -EINVAL;
 	} else {
-		pr_err(" VB buffer is NULL for ses_id=%d, str_id=%d\n",
-			    session_id, stream_id);
+		pr_err("%s: VB buffer is null\n", __func__);
 		rc = -EINVAL;
 	}
+
 	spin_unlock_irqrestore(&stream->stream_lock, flags);
 	return rc;
 }

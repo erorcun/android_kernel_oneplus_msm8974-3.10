@@ -2279,3 +2279,4 @@ struct msm_ver_num_info {
 	(handle |= (0x1 << 7) | (data & 0x7F))
 
 #endif /* __UAPI_MSM_CAMERA_H */
+

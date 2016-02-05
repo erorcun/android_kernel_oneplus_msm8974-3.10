@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,18 +14,13 @@
 
 #include <linux/i2c.h>
 #include <linux/gpio.h>
-#include <soc/qcom/camera2.h>
+#include <mach/camera2.h>
 #include <media/v4l2-subdev.h>
 #include <media/msmb_camera.h>
 #include "msm_camera_i2c.h"
-#include "msm_camera_dt_util.h"
-#include "msm_camera_io_util.h"
-
 
 #define DEFINE_MSM_MUTEX(mutexname) \
 	static struct mutex mutexname = __MUTEX_INITIALIZER(mutexname)
-
-#define	MSM_ACTUATOT_MAX_VREGS (10)
 
 struct msm_actuator_ctrl_t;
 
@@ -41,7 +36,7 @@ struct msm_actuator_func_tbl {
 	int32_t (*actuator_init_step_table)(struct msm_actuator_ctrl_t *,
 		struct msm_actuator_set_info_t *);
 	int32_t (*actuator_init_focus)(struct msm_actuator_ctrl_t *,
-		uint16_t, struct reg_settings_t *);
+		uint16_t, enum msm_actuator_data_type, struct reg_settings_t *);
 	int32_t (*actuator_set_default_focus) (struct msm_actuator_ctrl_t *,
 			struct msm_actuator_move_params_t *);
 	int32_t (*actuator_move_focus) (struct msm_actuator_ctrl_t *,
@@ -53,20 +48,11 @@ struct msm_actuator_func_tbl {
 			struct damping_params_t *,
 			int8_t,
 			int16_t);
-	int32_t (*actuator_set_position)(struct msm_actuator_ctrl_t *,
-		struct msm_actuator_set_position_t *);
-	int32_t (*actuator_park_lens)(struct msm_actuator_ctrl_t *);
 };
 
 struct msm_actuator {
 	enum actuator_type act_type;
 	struct msm_actuator_func_tbl func_tbl;
-};
-
-struct msm_actuator_vreg {
-	struct camera_vreg_t *cam_vreg;
-	void *data[MSM_ACTUATOT_MAX_VREGS];
-	int num_vreg;
 };
 
 struct msm_actuator_ctrl_t {
@@ -91,6 +77,8 @@ struct msm_actuator_ctrl_t {
 	struct msm_actuator_reg_params_t reg_tbl[MAX_ACTUATOR_REG_TBL_SIZE];
 	uint16_t region_size;
 	void *user_data;
+	uint32_t vcm_pwd;
+	uint32_t vcm_enable;
 	uint32_t total_steps;
 	uint16_t pwd_step;
 	uint16_t initial_code;
@@ -99,9 +87,6 @@ struct msm_actuator_ctrl_t {
 	enum cci_i2c_master_t cci_master;
 	uint32_t subdev_id;
 	enum msm_actuator_state_t actuator_state;
-	struct msm_actuator_vreg vreg_cfg;
-	struct park_lens_data_t park_lens;
-	uint32_t max_code_size;
 };
 
 #endif
