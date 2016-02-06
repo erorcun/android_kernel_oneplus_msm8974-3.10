@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -257,8 +257,10 @@ static unsigned long msm_cpp_queue_buffer_info(struct cpp_device *cpp_dev,
 	return buff->map_info.phy_addr;
 
 QUEUE_BUFF_ERROR2:
-	ion_free(cpp_dev->client, buff->map_info.ion_handle);
+	ion_unmap_iommu(cpp_dev->client, buff->map_info.ion_handle,
+		cpp_dev->domain_num, 0);
 QUEUE_BUFF_ERROR1:
+	ion_free(cpp_dev->client, buff->map_info.ion_handle);
 	buff->map_info.ion_handle = NULL;
 	kzfree(buff);
 
@@ -827,10 +829,7 @@ static void cpp_load_fw(struct cpp_device *cpp_dev, char *fw_name_bin)
 
 		/*Start firmware loading*/
 		msm_cpp_write(MSM_CPP_CMD_FW_LOAD, cpp_dev->base);
-		if (fw)
-			msm_cpp_write(fw->size, cpp_dev->base);
-		else
-			msm_cpp_write(MSM_CPP_END_ADDRESS, cpp_dev->base);
+		msm_cpp_write(fw->size, cpp_dev->base);
 		msm_cpp_write(MSM_CPP_START_ADDRESS, cpp_dev->base);
 
 		if (ptr_bin) {
@@ -2028,13 +2027,6 @@ static int cpp_probe(struct platform_device *pdev)
 	cpp_dev->timer_wq = create_workqueue("msm_cpp_workqueue");
 	cpp_dev->work = kmalloc(sizeof(struct msm_cpp_work_t),
 		GFP_KERNEL);
-
-	if (!cpp_dev->work) {
-		pr_err("no enough memory\n");
-		rc = -ENOMEM;
-		goto CPP_PROBE_INIT_ERROR;
-	}
-
 	INIT_WORK((struct work_struct *)cpp_dev->work, msm_cpp_do_timeout_work);
 	cpp_dev->cpp_open_cnt = 0;
 	cpp_dev->is_firmware_loaded = 0;
