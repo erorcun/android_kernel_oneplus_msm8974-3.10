@@ -15,11 +15,11 @@
 #include <linux/module.h>
 #include <linux/pm_qos.h>
 #include <linux/clk.h>
-#include <mach/clk.h>
 #include <linux/io.h>
+#include <linux/clk/msm-clk.h>
 
 #include <mach/camera.h>
-#include <mach/iommu_domains.h>
+#include <linux/msm_iommu_domains.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
 
