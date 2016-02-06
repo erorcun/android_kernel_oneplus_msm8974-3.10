@@ -37,6 +37,12 @@ enum msm_bus_perf_setting {
 	S_EXIT
 };
 
+enum cci_i2c_master_t {
+	MASTER_0,
+	MASTER_1,
+	MASTER_MAX,
+};
+
 struct msm_camera_slave_info {
 	uint16_t sensor_slave_addr;
 	uint16_t sensor_id_reg_addr;
@@ -66,8 +72,6 @@ struct msm_camera_power_ctrl_t {
 	struct device *dev;
 	struct msm_sensor_power_setting *power_setting;
 	uint16_t power_setting_size;
-	struct msm_sensor_power_setting *power_down_setting;
-	uint16_t power_down_setting_size;
 	struct msm_camera_gpio_conf *gpio_conf;
 	struct camera_vreg_t *cam_vreg;
 	int num_vreg;
@@ -78,16 +82,18 @@ struct msm_camera_power_ctrl_t {
 
 struct msm_camera_sensor_board_info {
 	const char *sensor_name;
-	const char *eeprom_name;
-	const char *actuator_name;
 	struct msm_camera_slave_info *slave_info;
 	struct msm_camera_csi_lane_params *csi_lane_params;
+	struct camera_vreg_t *cam_vreg;
+	int num_vreg;
 	struct msm_camera_sensor_strobe_flash_data *strobe_flash_data;
+	struct msm_camera_gpio_conf *gpio_conf;
 	struct msm_actuator_info *actuator_info;
+	struct msm_camera_i2c_conf *i2c_conf;
 	struct msm_sensor_info_t *sensor_info;
+	struct msm_sensor_init_params *sensor_init_params;
 	const char *misc_regulator;
 	struct msm_camera_power_ctrl_t power_info;
-	struct msm_camera_sensor_slave_info *cam_slave_info;
 };
 
 enum msm_camera_i2c_cmd_type {
@@ -145,3 +151,4 @@ struct msm_eeprom_board_info {
 };
 
 #endif
+
