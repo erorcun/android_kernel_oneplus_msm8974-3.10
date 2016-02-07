@@ -740,7 +740,7 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 	}
 	case GET_SOC_HW_VER:
 		*cfg_data = vfe_dev->soc_hw_version;
-		break;
+/*		break;
 	case GET_MAX_CLK_RATE: {
 		int rc = 0;
 
@@ -771,7 +771,7 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 		isp_id = (uint32_t *)cfg_data;
 		*isp_id = vfe_dev->pdev->id;
 	}
-	}
+*/	}
 	return 0;
 }
 
