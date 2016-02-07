@@ -348,12 +348,6 @@ static int msm_isp_get_buf(struct msm_isp_buf_mgr *buf_mgr, uint32_t id,
 				rc = -EINVAL;
 			}
 		}
-		break;
-	default:
-		pr_err("%s: Incorrect buf source.\n", __func__);
-		rc = -EINVAL;
-		spin_unlock_irqrestore(&bufq->bufq_lock, flags);
-		return rc;
 	}
 
 	if (!(*buf_info)) {
