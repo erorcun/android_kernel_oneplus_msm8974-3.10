@@ -486,7 +486,7 @@ static void msm_vfe44_reg_update(struct vfe_device *vfe_dev)
 }
 
 static long msm_vfe44_reset_hardware(struct vfe_device *vfe_dev ,
-				enum msm_isp_reset_type reset_type)
+	enum msm_isp_reset_type reset_type, uint32_t blocking)
 {
 	init_completion(&vfe_dev->reset_complete);
 	msm_camera_io_w_mb(0x1FF, vfe_dev->vfe_base + 0xC);
@@ -1013,7 +1013,8 @@ static void msm_vfe44_update_ping_pong_addr(
 		VFE44_PING_PONG_BASE(wm_idx, pingpong_status));
 }
 
-static long msm_vfe44_axi_halt(struct vfe_device *vfe_dev)
+static long msm_vfe44_axi_halt(struct vfe_device *vfe_dev,
+	uint32_t blocking)
 {
 	uint32_t halt_mask;
 	halt_mask = msm_camera_io_r(vfe_dev->vfe_base + 0x2C);
