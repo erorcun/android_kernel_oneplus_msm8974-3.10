@@ -1406,6 +1406,18 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	return 0;
 }
 
+#ifdef CONFIG_MSM_AVTIMER
+void msm_isp_end_avtimer(void)
+{
+       avcs_core_disable_power_collapse(0);
+}
+#else
+void msm_isp_end_avtimer(void)
+{
+       pr_err("AV Timer is not supported\n");
+}
+#endif
+
 int msm_isp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);

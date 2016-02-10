@@ -323,7 +323,7 @@ struct msm_vfe_axi_composite_info {
 };
 
 struct msm_vfe_src_info {
-	uint32_t frame_id;
+	unsigned long frame_id;
 	uint8_t active;
 	uint8_t pix_stream_count;
 	uint8_t raw_stream_count;
@@ -355,7 +355,7 @@ struct msm_vfe_axi_shared_data {
 	enum msm_isp_camif_update_state pipeline_update;
 	struct msm_vfe_src_info src_info[VFE_SRC_MAX];
 	uint16_t stream_handle_cnt;
-	uint32_t event_mask;
+	unsigned long event_mask;
 };
 
 struct msm_vfe_stats_hardware_info {
@@ -424,6 +424,29 @@ struct msm_vfe_error_info {
 	uint32_t error_count;
 };
 
+struct msm_vfe_frame_ts {
+	struct timeval buf_time;
+	uint32_t frame_id;
+};
+
+struct msm_isp_statistics {
+	int32_t imagemaster0_overflow;
+	int32_t imagemaster1_overflow;
+	int32_t imagemaster2_overflow;
+	int32_t imagemaster3_overflow;
+	int32_t imagemaster4_overflow;
+	int32_t imagemaster5_overflow;
+	int32_t imagemaster6_overflow;
+	int32_t be_overflow;
+	int32_t bg_overflow;
+	int32_t bf_overflow;
+	int32_t awb_overflow;
+	int32_t rs_overflow;
+	int32_t cs_overflow;
+	int32_t ihist_overflow;
+	int32_t skinbhist_overflow;
+};
+
 struct vfe_device {
 	struct platform_device *pdev;
 	struct msm_sd_subdev subdev;
@@ -467,12 +490,14 @@ struct vfe_device {
 	struct msm_vfe_axi_shared_data axi_data;
 	struct msm_vfe_stats_shared_data stats_data;
 	struct msm_vfe_error_info error_info;
+	struct msm_vfe_frame_ts frame_ts;
 	struct msm_isp_buf_mgr *buf_mgr;
 	int dump_reg;
 	int vfe_clk_idx;
 	uint32_t vfe_open_cnt;
 	uint8_t vt_enable;
 	uint8_t ignore_error;
+	struct msm_isp_statistics *stats;
 };
 
 #endif

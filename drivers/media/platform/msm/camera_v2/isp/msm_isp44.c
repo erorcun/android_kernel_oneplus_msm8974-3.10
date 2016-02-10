@@ -195,15 +195,6 @@ static int msm_vfe44_init_hardware(struct vfe_device *vfe_dev)
 		goto vbif_remap_failed;
 	}
 
-<<<<<<< HEAD
-	vfe_dev->vfe_avtimer_base = ioremap(vfe_dev->vfe_avtimer_mem->start,
-		resource_size(vfe_dev->vfe_avtimer_mem));
-	if (!vfe_dev->vfe_avtimer_base) {
-		rc = -ENOMEM;
-		pr_err("%s: vfe_avtimer ioremap failed\n", __func__);
-		goto avtimer_remap_failed;
-	}
-
 	vfe_dev->tcsr_base = ioremap(vfe_dev->tcsr_mem->start,
 		resource_size(vfe_dev->tcsr_mem));
 	if (!vfe_dev->tcsr_base) {
@@ -212,8 +203,6 @@ static int msm_vfe44_init_hardware(struct vfe_device *vfe_dev)
 		goto tcsr_remap_failed;
 	}
 
-=======
->>>>>>> parent of ef2b8b8... msm: camera: Support reading avtimer registers
 	rc = request_irq(vfe_dev->vfe_irq->start, msm_isp_process_irq,
 		IRQF_TRIGGER_RISING, "vfe", vfe_dev);
 	if (rc < 0) {
@@ -224,8 +213,6 @@ static int msm_vfe44_init_hardware(struct vfe_device *vfe_dev)
 irq_req_failed:
 	iounmap(vfe_dev->tcsr_base);
 tcsr_remap_failed:
-	iounmap(vfe_dev->vfe_avtimer_base);
-avtimer_remap_failed:
 	iounmap(vfe_dev->vfe_vbif_base);
 vbif_remap_failed:
 	iounmap(vfe_dev->vfe_base);
@@ -248,7 +235,6 @@ static void msm_vfe44_release_hardware(struct vfe_device *vfe_dev)
 	iounmap(vfe_dev->tcsr_base);
 	iounmap(vfe_dev->vfe_vbif_base);
 	iounmap(vfe_dev->vfe_base);
-	iounmap(vfe_dev->vfe_avtimer_base);
 	msm_cam_clk_enable(&vfe_dev->pdev->dev, msm_vfe44_clk_info,
 		vfe_dev->vfe_clk, ARRAY_SIZE(msm_vfe44_clk_info), 0);
 	regulator_disable(vfe_dev->fs_vfe);
