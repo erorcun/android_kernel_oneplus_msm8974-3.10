@@ -195,6 +195,14 @@ static int msm_vfe44_init_hardware(struct vfe_device *vfe_dev)
 		goto vbif_remap_failed;
 	}
 
+	vfe_dev->vfe_avtimer_base = ioremap(vfe_dev->vfe_avtimer_mem->start,
+		resource_size(vfe_dev->vfe_avtimer_mem));
+	if (!vfe_dev->vfe_avtimer_base) {
+		rc = -ENOMEM;
+		pr_err("%s: vfe_avtimer ioremap failed\n", __func__);
+		goto avtimer_remap_failed;
+	}
+
 	vfe_dev->tcsr_base = ioremap(vfe_dev->tcsr_mem->start,
 		resource_size(vfe_dev->tcsr_mem));
 	if (!vfe_dev->tcsr_base) {
@@ -216,6 +224,8 @@ tcsr_remap_failed:
 	iounmap(vfe_dev->vfe_vbif_base);
 vbif_remap_failed:
 	iounmap(vfe_dev->vfe_base);
+avtimer_remap_failed:
+	iounmap(vfe_dev->vfe_avtimer_base);
 vfe_remap_failed:
 	msm_cam_clk_enable(&vfe_dev->pdev->dev, msm_vfe44_clk_info,
 		vfe_dev->vfe_clk, ARRAY_SIZE(msm_vfe44_clk_info), 0);
@@ -1338,6 +1348,15 @@ static int msm_vfe44_get_platform_data(struct vfe_device *vfe_dev)
 		rc = -ENODEV;
 		goto vfe_no_resource;
 	}
+
+	vfe_dev->vfe_avtimer_mem = platform_get_resource_byname(
+		vfe_dev->pdev,
+		IORESOURCE_MEM, "vfe_avtimer");
+	if (!vfe_dev->vfe_avtimer_mem) {
+		pr_err("%s: no mem resource?\n", __func__);
+		rc = -ENODEV;
+		goto vfe_no_resource;
+		}
 
 	vfe_dev->tcsr_mem = platform_get_resource_byname(vfe_dev->pdev,
 		IORESOURCE_MEM, "tcsr");
