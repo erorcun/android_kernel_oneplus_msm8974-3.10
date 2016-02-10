@@ -778,7 +778,7 @@ static void msm_vfe44_update_camif_state(struct vfe_device *vfe_dev,
 		vfe_dev->ignore_error = 1;
 		vfe_dev->hw_info->vfe_ops.axi_ops.halt(vfe_dev, 1);
 		msm_camera_io_w_mb(0x6, vfe_dev->vfe_base + 0x2F4);
-		vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, ISP_RST_HARD);
+		vfe_dev->hw_info->vfe_ops.core_ops.reset_hw(vfe_dev, ISP_RST_HARD, 1);
 		vfe_dev->hw_info->vfe_ops.core_ops.init_hw_reg(vfe_dev);
 		vfe_dev->axi_data.src_info[VFE_PIX_0].active = 0;
 		vfe_dev->ignore_error = 0;

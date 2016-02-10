@@ -293,7 +293,7 @@ int msm_isp_unsubscribe_event(struct v4l2_subdev *sd, struct v4l2_fh *fh,
 	}
 	return rc;
 }
-
+/*
 static int msm_isp_get_max_clk_rate(struct vfe_device *vfe_dev, long *rate)
 {
 	int           clk_idx = 0;
@@ -330,7 +330,7 @@ static int msm_isp_get_max_clk_rate(struct vfe_device *vfe_dev, long *rate)
 	*rate = round_rate;
 	return 0;
 }
-
+*/
 static int msm_isp_set_clk_rate(struct vfe_device *vfe_dev, long *rate)
 {
 	int rc = 0;
