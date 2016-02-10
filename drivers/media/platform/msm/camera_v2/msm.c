@@ -722,7 +722,8 @@ int msm_post_event(struct v4l2_event *event, int timeout)
 	if (list_empty_careful(&cmd_ack->command_q.list)) {
 		if (!rc) {
 			pr_err("%s: Timed out\n", __func__);
-			rc = -ETIMEDOUT;
+			mutex_unlock(&session->lock);
+			return -ETIMEDOUT;
 		}
 		if (rc < 0) {
 			pr_err("%s: rc = %d\n", __func__, rc);
