@@ -2294,38 +2294,38 @@ static inline u32 mdss_mdp_mpq_pipe_num_map(u32 pipe_num)
 void mdss_mdp_set_roi(struct mdss_mdp_ctl *ctl,
 		struct mdp_display_commit *data)
 {
-	struct mdss_rect l_roi, r_roi;
+	struct mdss_rect l_roi, /*r_roi*/;
 
 	l_roi.x = data->l_roi.x;
 	l_roi.y = data->l_roi.y;
 	l_roi.w = data->l_roi.w;
 	l_roi.h = data->l_roi.h;
 
-	r_roi.x = data->r_roi.x;
+/*	r_roi.x = data->r_roi.x;
 	r_roi.y = data->r_roi.y;
 	r_roi.w = data->r_roi.w;
-	r_roi.h = data->r_roi.h;
+	r_roi.h = data->r_roi.h; */
 
 	/* Reset ROI when we have (1) invalid ROI (2) feature disabled */
 	if ((!l_roi.w && l_roi.h) || (l_roi.w && !l_roi.h) ||
-		(!r_roi.w && r_roi.h) || (r_roi.w && !r_roi.h) ||
+//		(!r_roi.w && r_roi.h) || (r_roi.w && !r_roi.h) ||
 		(!l_roi.w && !l_roi.h && !r_roi.w && !r_roi.h) ||
 		!ctl->panel_data->panel_info.partial_update_enabled) {
 		l_roi = (struct mdss_rect)
 		{0, 0, ctl->mixer_left->width, ctl->mixer_left->height};
 
-		if (ctl->mixer_right) {
+/*		if (ctl->mixer_right) {
 			r_roi = (struct mdss_rect)
 				{0, 0, ctl->mixer_right->width,
 				ctl->mixer_right->height};
 		}
-	}
+*/	}
 
 	mdss_mdp_set_mixer_roi(ctl, &l_roi);
 
-	if (ctl->mixer_right)
+/*	if (ctl->mixer_right)
 		mdss_mdp_set_mixer_roi(ctl->mixer_right->ctl, &r_roi);
-}
+*/}
 
 static void mdss_mdp_mixer_setup(struct mdss_mdp_ctl *master_ctl,
 	int mixer_mux)

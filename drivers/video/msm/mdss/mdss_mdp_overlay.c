@@ -1446,11 +1446,11 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	} else {
 		temp_data.l_roi = (struct mdp_rect){0, 0,
 			ctl->mixer_left->width, ctl->mixer_left->height};
-		if (ctl->mixer_right) {
+/*		if (ctl->mixer_right) {
 			temp_data.r_roi = (struct mdp_rect) {0, 0,
 			ctl->mixer_right->width, ctl->mixer_right->height};
 		}
-		mdss_mdp_set_roi(ctl, &temp_data);
+*/		mdss_mdp_set_roi(ctl, &temp_data);
 	}
 
 
