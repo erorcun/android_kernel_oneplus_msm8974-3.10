@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,7 +17,7 @@
 #include <linux/delay.h>
 #include "msm_vidc_internal.h"
 
-#define VIDC_DBG_TAG "msm_vidc: %4s: "
+#define VIDC_DBG_TAG "msm_vidc: %d: "
 
 /* To enable messages OR these values and
  * echo the result to debugfs file.
@@ -52,59 +52,22 @@ extern int msm_vidc_debug_out;
 extern int msm_fw_debug;
 extern int msm_fw_debug_mode;
 extern int msm_fw_low_power_mode;
+extern int msm_vp8_low_tier;
 extern int msm_vidc_hw_rsp_timeout;
-extern int msm_vidc_vpe_csc_601_to_709;
-extern int msm_vidc_dcvs_mode;
-extern int msm_vidc_sys_idle_indicator;
-
-#define VIDC_MSG_PRIO2STRING(__level) ({ \
-	char *__str; \
-	\
-	switch (__level) { \
-	case VIDC_ERR: \
-		__str = "err"; \
-		break; \
-	case VIDC_WARN: \
-		__str = "warn"; \
-		break; \
-	case VIDC_INFO: \
-		__str = "info"; \
-		break; \
-	case VIDC_DBG: \
-		__str = "dbg"; \
-		break; \
-	case VIDC_PROF: \
-		__str = "prof"; \
-		break; \
-	case VIDC_PKT: \
-		__str = "pkt"; \
-		break; \
-	case VIDC_FW: \
-		__str = "fw"; \
-		break; \
-	default: \
-		__str = "????"; \
-		break; \
-	} \
-	\
-	__str; \
-	})
+extern u32 msm_vidc_firmware_unload_delay;
 
 #define dprintk(__level, __fmt, arg...)	\
 	do { \
 		if (msm_vidc_debug & __level) { \
 			if (msm_vidc_debug_out == VIDC_OUT_PRINTK) { \
-				pr_info(VIDC_DBG_TAG __fmt, \
-						VIDC_MSG_PRIO2STRING(__level), \
-						## arg); \
+				printk(KERN_DEBUG VIDC_DBG_TAG \
+						__fmt, __level, ## arg); \
 			} else if (msm_vidc_debug_out == VIDC_OUT_FTRACE) { \
-				trace_printk(KERN_DEBUG VIDC_DBG_TAG __fmt, \
-						VIDC_MSG_PRIO2STRING(__level), \
-						## arg); \
+				trace_printk(KERN_DEBUG VIDC_DBG_TAG \
+						__fmt, __level, ## arg); \
 			} \
 		} \
 	} while (0)
-
 
 
 struct dentry *msm_vidc_debugfs_init_drv(void);
@@ -154,7 +117,7 @@ static inline void show_stats(struct msm_vidc_inst *i)
 				i->debug.pdata[x].name,
 				i->debug.pdata[x].cumulative /
 					i->debug.samples);
-			dprintk(VIDC_PROF, "%s Samples: %d\n",
+			dprintk(VIDC_PROF, "%s Samples: %d",
 					i->debug.pdata[x].name,
 					i->debug.samples);
 		}

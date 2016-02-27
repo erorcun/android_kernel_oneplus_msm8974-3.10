@@ -14,7 +14,6 @@
 #ifndef __VIDC_HFI_API_H__
 #define __VIDC_HFI_API_H__
 
-#include <linux/log2.h>
 #include <linux/platform_device.h>
 #include <linux/types.h>
 #include <media/msm_vidc.h>
@@ -45,11 +44,7 @@
 #define HAL_BUFFERFLAG_ENDOFSUBFRAME    0x00000400
 #define HAL_BUFFERFLAG_EOSEQ            0x00200000
 #define HAL_BUFFERFLAG_MBAFF            0x08000000
-#define HAL_BUFFERFLAG_YUV_601_709_CSC_CLAMP   0x10000000
 #define HAL_BUFFERFLAG_DROP_FRAME       0x20000000
-#define HAL_BUFFERFLAG_TS_DISCONTINUITY	0x40000000
-#define HAL_BUFFERFLAG_TS_ERROR		0x80000000
-
 
 
 #define HAL_DEBUG_MSG_LOW				0x00000001
@@ -57,11 +52,6 @@
 #define HAL_DEBUG_MSG_HIGH				0x00000004
 #define HAL_DEBUG_MSG_ERROR				0x00000008
 #define HAL_DEBUG_MSG_FATAL				0x00000010
-#define MAX_PROFILE_COUNT	16
-
-#define HAL_MAX_MATRIX_COEFFS 9
-#define HAL_MAX_BIAS_COEFFS 3
-#define HAL_MAX_LIMIT_COEFFS 6
 
 enum vidc_status {
 	VIDC_ERR_NONE = 0x0,
@@ -83,7 +73,6 @@ enum vidc_status {
 	VIDC_ERR_NO_VALID_SESSION,
 	VIDC_ERR_TIMEOUT,
 	VIDC_ERR_CMDQFULL,
-	VIDC_ERR_START_CODE_NOT_FOUND,
 	VIDC_ERR_CLIENT_PRESENT = 0x90000001,
 	VIDC_ERR_CLIENT_FATAL,
 	VIDC_ERR_CMD_QUEUE_FULL,
@@ -107,13 +96,11 @@ enum hal_extradata_id {
 	HAL_EXTRADATA_METADATA_FILLER,
 	HAL_EXTRADATA_ASPECT_RATIO,
 	HAL_EXTRADATA_MPEG2_SEQDISP,
-	HAL_EXTRADATA_STREAM_USERDATA,
 	HAL_EXTRADATA_FRAME_QP,
 	HAL_EXTRADATA_FRAME_BITS_INFO,
-	HAL_EXTRADATA_INPUT_CROP,
-	HAL_EXTRADATA_DIGITAL_ZOOM,
 	HAL_EXTRADATA_LTR_INFO,
 	HAL_EXTRADATA_METADATA_MBI,
+	HAL_EXTRADATA_STREAM_USERDATA,
 };
 
 enum hal_property {
@@ -192,17 +179,11 @@ enum hal_property {
 	HAL_PARAM_VENC_MAX_NUM_B_FRAMES,
 	HAL_PARAM_BUFFER_ALLOC_MODE,
 	HAL_PARAM_VDEC_FRAME_ASSEMBLY,
-	HAL_PARAM_VENC_H264_VUI_BITSTREAM_RESTRC,
-	HAL_PARAM_VENC_PRESERVE_TEXT_QUALITY,
 	HAL_PARAM_VDEC_CONCEAL_COLOR,
-	HAL_PARAM_VDEC_SCS_THRESHOLD,
-	HAL_PARAM_GET_BUFFER_REQUIREMENTS,
-	HAL_PARAM_MVC_BUFFER_LAYOUT,
 	HAL_PARAM_VENC_LTRMODE,
 	HAL_CONFIG_VENC_MARKLTRFRAME,
 	HAL_CONFIG_VENC_USELTRFRAME,
 	HAL_CONFIG_VENC_LTRPERIOD,
-	HAL_PARAM_VPE_COLOR_SPACE_CONVERSION,
 	HAL_CONFIG_VENC_HIER_P_NUM_FRAMES,
 	HAL_PARAM_VENC_HIER_P_MAX_ENH_LAYERS,
 	HAL_PARAM_VENC_ENABLE_INITIAL_QP,
@@ -412,7 +393,8 @@ enum hal_divx_profile {
 };
 
 enum hal_mvc_profile {
-	HAL_MVC_PROFILE_STEREO_HIGH  = 0x00001000,
+	HAL_MVC_PROFILE_STEREO_HIGH  = 0x00000001,
+	HAL_MVC_PROFILE_MV_HIGH      = 0x00000002,
 	HAL_UNUSED_MVC_PROFILE = 0x10000000,
 };
 
@@ -579,12 +561,18 @@ struct hal_profile_level {
 	u32 profile;
 	u32 level;
 };
+/*
+struct hal_profile_level_range {
+	u32 profile;
+	u32 min_level;
+	u32 max_level;
+}
 
 struct hal_profile_level_supported {
 	u32 profile_count;
-	struct hal_profile_level profile_level[MAX_PROFILE_COUNT];
+	struct hal_profile_level_range profile_level[1];
 };
-
+*/
 enum hal_h264_entropy {
 	HAL_H264_ENTROPY_CAVLC = 1,
 	HAL_H264_ENTROPY_CABAC = 2,
@@ -648,7 +636,7 @@ struct hal_initial_quantization {
 	u32 qpi;
 	u32 qpp;
 	u32 qpb;
-	u32 init_qp_enable;
+	u32 initqp_enable;
 };
 
 struct hal_quantization_range {
@@ -815,18 +803,6 @@ struct hal_multi_view_format {
 	u32 rg_view_order[1];
 };
 
-enum hal_buffer_layout_type {
-	HAL_BUFFER_LAYOUT_TOP_BOTTOM,
-	HAL_BUFFER_LAYOUT_SEQ,
-	HAL_UNUSED_BUFFER_LAYOUT = 0x10000000,
-};
-
-struct hal_mvc_buffer_layout {
-	enum hal_buffer_layout_type layout_type;
-	u32 bright_view_first;
-	u32 ngap;
-};
-
 struct hal_seq_header_info {
 	u32 nax_header_len;
 };
@@ -849,20 +825,6 @@ struct hal_h264_vui_timing_info {
 	u32 enable;
 	u32 fixed_frame_rate;
 	u32 time_scale;
-};
-
-struct hal_h264_vui_bitstream_restrc {
-	u32 enable;
-};
-
-struct hal_preserve_text_quality {
-	u32 enable;
-};
-
-struct hal_vpe_color_space_conversion {
-	u32 csc_matrix[HAL_MAX_MATRIX_COEFFS];
-	u32 csc_bias[HAL_MAX_BIAS_COEFFS];
-	u32 csc_limit[HAL_MAX_LIMIT_COEFFS];
 };
 
 enum vidc_resource_id {
@@ -925,6 +887,14 @@ struct vidc_seq_hdr {
 	u32 seq_hdr_len;
 };
 
+struct hal_fw_info {
+	char version[128];
+	int base_addr;
+	int register_base;
+	int register_size;
+	int irq;
+};
+
 enum hal_flush {
 	HAL_FLUSH_INPUT,
 	HAL_FLUSH_OUTPUT,
@@ -972,71 +942,6 @@ struct hal_ltruse {
 struct hal_ltrmark {
 	u32 markframe;
 };
-
-struct hfi_scs_threshold {
-	u32 threshold_value;
-};
-
-struct buffer_requirements {
-	struct hal_buffer_requirements buffer[HAL_BUFFER_MAX];
-};
-
-union hal_get_property {
-	struct hal_frame_rate frame_rate;
-	struct hal_uncompressed_format_select format_select;
-	struct hal_uncompressed_plane_actual plane_actual;
-	struct hal_uncompressed_plane_actual_info plane_actual_info;
-	struct hal_uncompressed_plane_constraints plane_constraints;
-	struct hal_uncompressed_plane_actual_constraints_info
-						plane_constraints_info;
-	struct hal_extra_data_header_config extra_data_header_config;
-	struct hal_frame_size frame_size;
-	struct hal_enable enable;
-	struct hal_buffer_count_actual buffer_count_actual;
-	struct hal_extradata_enable extradata_enable;
-	struct hal_enable_picture enable_picture;
-	struct hal_multi_stream multi_stream;
-	struct hal_display_picture_buffer_count display_picture_buffer_count;
-	struct hal_mb_error_map mb_error_map;
-	struct hal_request_iframe request_iframe;
-	struct hal_bitrate bitrate;
-	struct hal_profile_level profile_level;
-	struct hal_profile_level_supported profile_level_supported;
-	struct hal_h264_entropy_control h264_entropy_control;
-	struct hal_mpeg4_time_resolution mpeg4_time_resolution;
-	struct hal_mpeg4_header_extension mpeg4_header_extension;
-	struct hal_h264_db_control h264_db_control;
-	struct hal_temporal_spatial_tradeoff temporal_spatial_tradeoff;
-	struct hal_quantization quantization;
-	struct hal_quantization_range quantization_range;
-	struct hal_intra_period intra_period;
-	struct hal_idr_period idr_period;
-	struct hal_operations operations;
-	struct hal_intra_refresh intra_refresh;
-	struct hal_multi_slice_control multi_slice_control;
-	struct hal_debug_config debug_config;
-	struct hal_batch_info batch_info;
-	struct hal_metadata_pass_through metadata_pass_through;
-	struct hal_uncompressed_format_supported uncompressed_format_supported;
-	struct hal_interlace_format_supported interlace_format_supported;
-	struct hal_properties_supported properties_supported;
-	struct hal_capability_supported capability_supported;
-	struct hal_capability_supported_info capability_supported_info;
-	struct hal_nal_stream_format_supported nal_stream_format_supported;
-	struct hal_nal_stream_format_select nal_stream_format_select;
-	struct hal_multi_view_format multi_view_format;
-	struct hal_seq_header_info seq_header_info;
-	struct hal_codec_supported codec_supported;
-	struct hal_multi_view_select multi_view_select;
-	struct hal_timestamp_scale timestamp_scale;
-	struct hal_h264_vui_timing_info h264_vui_timing_info;
-	struct hal_h264_vui_bitstream_restrc h264_vui_bitstream_restrc;
-	struct hal_preserve_text_quality preserve_text_quality;
-	struct hal_buffer_info buffer_info;
-	struct hal_buffer_alloc_mode buffer_alloc_mode;
-	struct buffer_requirements buf_req;
-};
-
 /* HAL Response */
 
 enum command_response {
@@ -1173,16 +1078,18 @@ struct vidc_hal_session_init_done {
 	struct hal_capability_supported scale_x;
 	struct hal_capability_supported scale_y;
 	struct hal_capability_supported bitrate;
-	struct hal_capability_supported hier_p;
 	struct hal_capability_supported ltr_count;
+	struct hal_capability_supported hier_p;
 	struct hal_uncompressed_format_supported uncomp_format;
 	struct hal_interlace_format_supported HAL_format;
 	struct hal_nal_stream_format_supported nal_stream_format;
-	struct hal_profile_level_supported profile_level;
-	/*allocate and released memory for above.*/
 	struct hal_intra_refresh intra_refresh;
 	struct hal_seq_header_info seq_hdr_info;
 	enum buffer_mode_type alloc_mode_out;
+};
+
+struct buffer_requirements {
+	struct hal_buffer_requirements buffer[HAL_BUFFER_MAX];
 };
 
 enum msm_vidc_hfi_type {
@@ -1190,40 +1097,17 @@ enum msm_vidc_hfi_type {
 	VIDC_HFI_Q6,
 };
 
-enum fw_info {
-	FW_BASE_ADDRESS,
-	FW_REGISTER_BASE,
-	FW_REGISTER_SIZE,
-	FW_IRQ,
-	FW_INFO_MAX,
+enum mem_type {
+	DDR_MEM = 0x1,
+	OCMEM_MEM = 0x2,
 };
 
-enum vidc_bus_vote_data_session {
-	VIDC_BUS_VOTE_DATA_SESSION_INVALID = 0,
-	/* No declarations exist. Values generated by BUS_VOTE_DATA_SESSION_VAL
-	 * describe the enumerations e.g.:
-	 *
-	 * enum vidc_bus_vote_data_session_type h264_decoder_session =
-	 *         VIDC_BUS_VOTE_DATA_SESSION_VAL(HAL_VIDEO_CODEC_H264,
-	 *                 HAL_VIDEO_DOMAIN_DECODER);
-	 */
-};
-
-/* Careful modifying BUS_VOTE_DATA_SESSION_VAL().
- *
- * This macro assigns two bits to each codec: the lower bit denoting the codec
- * type, and the higher bit denoting session type. */
-static inline enum vidc_bus_vote_data_session VIDC_BUS_VOTE_DATA_SESSION_VAL(
-		enum hal_video_codec c, enum hal_domain d) {
-	if (d != HAL_VIDEO_DOMAIN_ENCODER && d != HAL_VIDEO_DOMAIN_DECODER)
-		return VIDC_BUS_VOTE_DATA_SESSION_INVALID;
-
-	return (1 << ilog2(c) * 2) | ((d - 1) << (ilog2(c) * 2 + 1));
-}
-
-struct vidc_bus_vote_data {
-	enum vidc_bus_vote_data_session session;
-	int load;
+enum dev_info {
+	DEV_CLOCK_COUNT,
+	DEV_CLOCK_ENABLED,
+	DEV_PWR_COUNT,
+	DEV_PWR_ENABLED,
+	DEV_INFO_MAX
 };
 
 #define call_hfi_op(q, op, args...)			\
@@ -1264,21 +1148,21 @@ struct hfi_device {
 	int (*session_flush)(void *sess, enum hal_flush flush_mode);
 	int (*session_set_property)(void *sess, enum hal_property ptype,
 			void *pdata);
-	int (*session_get_property)(void *sess, enum hal_property ptype);
+	int (*session_get_property)(void *sess, enum hal_property ptype,
+			void *pdata);
 	int (*scale_clocks)(void *dev, int load);
-	int (*vote_bus)(void *dev, struct vidc_bus_vote_data *data,
-			int num_data);
-	int (*unvote_bus)(void *dev);
+	int (*scale_bus)(void *dev, int load,
+			enum session_type type, enum mem_type mtype);
+	int (*unvote_bus)(void *dev, enum session_type type,
+		enum mem_type mtype);
 	int (*iommu_get_domain_partition)(void *dev, u32 flags, u32 buffer_type,
 			int *domain_num, int *partition_num);
 	int (*load_fw)(void *dev);
 	void (*unload_fw)(void *dev);
-	int (*resurrect_fw)(void *dev);
-	int (*get_fw_info)(void *dev, enum fw_info info);
+	int (*get_fw_info)(void *dev, struct hal_fw_info *fw_info);
+	int (*get_info) (void *dev, enum dev_info info);
 	int (*get_stride_scanline)(int color_fmt, int width,
 		int height,	int *stride, int *scanlines);
-	int (*capability_check)(u32 fourcc, u32 width,
-		u32 *max_width, u32 *max_height);
 	int (*session_clean)(void *sess);
 	int (*get_core_capabilities)(void);
 	int (*power_enable)(void *dev);

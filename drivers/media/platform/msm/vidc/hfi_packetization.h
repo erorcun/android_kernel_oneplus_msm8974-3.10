@@ -26,9 +26,6 @@ int create_pkt_cmd_sys_idle_indicator(
 		struct hfi_cmd_sys_set_property_packet *pkt,
 		u32 enable);
 
-int create_pkt_cmd_sys_power_control(
-	struct hfi_cmd_sys_set_property_packet *pkt, u32 enable);
-
 int create_pkt_set_cmd_sys_resource(
 		struct hfi_cmd_sys_set_resource_packet *pkt,
 		struct vidc_resource_hdr *resource_hdr,
@@ -89,10 +86,6 @@ int create_pkt_cmd_session_flush(struct hfi_cmd_session_flush_packet *pkt,
 int create_pkt_cmd_session_set_property(
 		struct hfi_cmd_session_set_property_packet *pkt,
 		u32 session_id, enum hal_property ptype, void *pdata);
-
-int create_pkt_cmd_session_get_property(
-		struct hfi_cmd_session_get_property_packet *pkt,
-		u32 session_id, enum hal_property ptype);
 
 int create_pkt_ssr_cmd(enum hal_ssr_trigger_type type,
 		struct hfi_cmd_sys_test_ssr_packet *pkt);

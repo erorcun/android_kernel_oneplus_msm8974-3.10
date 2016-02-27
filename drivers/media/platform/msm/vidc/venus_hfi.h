@@ -19,7 +19,8 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <mach/ocmem.h>
-#include <linux/msm_iommu_domains.h>
+#include <mach/iommu_domains.h>
+
 #include "vidc_hfi_api.h"
 #include "vidc_hfi_helper.h"
 #include "vidc_hfi_api.h"
@@ -125,6 +126,7 @@ enum bus_index {
 enum clock_state {
 	DISABLED_UNPREPARED,
 	ENABLED_PREPARED,
+	DISABLED_PREPARED
 };
 
 struct vidc_mem_addr {
@@ -147,6 +149,22 @@ struct hal_data {
 	u8 *register_base_addr;
 };
 
+enum vidc_clocks {
+	VCODEC_NONE,
+	VCODEC_CLK,
+	VCODEC_AHB_CLK,
+	VCODEC_AXI_CLK,
+	VCODEC_OCMEM_CLK,
+	VCODEC_MAX_CLKS
+};
+
+struct venus_core_clock {
+	char name[VIDC_MAX_NAME_LENGTH];
+	struct clk *clk;
+	u32 count;
+	struct load_freq_table load_freq_tbl[8];
+};
+
 struct venus_bus_info {
 	u32 ddr_handle[MSM_VIDC_MAX_DEVICES];
 	u32 ocmem_handle[MSM_VIDC_MAX_DEVICES];
@@ -160,6 +178,8 @@ struct on_chip_mem {
 
 struct venus_resources {
 	struct msm_vidc_fw fw;
+	struct venus_core_clock clock[VCODEC_MAX_CLKS];
+	struct venus_bus_info bus_info;
 	struct on_chip_mem ocmem;
 };
 
@@ -174,16 +194,13 @@ struct venus_hfi_device {
 	u32 intr_status;
 	u32 device_id;
 	u32 clk_load;
-	u32 last_packet_type;
-	struct {
-		struct vidc_bus_vote_data *vote_data;
-		u32 vote_data_count;
-	} bus_load;
+	u32 bus_load[MSM_VIDC_MAX_DEVICES];
 	enum clock_state clk_state;
 	bool power_enabled;
+	enum vidc_clocks clk_gating_level;
 	struct mutex read_lock;
 	struct mutex write_lock;
-	struct mutex resource_lock;
+	struct mutex clk_pwr_lock;
 	struct mutex session_lock;
 	msm_vidc_callback callback;
 	struct vidc_mem_addr iface_q_table;
@@ -197,12 +214,16 @@ struct venus_hfi_device {
 	struct workqueue_struct *venus_pm_workq;
 	int spur_count;
 	int reg_count;
+	int pc_num_cmds;
 	u32 base_addr;
 	u32 register_base;
 	u32 register_size;
 	u32 irq;
+	int clk_cnt;
+	int pwr_cnt;
 	struct venus_resources resources;
 	struct msm_vidc_platform_resources *res;
+	struct regulator *gdsc;
 	enum venus_hfi_state state;
 };
 

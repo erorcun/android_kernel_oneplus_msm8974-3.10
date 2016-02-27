@@ -70,14 +70,13 @@ static enum vidc_status hfi_map_err_status(int hfi_err)
 	case HFI_ERR_SESSION_SYNC_FRAME_NOT_DETECTED:
 		vidc_err = VIDC_ERR_IFRAME_EXPECTED;
 		break;
-	case HFI_ERR_SESSION_START_CODE_NOT_FOUND:
-		vidc_err = VIDC_ERR_START_CODE_NOT_FOUND;
-		break;
 	case HFI_ERR_SESSION_EMPTY_BUFFER_DONE_OUTPUT_PENDING:
 	default:
 		vidc_err = VIDC_ERR_FAIL;
 		break;
 	}
+	if (vidc_err != HFI_ERR_NONE)
+		dprintk(VIDC_ERR, "HFI Error: %d\n", vidc_err);
 	return vidc_err;
 }
 
@@ -108,15 +107,14 @@ static void hfi_process_sess_evt_seq_changed(
 	struct msm_vidc_cb_cmd_done cmd_done;
 	struct msm_vidc_cb_event event_notify;
 	int num_properties_changed;
-	struct hfi_frame_size *frame_sz;
-	struct hfi_profile_level *profile_level;
+	struct hfi_frame_size frame_sz;
 	u8 *data_ptr;
 	int prop_id;
-	dprintk(VIDC_DBG, "RECEIVED: EVENT_NOTIFY[%u]\n", pkt->session_id);
+	dprintk(VIDC_DBG, "RECEIVED: EVENT_NOTIFY[%u]: %d, 0x%x\n",
+		pkt->session_id, pkt->event_data1, pkt->event_data2);
 	if (sizeof(struct hfi_msg_event_notify_packet)
 		> pkt->size) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_init_done: bad_pkt_size\n");
+		dprintk(VIDC_ERR, "hal_process_session_init_done:bad_pkt_size");
 		return;
 	}
 
@@ -148,31 +146,18 @@ static void hfi_process_sess_evt_seq_changed(
 			prop_id = (int) *((u32 *)data_ptr);
 			switch (prop_id) {
 			case HFI_PROPERTY_PARAM_FRAME_SIZE:
-				data_ptr = data_ptr + sizeof(u32);
-				frame_sz =
-					(struct hfi_frame_size *) data_ptr;
-				event_notify.width = frame_sz->width;
-				event_notify.height = frame_sz->height;
-				dprintk(VIDC_DBG, "height: %d width: %d\n",
-					frame_sz->height, frame_sz->width);
-				data_ptr +=
-					sizeof(struct hfi_frame_size);
-				break;
-			case HFI_PROPERTY_PARAM_PROFILE_LEVEL_CURRENT:
-				data_ptr = data_ptr + sizeof(u32);
-				profile_level =
-					(struct hfi_profile_level *) data_ptr;
-				dprintk(VIDC_DBG, "profile: %d level: %d\n",
-					profile_level->profile,
-					profile_level->level);
-				data_ptr +=
-					sizeof(struct hfi_profile_level);
-				break;
+				frame_sz.buffer_type =
+					(int) *((((u32 *)data_ptr)+1));
+				frame_sz.width =
+					event_notify.width =
+						*((((u32 *)data_ptr)+2));
+				frame_sz.height =
+					event_notify.height =
+						*((((u32 *)data_ptr)+3));
+				data_ptr += 4;
+			break;
 			default:
-				dprintk(VIDC_ERR,
-						"%s cmd: 0x%x not supported\n",
-							__func__, prop_id);
-				break;
+			break;
 			}
 			num_properties_changed--;
 		} while (num_properties_changed > 0);
@@ -190,12 +175,10 @@ static void hfi_process_evt_release_buffer_ref(
 
 	struct hfi_msg_release_buffer_ref_event_packet *data;
 
-	dprintk(VIDC_DBG,
-			"RECEIVED: EVENT_NOTIFY - release_buffer_reference\n");
+	dprintk(VIDC_DBG, "RECEIVED:EVENT_NOTIFY - release_buffer_reference");
 	if (sizeof(struct hfi_msg_event_notify_packet)
 		> pkt->size) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_init_done: bad_pkt_size\n");
+		dprintk(VIDC_ERR, "hal_process_session_init_done:bad_pkt_size");
 		return;
 	}
 
@@ -239,6 +222,7 @@ static void hfi_process_session_error(
 	case HFI_ERR_SESSION_INVALID_SCALE_FACTOR:
 	case HFI_ERR_SESSION_UNSUPPORT_BUFFERTYPE:
 	case HFI_ERR_SESSION_UNSUPPORTED_SETTING:
+	case HFI_ERR_SESSION_UPSCALE_NOT_SUPPORTED:
 		cmd_done.status = VIDC_ERR_NONE;
 		dprintk(VIDC_INFO, "Non Fatal : HFI_EVENT_SESSION_ERROR\n");
 		break;
@@ -254,19 +238,19 @@ static void hfi_process_event_notify(
 		struct list_head *sessions, struct mutex *session_lock)
 {
 	struct hal_session *sess = NULL;
-	dprintk(VIDC_DBG, "Received: EVENT_NOTIFY\n");
+	dprintk(VIDC_DBG, "RECVD:EVENT_NOTIFY");
 
 	if (!callback || !pkt ||
 		pkt->size < sizeof(struct hfi_msg_event_notify_packet)) {
-		dprintk(VIDC_ERR, "Invalid Params\n");
+		dprintk(VIDC_ERR, "Invalid Params");
 		return;
 	}
 	sess = (struct hal_session *)pkt->session_id;
 
 	switch (pkt->event_id) {
 	case HFI_EVENT_SYS_ERROR:
-		dprintk(VIDC_ERR, "HFI_EVENT_SYS_ERROR[%u]: %d, 0x%x\n",
-			pkt->session_id, pkt->event_data1, pkt->event_data2);
+		dprintk(VIDC_ERR, "HFI_EVENT_SYS_ERROR: %d, 0x%x\n",
+			pkt->event_data1, pkt->event_data2);
 		hfi_process_sys_error(callback, device_id);
 		break;
 	case HFI_EVENT_SESSION_ERROR:
@@ -295,8 +279,8 @@ static void hfi_process_event_notify(
 		break;
 	default:
 		dprintk(VIDC_WARN,
-				"hal_process_event_notify: unknown_event_id[%u]\n",
-				pkt->session_id);
+			"hal_process_event_notify: unknown_event_id[%u]\n",
+			pkt->session_id);
 		break;
 	}
 }
@@ -311,10 +295,9 @@ static void hfi_process_sys_init_done(
 	int prop_id;
 	enum vidc_status status = VIDC_ERR_NONE;
 
-	dprintk(VIDC_DBG, "RECEIVED: SYS_INIT_DONE\n");
+	dprintk(VIDC_DBG, "RECEIVED:SYS_INIT_DONE");
 	if (sizeof(struct hfi_msg_sys_init_done_packet) > pkt->size) {
-		dprintk(VIDC_ERR,
-				"hal_process_sys_init_done: bad_pkt_size: %d\n",
+		dprintk(VIDC_ERR, "hal_process_sys_init_done:bad_pkt_size: %d",
 				pkt->size);
 		return;
 	}
@@ -323,8 +306,8 @@ static void hfi_process_sys_init_done(
 
 	if (!status) {
 		if (pkt->num_properties == 0) {
-			dprintk(VIDC_ERR,
-					"hal_process_sys_init_done: no_properties\n");
+			dprintk(VIDC_ERR, "hal_process_sys_init_done:"
+						"no_properties");
 			status = VIDC_ERR_FAIL;
 			goto err_no_prop;
 		}
@@ -333,8 +316,8 @@ static void hfi_process_sys_init_done(
 			hfi_msg_sys_init_done_packet) + sizeof(u32);
 
 		if (rem_bytes == 0) {
-			dprintk(VIDC_ERR,
-					"hal_process_sys_init_done: missing_prop_info\n");
+			dprintk(VIDC_ERR, "hal_process_sys_init_done:"
+						"missing_prop_info");
 			status = VIDC_ERR_FAIL;
 			goto err_no_prop;
 		}
@@ -366,8 +349,8 @@ static void hfi_process_sys_init_done(
 				break;
 			}
 			default:
-				dprintk(VIDC_ERR,
-						"hal_process_sys_init_done: bad_prop_id\n");
+				dprintk(VIDC_ERR, "hal_process_sys_init_done:"
+							"bad_prop_id");
 				status = VIDC_ERR_BAD_PARAM;
 				break;
 			}
@@ -395,11 +378,11 @@ static void hfi_process_sys_rel_resource_done(
 	enum vidc_status status = VIDC_ERR_NONE;
 	u32 pkt_size;
 	memset(&cmd_done, 0, sizeof(struct msm_vidc_cb_cmd_done));
-	dprintk(VIDC_DBG, "RECEIVED: SYS_RELEASE_RESOURCE_DONE\n");
+	dprintk(VIDC_DBG, "RECEIVED:SYS_RELEASE_RESOURCE_DONE");
 	pkt_size = sizeof(struct hfi_msg_sys_release_resource_done_packet);
 	if (pkt_size > pkt->size) {
 		dprintk(VIDC_ERR,
-			"hal_process_sys_rel_resource_done: bad size: %d\n",
+			"hal_process_sys_rel_resource_done:bad size:%d",
 			pkt->size);
 		return;
 	}
@@ -454,12 +437,12 @@ static inline void copy_cap_prop(
 		out = &sess_init_done->bitrate;
 		break;
 
-	case HFI_CAPABILITY_HIER_P_NUM_ENH_LAYERS:
-		out = &sess_init_done->hier_p;
-		break;
-
 	case HFI_CAPABILITY_ENC_LTR_COUNT:
 		out = &sess_init_done->ltr_count;
+		break;
+
+	case HFI_CAPABILITY_HIER_P_NUM_ENH_LAYERS:
+		out = &sess_init_done->hier_p;
 		break;
 	}
 
@@ -480,14 +463,13 @@ enum vidc_status hfi_process_sess_init_done_prop_read(
 	u8 *data_ptr;
 	u32 status = VIDC_ERR_NONE;
 	u32 prop_id, next_offset = 0;
-	u32 prop_count = 0;
 
 	rem_bytes = pkt->size - sizeof(struct
 			hfi_msg_sys_session_init_done_packet) + sizeof(u32);
 
 	if (rem_bytes == 0) {
 		dprintk(VIDC_ERR,
-			"hfi_msg_sys_session_init_done: missing_prop_info\n");
+			"hfi_msg_sys_session_init_done:missing_prop_info");
 		return VIDC_ERR_FAIL;
 	}
 
@@ -587,35 +569,10 @@ enum vidc_status hfi_process_sess_init_done_prop_read(
 		}
 		case HFI_PROPERTY_PARAM_PROFILE_LEVEL_SUPPORTED:
 		{
-			char *ptr = NULL;
-			int count = 0;
-			struct hfi_profile_level *prop_level;
 			struct hfi_profile_level_supported *prop =
 				(struct hfi_profile_level_supported *)
 				(data_ptr + next_offset);
-			ptr = (char *) &prop->rg_profile_level[0];
-			dprintk(VIDC_DBG, "prop->profile_count: %d\n",
-				prop->profile_count);
-			prop_count = prop->profile_count;
-			if (prop_count > MAX_PROFILE_COUNT) {
-				prop_count = MAX_PROFILE_COUNT;
-				dprintk(VIDC_WARN,
-					"prop count exceeds max profile count\n");
-			}
-			while (prop_count) {
-				ptr++;
-				prop_level = (struct hfi_profile_level *) ptr;
-				sess_init_done->
-				profile_level.profile_level[count].profile
-					= prop_level->profile;
-				sess_init_done->
-				profile_level.profile_level[count].level
-					= prop_level->level;
-				prop_count--;
-				count++;
-				ptr +=
-				sizeof(struct hfi_profile_level) / sizeof(u32);
-			}
+
 			next_offset += sizeof(*prop) -
 				sizeof(struct hfi_profile_level) +
 				prop->profile_count *
@@ -684,43 +641,12 @@ enum vidc_status hfi_process_sess_init_done_prop_read(
 		}
 		default:
 			dprintk(VIDC_DBG,
-				"%s default case - 0x%x\n", __func__, prop_id);
+				"%s default case - 0x%x", __func__, prop_id);
 		}
 		rem_bytes -= next_offset;
 		data_ptr += next_offset;
 	}
 	return status;
-}
-
-static void hfi_process_sess_get_prop_profile_level(
-	struct hfi_msg_session_property_info_packet *prop,
-	struct hfi_profile_level *profile_level)
-{
-	struct hfi_profile_level *hfi_profile_level;
-	u32 req_bytes;
-	dprintk(VIDC_DBG, "Entered %s\n", __func__);
-	if (!prop) {
-		dprintk(VIDC_ERR,
-			"hal_process_sess_get_profile_level: bad_prop: %p\n",
-			prop);
-		return;
-	}
-	req_bytes = prop->size - sizeof(
-	struct hfi_msg_session_property_info_packet);
-
-	if (!req_bytes || (req_bytes % sizeof(struct hfi_profile_level))) {
-		dprintk(VIDC_ERR,
-			"hal_process_sess_get_profile_level: bad_pkt: %d\n",
-			req_bytes);
-		return;
-	}
-	hfi_profile_level = (struct hfi_profile_level *)
-				&prop->rg_property_data[1];
-	profile_level->profile = hfi_profile_level->profile;
-	profile_level->level = hfi_profile_level->level;
-	dprintk(VIDC_DBG, "%s profile: %d level: %d\n",
-		__func__, profile_level->profile,
-		profile_level->level);
 }
 
 static void hfi_process_sess_get_prop_buf_req(
@@ -730,9 +656,10 @@ static void hfi_process_sess_get_prop_buf_req(
 	struct hfi_buffer_requirements *hfi_buf_req;
 	u32 req_bytes;
 
+	dprintk(VIDC_DBG, "Entered ");
 	if (!prop) {
 		dprintk(VIDC_ERR,
-			"hal_process_sess_get_prop_buf_req: bad_prop: %p\n",
+			"hal_process_sess_get_prop_buf_req:bad_prop: %p",
 			prop);
 		return;
 	}
@@ -743,7 +670,7 @@ static void hfi_process_sess_get_prop_buf_req(
 		struct hfi_buffer_requirements)) ||
 		(!prop->rg_property_data[1])) {
 		dprintk(VIDC_ERR,
-			"hal_process_sess_get_prop_buf_req: bad_pkt: %d\n",
+			"hal_process_sess_get_prop_buf_req:bad_pkt: %d",
 			req_bytes);
 		return;
 	}
@@ -757,9 +684,9 @@ static void hfi_process_sess_get_prop_buf_req(
 			buffer_count_actual)))
 				dprintk(VIDC_WARN,
 					"hal_process_sess_get_prop_buf_req:"
-					"bad_buf_req\n");
+					"bad_buf_req");
 
-		dprintk(VIDC_DBG, "got buffer requirements for: %d\n",
+		dprintk(VIDC_DBG, "got buffer requirements for: %d",
 					hfi_buf_req->buffer_type);
 		switch (hfi_buf_req->buffer_type) {
 		case HFI_BUFFER_INPUT:
@@ -827,7 +754,7 @@ static void hfi_process_sess_get_prop_buf_req(
 			break;
 		default:
 			dprintk(VIDC_ERR,
-			"hal_process_sess_get_prop_buf_req: bad_buffer_type: %d\n",
+			"hal_process_sess_get_prop_buf_req: bad_buffer_type: %d",
 			hfi_buf_req->buffer_type);
 			break;
 		}
@@ -840,28 +767,28 @@ static void hfi_process_session_prop_info(
 		msm_vidc_callback callback, u32 device_id,
 		struct hfi_msg_session_property_info_packet *pkt)
 {
-	struct msm_vidc_cb_cmd_done cmd_done = {0};
-	struct hfi_profile_level profile_level = {0};
+	struct msm_vidc_cb_cmd_done cmd_done;
 	struct buffer_requirements buff_req;
 
 	dprintk(VIDC_DBG, "Received SESSION_PROPERTY_INFO[%u]\n",
 		pkt->session_id);
 
 	if (pkt->size < sizeof(struct hfi_msg_session_property_info_packet)) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_prop_info: bad_pkt_size\n");
+		dprintk(VIDC_ERR, "hal_process_session_prop_info:bad_pkt_size");
 		return;
 	}
 
 	if (pkt->num_properties == 0) {
 		dprintk(VIDC_ERR,
-			"hal_process_session_prop_info: no_properties\n");
+			"hal_process_session_prop_info:no_properties");
 		return;
 	}
 
+	memset(&cmd_done, 0, sizeof(struct msm_vidc_cb_cmd_done));
+	memset(&buff_req, 0, sizeof(struct buffer_requirements));
+
 	switch (pkt->rg_property_data[0]) {
 	case HFI_PROPERTY_CONFIG_BUFFER_REQUIREMENTS:
-		memset(&buff_req, 0, sizeof(struct buffer_requirements));
 		hfi_process_sess_get_prop_buf_req(pkt, &buff_req);
 		cmd_done.device_id = device_id;
 		cmd_done.session_id =
@@ -871,19 +798,9 @@ static void hfi_process_session_prop_info(
 		cmd_done.size = sizeof(struct buffer_requirements);
 		callback(SESSION_PROPERTY_INFO, &cmd_done);
 		break;
-	case HFI_PROPERTY_PARAM_PROFILE_LEVEL_CURRENT:
-		hfi_process_sess_get_prop_profile_level(pkt, &profile_level);
-		cmd_done.device_id = device_id;
-		cmd_done.session_id =
-			((struct hal_session *) pkt->session_id)->session_id;
-		cmd_done.status = VIDC_ERR_NONE;
-		cmd_done.data = &profile_level;
-		cmd_done.size = sizeof(struct hal_profile_level);
-		callback(SESSION_PROPERTY_INFO, &cmd_done);
-		break;
 	default:
-		dprintk(VIDC_ERR,
-				"hal_process_session_prop_info: unknown_prop_id: %d\n",
+		dprintk(VIDC_ERR, "hal_process_session_prop_info:"
+					"unknown_prop_id: %d",
 				pkt->rg_property_data[0]);
 		break;
 	}
@@ -900,8 +817,7 @@ static void hfi_process_session_init_done(
 		pkt->session_id);
 	if (sizeof(struct hfi_msg_sys_session_init_done_packet)
 		> pkt->size) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_init_done: bad_pkt_size\n");
+		dprintk(VIDC_ERR, "hal_process_session_init_done:bad_pkt_size");
 		return;
 	}
 
@@ -921,7 +837,7 @@ static void hfi_process_session_init_done(
 		sess_close = (struct hal_session *)pkt->session_id;
 		if (sess_close) {
 			dprintk(VIDC_WARN,
-				"Sess init failed: 0x%x, 0x%p\n",
+				"Sess init failed: 0x%x, 0x%p",
 				sess_close->session_id, sess_close);
 		}
 	}
@@ -939,9 +855,8 @@ static void hfi_process_session_load_res_done(
 
 	if (sizeof(struct hfi_msg_session_load_resources_done_packet) !=
 		pkt->size) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_load_res_done: bad packet size: %d\n",
-				pkt->size);
+		dprintk(VIDC_ERR, "hal_process_session_load_res_done:"
+		" bad packet size: %d", pkt->size);
 		return;
 	}
 
@@ -966,9 +881,8 @@ static void hfi_process_session_flush_done(
 		pkt->session_id);
 
 	if (sizeof(struct hfi_msg_session_flush_done_packet) != pkt->size) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_flush_done: bad packet size: %d\n",
-				pkt->size);
+		dprintk(VIDC_ERR, "hal_process_session_flush_done: "
+		"bad packet size: %d", pkt->size);
 		return;
 	}
 
@@ -993,8 +907,7 @@ static void hfi_process_session_etb_done(
 
 	if (!pkt || pkt->size <
 		sizeof(struct hfi_msg_session_empty_buffer_done_packet)) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_etb_done: bad_pkt_size\n");
+		dprintk(VIDC_ERR, "hal_process_session_etb_done:bad_pkt_size");
 		return;
 	}
 
@@ -1009,7 +922,6 @@ static void hfi_process_session_etb_done(
 	data_done.input_done.offset = pkt->offset;
 	data_done.input_done.filled_len = pkt->filled_len;
 	data_done.input_done.packet_buffer = pkt->packet_buffer;
-	data_done.input_done.extra_data_buffer = pkt->extra_data_buffer;
 	data_done.input_done.status =
 		hfi_map_err_status((u32) pkt->error_type);
 	callback(SESSION_ETB_DONE, &data_done);
@@ -1026,7 +938,7 @@ static void hfi_process_session_ftb_done(
 	struct hal_session *session;
 
 	if (!msg_hdr) {
-		dprintk(VIDC_ERR, "Invalid Params\n");
+		dprintk(VIDC_ERR, "Invalid Params");
 		return;
 	}
 
@@ -1045,11 +957,11 @@ static void hfi_process_session_ftb_done(
 			hfi_msg_session_fill_buffer_done_compressed_packet)
 			> pkt->size) {
 			dprintk(VIDC_ERR,
-				"hal_process_session_ftb_done: bad_pkt_size\n");
+				"hal_process_session_ftb_done: bad_pkt_size");
 			return;
 		} else if (pkt->error_type != HFI_ERR_NONE) {
 			dprintk(VIDC_ERR,
-				"got buffer back with error %x\n",
+				"got buffer back with error %x",
 				pkt->error_type);
 			/* Proceed with the FBD */
 		}
@@ -1084,8 +996,8 @@ static void hfi_process_session_ftb_done(
 		if (sizeof(struct
 		hfi_msg_session_fbd_uncompressed_plane0_packet)
 		> pkt->size) {
-			dprintk(VIDC_ERR,
-					"hal_process_session_ftb_done: bad_pkt_size\n");
+			dprintk(VIDC_ERR, "hal_process_session_ftb_done:"
+						"bad_pkt_size");
 			return;
 		}
 
@@ -1136,9 +1048,8 @@ static void hfi_process_session_start_done(
 
 	if (!pkt || pkt->size !=
 		sizeof(struct hfi_msg_session_start_done_packet)) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_start_done: bad packet/packet size: %d\n",
-				pkt->size);
+		dprintk(VIDC_ERR, "hal_process_session_start_done:"
+		"bad packet/packet size: %d", pkt->size);
 		return;
 	}
 
@@ -1163,9 +1074,8 @@ static void hfi_process_session_stop_done(
 
 	if (!pkt || pkt->size !=
 		sizeof(struct hfi_msg_session_stop_done_packet)) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_stop_done: bad packet/packet size: %d\n",
-				pkt->size);
+		dprintk(VIDC_ERR, "hal_process_session_stop_done:"
+		"bad packet/packet size: %d", pkt->size);
 		return;
 	}
 
@@ -1190,9 +1100,8 @@ static void hfi_process_session_rel_res_done(
 
 	if (!pkt || pkt->size !=
 		sizeof(struct hfi_msg_session_release_resources_done_packet)) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_rel_res_done: bad packet/packet size: %d\n",
-				pkt->size);
+		dprintk(VIDC_ERR, "hal_process_session_rel_res_done:"
+		"bad packet/packet size: %d", pkt->size);
 		return;
 	}
 
@@ -1211,14 +1120,14 @@ static void hfi_process_session_rel_buf_done(
 		struct hfi_msg_session_release_buffers_done_packet *pkt)
 {
 	struct msm_vidc_cb_cmd_done cmd_done;
+	dprintk(VIDC_DBG, "RECEIVED:SESSION_RELEASE_BUFFER_DONE[%u]\n",
+		pkt->session_id);
 	if (!pkt || pkt->size !=
 		sizeof(struct
 			   hfi_msg_session_release_buffers_done_packet)) {
-		dprintk(VIDC_ERR, "bad packet/packet size: %d\n", pkt->size);
+		dprintk(VIDC_ERR, "bad packet/packet size: %d", pkt->size);
 		return;
 	}
-	dprintk(VIDC_DBG, "RECEIVED:SESSION_RELEASE_BUFFER_DONE[%u]",
-		pkt->session_id);
 	memset(&cmd_done, 0, sizeof(struct msm_vidc_cb_cmd_done));
 	cmd_done.device_id = device_id;
 	cmd_done.size = sizeof(struct msm_vidc_cb_cmd_done);
@@ -1245,9 +1154,8 @@ static void hfi_process_session_end_done(
 
 	if (!pkt || pkt->size !=
 		sizeof(struct hfi_msg_sys_session_end_done_packet)) {
-		dprintk(VIDC_ERR,
-				"hal_process_session_end_done: bad packet/packet size: %d\n",
-				pkt->size);
+		dprintk(VIDC_ERR, "hal_process_session_end_done: "
+		"bad packet/packet size: %d", pkt->size);
 		return;
 	}
 
@@ -1269,10 +1177,9 @@ static void hfi_process_session_abort_done(
 
 	dprintk(VIDC_DBG, "RECEIVED: SESSION_ABORT_DONE[%u]\n",
 		pkt->session_id);
-
 	if (!pkt || pkt->size !=
 		sizeof(struct hfi_msg_sys_session_abort_done_packet)) {
-		dprintk(VIDC_ERR, "%s: bad packet/packet size: %d\n",
+		dprintk(VIDC_ERR, "%s: bad packet/packet size: %d",
 				__func__, pkt ? pkt->size : 0);
 		return;
 	}
@@ -1295,10 +1202,10 @@ static void hfi_process_session_get_seq_hdr_done(
 	if (!pkt || pkt->size !=
 		sizeof(struct
 		hfi_msg_session_get_sequence_header_done_packet)) {
-		dprintk(VIDC_ERR, "bad packet/packet size: %d\n", pkt->size);
+		dprintk(VIDC_ERR, "bad packet/packet size: %d", pkt->size);
 		return;
 	}
-	dprintk(VIDC_DBG, "RECEIVED:SESSION_GET_SEQ_HDR_DONE[%u]",
+	dprintk(VIDC_DBG, "RECEIVED:SESSION_GET_SEQ_HDR_DONE[%u]\n",
 		pkt->session_id);
 	memset(&data_done, 0, sizeof(struct msm_vidc_cb_data_done));
 	data_done.device_id = device_id;
@@ -1308,7 +1215,7 @@ static void hfi_process_session_get_seq_hdr_done(
 	data_done.status = hfi_map_err_status((u32)pkt->error_type);
 	data_done.output_done.packet_buffer1 = pkt->sequence_header;
 	data_done.output_done.filled_len1 = pkt->header_len;
-	dprintk(VIDC_INFO, "seq_hdr: %p, Length: %d\n",
+	dprintk(VIDC_INFO, "seq_hdr: %p, Length: %d",
 		   pkt->sequence_header, pkt->header_len);
 	callback(SESSION_GET_SEQ_HDR_DONE, &data_done);
 }
@@ -1330,7 +1237,7 @@ static void hfi_process_sys_get_prop_image_version(
 			!pkt->rg_property_data[1] ||
 			pkt->num_properties > 1) {
 		dprintk(VIDC_ERR,
-				"hfi_process_sys_get_prop_image_version: bad_pkt: %d\n",
+				"hfi_process_sys_get_prop_image_version:bad_pkt: %d",
 				req_bytes);
 		return;
 	}
@@ -1359,6 +1266,7 @@ static void hfi_process_sys_get_prop_image_version(
 }
 
 static void hfi_process_sys_property_info(
+		msm_vidc_callback callback, u32 device_id,
 		struct hfi_msg_sys_property_info_packet *pkt)
 {
 	if (!pkt) {
@@ -1382,7 +1290,7 @@ static void hfi_process_sys_property_info(
 		break;
 	default:
 		dprintk(VIDC_ERR,
-				"hfi_process_sys_property_info: unknown_prop_id: %d\n",
+				"hfi_process_sys_property_info:unknown_prop_id: %d\n",
 				pkt->rg_property_data[0]);
 	}
 }
@@ -1396,14 +1304,13 @@ u32 hfi_process_msg_packet(
 	struct hal_session *sess = NULL;
 	if (!callback || !msg_hdr || msg_hdr->size <
 		VIDC_IFACEQ_MIN_PKT_SIZE) {
-		dprintk(VIDC_ERR,
-				"hal_process_msg_packet: bad packet/packet size: %d\n",
-				msg_hdr->size);
+		dprintk(VIDC_ERR, "hal_process_msg_packet:bad"
+			"packet/packet size: %d", msg_hdr->size);
 		rc = -EINVAL;
 		return rc;
 	}
 
-	dprintk(VIDC_INFO, "Received: 0x%x\n", msg_hdr->packet);
+	dprintk(VIDC_INFO, "Received: 0x%x in ", msg_hdr->packet);
 	rc = (u32) msg_hdr->packet;
 	sess = (struct hal_session *)((struct
 			vidc_hal_session_cmd_pkt*) msg_hdr)->session_id;
@@ -1429,7 +1336,7 @@ u32 hfi_process_msg_packet(
 						msg_hdr);
 		break;
 	case HFI_MSG_SYS_PROPERTY_INFO:
-		hfi_process_sys_property_info(
+		hfi_process_sys_property_info(callback, device_id,
 		   (struct hfi_msg_sys_property_info_packet *)
 			msg_hdr);
 		break;
@@ -1511,7 +1418,7 @@ u32 hfi_process_msg_packet(
 						msg_hdr);
 		break;
 	default:
-		dprintk(VIDC_DBG, "UNKNOWN_MSG_TYPE : %d\n", msg_hdr->packet);
+		dprintk(VIDC_DBG, "UNKNOWN_MSG_TYPE : %d", msg_hdr->packet);
 		break;
 	}
 	return rc;

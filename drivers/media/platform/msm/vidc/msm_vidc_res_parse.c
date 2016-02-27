@@ -17,9 +17,48 @@
 #include "msm_vidc_debug.h"
 #include "msm_vidc_res_parse.h"
 
-enum clock_properties {
-	CLOCK_PROP_HAS_SCALING = 1 << 0,
-	CLOCK_PROP_HAS_GATING = 1 << 1,
+struct master_slave {
+	int masters_ocmem[2];
+	int masters_ddr[2];
+	int slaves_ocmem[2];
+	int slaves_ddr[2];
+};
+
+static struct master_slave bus_vectors_masters_slaves = {
+	.masters_ocmem = {MSM_BUS_MASTER_VIDEO_P0_OCMEM,
+				MSM_BUS_MASTER_VIDEO_P1_OCMEM},
+	.masters_ddr = {MSM_BUS_MASTER_VIDEO_P0, MSM_BUS_MASTER_VIDEO_P1},
+	.slaves_ocmem = {MSM_BUS_SLAVE_OCMEM, MSM_BUS_SLAVE_OCMEM},
+	.slaves_ddr = {MSM_BUS_SLAVE_EBI_CH0, MSM_BUS_SLAVE_EBI_CH0},
+};
+
+struct bus_pdata_config {
+	int *masters;
+	int *slaves;
+	char *name;
+};
+
+static struct bus_pdata_config bus_pdata_config_vector[] = {
+	{
+		.masters = bus_vectors_masters_slaves.masters_ocmem,
+		.slaves = bus_vectors_masters_slaves.slaves_ocmem,
+		.name = "qcom,enc-ocmem-ab-ib",
+	},
+	{
+		.masters = bus_vectors_masters_slaves.masters_ocmem,
+		.slaves = bus_vectors_masters_slaves.slaves_ocmem,
+		.name = "qcom,dec-ocmem-ab-ib",
+	},
+	{
+		.masters = bus_vectors_masters_slaves.masters_ddr,
+		.slaves = bus_vectors_masters_slaves.slaves_ddr,
+		.name = "qcom,enc-ddr-ab-ib",
+	},
+	{
+		.masters = bus_vectors_masters_slaves.masters_ddr,
+		.slaves = bus_vectors_masters_slaves.slaves_ddr,
+		.name = "qcom,dec-ddr-ab-ib",
+	},
 };
 
 static size_t get_u32_array_num_elements(struct platform_device *pdev,
@@ -87,10 +126,15 @@ static inline void msm_vidc_free_reg_table(
 static inline void msm_vidc_free_bus_vectors(
 			struct msm_vidc_platform_resources *res)
 {
-	int i = 0;
-	for (i = 0; i < res->bus_set.count; i++) {
-		if (res->bus_set.bus_tbl[i].pdata)
-			msm_bus_cl_clear_pdata(res->bus_set.bus_tbl[i].pdata);
+	int i, j;
+	if (res->bus_pdata) {
+		for (i = 0; i < ARRAY_SIZE(bus_pdata_config_vector); i++) {
+			for (j = 0; j < res->bus_pdata[i].num_usecases; j++) {
+				res->bus_pdata[i].usecase[j].vectors = NULL;
+			}
+			res->bus_pdata[i].usecase = NULL;
+		}
+		res->bus_pdata = NULL;
 	}
 }
 
@@ -106,42 +150,24 @@ static inline void msm_vidc_free_buffer_usage_table(
 	res->buffer_usage_set.buffer_usage_tbl = NULL;
 }
 
-static inline void msm_vidc_free_regulator_table(
-			struct msm_vidc_platform_resources *res)
-{
-	int c = 0;
-	for (c = 0; c < res->regulator_set.count; ++c) {
-		struct regulator_info *rinfo =
-			&res->regulator_set.regulator_tbl[c];
-
-		kfree(rinfo->name);
-		rinfo->name = NULL;
-	}
-
-	/* The regulator table is one the few allocs that aren't managed, hence
-	 * free it manually */
-	kfree(res->regulator_set.regulator_tbl);
-	res->regulator_set.regulator_tbl = NULL;
-	res->regulator_set.count = 0;
-}
-
-static inline void msm_vidc_free_clock_table(
-			struct msm_vidc_platform_resources *res)
-{
-	res->clock_set.clock_tbl = NULL;
-	res->clock_set.count = 0;
-}
-
 void msm_vidc_free_platform_resources(
 			struct msm_vidc_platform_resources *res)
 {
-	msm_vidc_free_clock_table(res);
-	msm_vidc_free_regulator_table(res);
 	msm_vidc_free_freq_table(res);
 	msm_vidc_free_reg_table(res);
 	msm_vidc_free_bus_vectors(res);
 	msm_vidc_free_iommu_groups(res);
 	msm_vidc_free_buffer_usage_table(res);
+}
+
+static void msm_vidc_free_bus_vector(struct msm_bus_scale_pdata *bus_pdata)
+{
+	int i;
+	for (i = 0; i < bus_pdata->num_usecases; i++) {
+		bus_pdata->usecase[i].vectors = NULL;
+	}
+
+	bus_pdata->usecase = NULL;
 }
 
 static int msm_vidc_load_reg_table(struct msm_vidc_platform_resources *res)
@@ -228,77 +254,134 @@ static int msm_vidc_load_freq_table(struct msm_vidc_platform_resources *res)
 	return rc;
 }
 
+static int msm_vidc_load_bus_vector(struct platform_device *pdev,
+			struct msm_bus_scale_pdata *bus_pdata, u32 num_ports,
+			struct bus_pdata_config *bus_pdata_config)
+{
+	struct bus_values {
+	    u32 ab;
+	    u32 ib;
+	};
+	struct bus_values *values;
+	int i, j;
+	int rc = 0;
+
+	values = devm_kzalloc(&pdev->dev, sizeof(*values) *
+			bus_pdata->num_usecases, GFP_KERNEL);
+	if (!values) {
+		dprintk(VIDC_ERR, "%s Failed to alloc bus_values\n", __func__);
+		rc = -ENOMEM;
+		goto err_mem_alloc;
+	}
+
+	if (of_property_read_u32_array(pdev->dev.of_node,
+		    bus_pdata_config->name, (u32 *)values,
+		    bus_pdata->num_usecases * (sizeof(*values)/sizeof(u32)))) {
+		dprintk(VIDC_ERR, "%s Failed to read bus values\n", __func__);
+		rc = -EINVAL;
+		goto err_parse_dt;
+	}
+
+	bus_pdata->usecase = devm_kzalloc(&pdev->dev,
+			sizeof(*bus_pdata->usecase) * bus_pdata->num_usecases,
+			GFP_KERNEL);
+	if (!bus_pdata->usecase) {
+		dprintk(VIDC_ERR,
+			"%s Failed to alloc bus_pdata usecase\n", __func__);
+		rc = -ENOMEM;
+		goto err_parse_dt;
+	}
+	bus_pdata->name = bus_pdata_config->name;
+	for (i = 0; i < bus_pdata->num_usecases; i++) {
+		bus_pdata->usecase[i].vectors = devm_kzalloc(&pdev->dev,
+			sizeof(*bus_pdata->usecase[i].vectors) * num_ports,
+			GFP_KERNEL);
+		if (!bus_pdata->usecase[i].vectors) {
+			dprintk(VIDC_ERR,
+				"%s Failed to alloc bus_pdata usecase\n",
+				__func__);
+			break;
+		}
+		for (j = 0; j < num_ports; j++) {
+			bus_pdata->usecase[i].vectors[j].ab = (u64)values[i].ab
+									* 1000;
+			bus_pdata->usecase[i].vectors[j].ib = (u64)values[i].ib
+									* 1000;
+			bus_pdata->usecase[i].vectors[j].src =
+						bus_pdata_config->masters[j];
+			bus_pdata->usecase[i].vectors[j].dst =
+						bus_pdata_config->slaves[j];
+			dprintk(VIDC_DBG,
+				"ab = %llu, ib = %llu, src = %d, dst = %d\n",
+				bus_pdata->usecase[i].vectors[j].ab,
+				bus_pdata->usecase[i].vectors[j].ib,
+				bus_pdata->usecase[i].vectors[j].src,
+				bus_pdata->usecase[i].vectors[j].dst);
+		}
+		bus_pdata->usecase[i].num_paths = num_ports;
+	}
+	if (i < bus_pdata->num_usecases) {
+		for (--i; i >= 0; i--) {
+			bus_pdata->usecase[i].vectors = NULL;
+		}
+		bus_pdata->usecase = NULL;
+		rc = -EINVAL;
+	}
+err_parse_dt:
+err_mem_alloc:
+	return rc;
+}
+
 static int msm_vidc_load_bus_vectors(struct msm_vidc_platform_resources *res)
 {
+	u32 num_ports = 0;
+	int rc = 0;
+	int i;
 	struct platform_device *pdev = res->pdev;
-	struct device_node *child_node, *bus_node;
-	struct bus_set *buses = &res->bus_set;
-	int rc = 0, c = 0;
-	u32 num_buses = 0;
+	u32 num_bus_pdata = ARRAY_SIZE(bus_pdata_config_vector);
 
-	bus_node = of_find_node_by_name(pdev->dev.of_node,
-			"qcom,msm-bus-clients");
-	if (!bus_node) {
-		/* Not a required property */
-		dprintk(VIDC_DBG, "qcom,msm-bus-clients not found\n");
-		rc = 0;
-		goto err_bad_node;
-	}
+	if (of_property_read_u32_array(pdev->dev.of_node, "qcom,bus-ports",
+			(u32 *)&num_ports, 1) || (num_ports == 0))
+		goto err_mem_alloc;
 
-	for_each_child_of_node(bus_node, child_node)
-		++num_buses;
-
-	buses->bus_tbl = devm_kzalloc(&pdev->dev, sizeof(*buses->bus_tbl) *
-			num_buses, GFP_KERNEL);
-	if (!buses->bus_tbl) {
-		dprintk(VIDC_ERR, "%s: Failed to allocate memory\n", __func__);
+	res->bus_pdata = devm_kzalloc(&pdev->dev, sizeof(*res->bus_pdata) *
+			num_bus_pdata, GFP_KERNEL);
+	if (!res->bus_pdata) {
+		dprintk(VIDC_ERR, "Failed to alloc memory\n");
 		rc = -ENOMEM;
-		goto err_bad_node;
+		goto err_mem_alloc;
 	}
-
-	buses->count = num_buses;
-	c = 0;
-
-	for_each_child_of_node(bus_node, child_node) {
-		u32 configs = 0;
-		struct bus_info *bus = &buses->bus_tbl[c];
-
-		rc = of_property_read_u32(child_node, "qcom,bus-configs",
-				&configs);
-		if (rc) {
-			dprintk(VIDC_ERR,
-					"Failed to read qcom,bus-configs in %s: %d\n",
-					child_node->name, rc);
-			break;
-		} else if (!configs) {
-			dprintk(VIDC_ERR,
-					"qcom,bus-configs in %s needs to be applicable for some codec\n",
-					child_node->name);
+	for (i = 0; i < num_bus_pdata; i++) {
+		if (!res->ocmem_size &&
+			(!strcmp(bus_pdata_config_vector[i].name,
+				"qcom,enc-ocmem-ab-ib")
+			|| !strcmp(bus_pdata_config_vector[i].name,
+				"qcom,dec-ocmem-ab-ib"))) {
+			continue;
+		}
+		res->bus_pdata[i].num_usecases = get_u32_array_num_elements(
+					pdev, bus_pdata_config_vector[i].name);
+		if (res->bus_pdata[i].num_usecases == 0) {
+			dprintk(VIDC_ERR, "no elements in %s\n",
+				bus_pdata_config_vector[i].name);
 			rc = -EINVAL;
 			break;
 		}
 
-		bus->sessions_supported = configs;
-		bus->pdata = msm_bus_pdata_from_node(pdev, child_node);
-		if (IS_ERR_OR_NULL(bus->pdata)) {
-			rc = PTR_ERR(bus->pdata);
-			dprintk(VIDC_ERR, "Failed to get bus pdata: %d\n", rc);
+		rc = msm_vidc_load_bus_vector(pdev, &res->bus_pdata[i],
+				num_ports, &bus_pdata_config_vector[i]);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"Failed to load bus vector: %d\n", i);
 			break;
 		}
-
-		dprintk(VIDC_DBG, "Bus %s supports: %x\n", bus->pdata->name,
-				bus->sessions_supported);
-		++c;
 	}
-
-	if (c < num_buses) {
-		for (c--; c >= 0; c--)
-			msm_bus_cl_clear_pdata(buses->bus_tbl[c].pdata);
-
-		goto err_bad_node;
+	if (i < num_bus_pdata) {
+		for (--i; i >= 0; i--)
+			msm_vidc_free_bus_vector(&res->bus_pdata[i]);
+		res->bus_pdata = NULL;
 	}
-
-err_bad_node:
+err_mem_alloc:
 	return rc;
 }
 
@@ -401,7 +484,7 @@ static int msm_vidc_load_iommu_groups(struct msm_vidc_platform_resources *res)
 			of_property_read_bool(ctx_node,	"qcom,secure-domain");
 
 		dprintk(VIDC_DBG,
-				"domain %s : secure = %d\n",
+				"domain %s : secure = %d",
 				iommu_map->name,
 				iommu_map->is_secure);
 
@@ -413,7 +496,7 @@ static int msm_vidc_load_iommu_groups(struct msm_vidc_platform_resources *res)
 
 		if (rc) {
 			dprintk(VIDC_ERR,
-					"cannot load partition buffertype information (%d)\n",
+					"cannot load partition buffertype information (%d)",
 					rc);
 			rc = -ENOENT;
 			goto err_load_groups;
@@ -477,167 +560,6 @@ err_load_buf_usage:
 	return rc;
 }
 
-static int msm_vidc_load_regulator_table(
-		struct msm_vidc_platform_resources *res)
-{
-	int rc = 0;
-	struct platform_device *pdev = res->pdev;
-	struct regulator_set *regulators = &res->regulator_set;
-	struct device_node *domains_parent_node = NULL;
-	struct property *domains_property = NULL;
-
-	regulators->count = 0;
-	regulators->regulator_tbl = NULL;
-
-	domains_parent_node = pdev->dev.of_node;
-	for_each_property_of_node(domains_parent_node, domains_property) {
-		const char *search_string = "-supply";
-		char *supply;
-		bool matched = false;
-		struct device_node *regulator_node = NULL;
-		struct regulator_info *rinfo = NULL;
-		void *temp = NULL;
-
-		/* 1) check if current property is possibly a regulator */
-		supply = strnstr(domains_property->name, search_string,
-				strlen(domains_property->name) + 1);
-		matched = supply && (*(supply + strlen(search_string)) == '\0');
-		if (!matched)
-			continue;
-
-		/* 2) make sure prop isn't being misused */
-		regulator_node = of_parse_phandle(domains_parent_node,
-				domains_property->name, 0);
-		if (IS_ERR(regulator_node)) {
-			dprintk(VIDC_WARN, "%s is not a phandle\n",
-					domains_property->name);
-			continue;
-		}
-
-		/* 3) expand our table */
-		temp = krealloc(regulators->regulator_tbl,
-				sizeof(*regulators->regulator_tbl) *
-				(regulators->count + 1), GFP_KERNEL);
-		if (!temp) {
-			rc = -ENOMEM;
-			dprintk(VIDC_ERR,
-					"Failed to alloc memory for regulator table\n");
-			goto err_reg_tbl_alloc;
-		}
-
-		regulators->regulator_tbl = temp;
-		regulators->count++;
-
-		/* 4) populate regulator info */
-		rinfo = &regulators->regulator_tbl[regulators->count - 1];
-		rinfo->name = kstrndup(domains_property->name,
-				supply - domains_property->name, GFP_KERNEL);
-		if (!rinfo->name) {
-			rc = -ENOMEM;
-			dprintk(VIDC_ERR,
-					"Failed to alloc memory for regulator name\n");
-			goto err_reg_name_alloc;
-		}
-
-		rinfo->has_hw_power_collapse = of_property_read_bool(
-			regulator_node, "qcom,support-hw-trigger");
-
-		dprintk(VIDC_DBG, "Found regulator %s: h/w collapse = %s\n",
-				rinfo->name,
-				rinfo->has_hw_power_collapse ? "yes" : "no");
-	}
-
-	if (!regulators->count)
-		dprintk(VIDC_DBG, "No regulators found");
-
-	return 0;
-
-err_reg_name_alloc:
-err_reg_tbl_alloc:
-	msm_vidc_free_regulator_table(res);
-	return rc;
-}
-
-static int msm_vidc_load_clock_table(
-		struct msm_vidc_platform_resources *res)
-{
-	int rc = 0, num_clocks = 0, c = 0;
-	struct platform_device *pdev = res->pdev;
-	int *clock_props = NULL;
-	struct clock_set *clocks = &res->clock_set;
-
-	num_clocks = of_property_count_strings(pdev->dev.of_node,
-				"qcom,clock-names");
-	if (num_clocks <= 0) {
-		/* Devices such as Q6 might not have any control over clocks
-		 * hence have none specified, which is ok. */
-		dprintk(VIDC_DBG, "No clocks found\n");
-		clocks->count = 0;
-		rc = 0;
-		goto err_load_clk_table_fail;
-	}
-
-	clock_props = devm_kzalloc(&pdev->dev, num_clocks *
-			sizeof(*clock_props), GFP_KERNEL);
-	if (!clock_props) {
-		dprintk(VIDC_ERR, "No memory to read clock properties\n");
-		rc = -ENOMEM;
-		goto err_load_clk_table_fail;
-	}
-
-	rc = of_property_read_u32_array(pdev->dev.of_node,
-				"qcom,clock-configs", clock_props,
-				num_clocks);
-	if (rc) {
-		dprintk(VIDC_ERR, "Failed to read clock properties: %d\n", rc);
-		goto err_load_clk_prop_fail;
-	}
-
-	clocks->clock_tbl = devm_kzalloc(&pdev->dev, sizeof(*clocks->clock_tbl)
-			* num_clocks, GFP_KERNEL);
-	if (!clocks->clock_tbl) {
-		dprintk(VIDC_ERR, "Failed to allocate memory for clock tbl\n");
-		rc = -ENOMEM;
-		goto err_load_clk_prop_fail;
-	}
-
-	clocks->count = num_clocks;
-	dprintk(VIDC_DBG, "Found %d clocks\n", num_clocks);
-
-	for (c = 0; c < num_clocks; ++c) {
-		struct clock_info *vc = &res->clock_set.clock_tbl[c];
-
-		of_property_read_string_index(pdev->dev.of_node,
-				"qcom,clock-names", c, &vc->name);
-
-		if (clock_props[c] & CLOCK_PROP_HAS_SCALING) {
-			vc->count = res->load_freq_tbl_size;
-			vc->load_freq_tbl = res->load_freq_tbl;
-		} else {
-			vc->count = 0;
-			vc->load_freq_tbl = NULL;
-		}
-
-		vc->has_gating = !!(clock_props[c] & CLOCK_PROP_HAS_GATING);
-
-		dprintk(VIDC_DBG,
-			"Found clock %s: scale-able = %s, gate-able = %s\n",
-			vc->name, vc->count ? "yes" : "no",
-			vc->has_gating ? "yes" : "no");
-	}
-
-	res->sw_power_collapsible = of_property_read_bool(pdev->dev.of_node,
-					"qcom,sw-power-collapse");
-	dprintk(VIDC_DBG, "Power collapse supported = %s\n",
-		res->sw_power_collapsible ? "yes" : "no");
-
-	return 0;
-
-err_load_clk_prop_fail:
-err_load_clk_table_fail:
-	return rc;
-}
-
 int read_platform_resources_from_dt(
 		struct msm_vidc_platform_resources *res)
 {
@@ -659,12 +581,11 @@ int read_platform_resources_from_dt(
 	kres = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	res->irq = kres ? kres->start : -1;
 
-	of_property_read_u32(pdev->dev.of_node,
-			"qcom,ocmem-size", &res->ocmem_size);
-
-	res->sys_idle_indicator = of_property_read_bool(pdev->dev.of_node,
-			"qcom,enable-idle-indicator");
-
+	rc = of_property_read_u32(pdev->dev.of_node,
+						"qcom,ocmem-size", &res->ocmem_size);
+	if (rc) {
+		dprintk(VIDC_INFO, "Failed to read ocmem size: %d\n", rc);
+	}
 	rc = msm_vidc_load_freq_table(res);
 	if (rc) {
 		dprintk(VIDC_ERR, "Failed to load freq table: %d\n", rc);
@@ -692,34 +613,16 @@ int read_platform_resources_from_dt(
 		goto err_load_buffer_usage_table;
 	}
 
-	rc = msm_vidc_load_regulator_table(res);
-	if (rc) {
-		dprintk(VIDC_ERR, "Failed to load list of regulators %d\n", rc);
-		goto err_load_regulator_table;
-	}
-
-	rc = msm_vidc_load_clock_table(res);
-	if (rc) {
-		dprintk(VIDC_ERR,
-			"Failed to load clock table: %d\n", rc);
-		goto err_load_clock_table;
-	}
-
 	rc = of_property_read_u32(pdev->dev.of_node, "qcom,max-hw-load",
 			&res->max_load);
 	if (rc) {
 		dprintk(VIDC_ERR,
 			"Failed to determine max load supported: %d\n", rc);
-		goto err_load_max_hw_load;
+		goto err_load_buffer_usage_table;
 	}
 
 	return rc;
-err_load_max_hw_load:
-	msm_vidc_free_clock_table(res);
-err_load_clock_table:
-	msm_vidc_free_regulator_table(res);
-err_load_regulator_table:
-	msm_vidc_free_buffer_usage_table(res);
+
 err_load_buffer_usage_table:
 	msm_vidc_free_iommu_groups(res);
 err_load_iommu_groups:
