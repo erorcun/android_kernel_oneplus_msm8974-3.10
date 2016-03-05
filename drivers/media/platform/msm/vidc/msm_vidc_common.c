@@ -48,7 +48,16 @@ static inline bool is_turbo_session(struct msm_vidc_inst *inst)
 
 static bool is_thumbnail_session(struct msm_vidc_inst *inst)
 {
-	return !!(inst->flags & VIDC_THUMBNAIL);
+	if (inst->session_type == MSM_VIDC_DECODER) {
+		int rc = 0;
+		struct v4l2_control ctrl = {
+			.id = V4L2_CID_MPEG_VIDC_VIDEO_SYNC_FRAME_DECODE
+		};
+		rc = v4l2_g_ctrl(&inst->ctrl_handler, &ctrl);
+		if (!rc && ctrl.value)
+			return true;
+	}
+	return false;
 }
 
 static inline bool is_non_realtime_session(struct msm_vidc_inst *inst)
