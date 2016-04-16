@@ -236,6 +236,7 @@ struct fuse_file_lock {
 #define FUSE_DO_READDIRPLUS	(1 << 13)
 #define FUSE_READDIRPLUS_AUTO	(1 << 14)
 #define FUSE_ASYNC_DIO		(1 << 15)
+#define FUSE_SHORTCIRCUIT	(1 << 31)
 
 /**
  * CUSE INIT request/reply flags
@@ -453,13 +454,13 @@ struct fuse_create_in {
 	uint32_t	flags;
 	uint32_t	mode;
 	uint32_t	umask;
-	uint32_t	padding;
+	int32_t	lower_fd;
 };
 
 struct fuse_open_out {
 	uint64_t	fh;
 	uint32_t	open_flags;
-	uint32_t	padding;
+	int32_t	lower_fd;
 };
 
 struct fuse_release_in {
