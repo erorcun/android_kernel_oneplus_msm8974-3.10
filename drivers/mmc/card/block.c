@@ -2779,6 +2779,7 @@ out:
 	 *   (all existing requests completed or reinserted to the block layer)
 	 */
 	if ((!req && !(test_bit(MMC_QUEUE_NEW_REQUEST, &mq->flags))) ||
+			(cmd_flags & MMC_REQ_SPECIAL_MASK) ||
 			((test_bit(MMC_QUEUE_URGENT_REQUEST, &mq->flags)) &&
 			 !(mq->mqrq_cur->req->cmd_flags &
 				MMC_REQ_NOREINSERT_MASK))) {
