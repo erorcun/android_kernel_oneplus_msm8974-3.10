@@ -790,7 +790,7 @@ int sps_bam_pipe_connect(struct sps_pipe *bam_pipe,
 
 		/* Clear the data FIFO for debug */
 		if (map->data.base != NULL && bam_pipe->mode == SPS_MODE_SRC)
-			memset(map->data.base, 0, hw_params.data_size);
+			memset_io(map->data.base, 0, hw_params.data_size);
 
 		/* set NWD bit for BAM2BAM producer pipe */
 		if (bam_pipe->mode == SPS_MODE_SRC) {
@@ -835,7 +835,7 @@ int sps_bam_pipe_connect(struct sps_pipe *bam_pipe,
 	if (desc_buf != NULL)
 		if (bam_pipe->mode == SPS_MODE_SRC ||
 		    hw_params.mode == BAM_PIPE_MODE_SYSTEM)
-			memset(desc_buf, 0, hw_params.desc_size);
+			memset_io(desc_buf, 0, hw_params.desc_size);
 
 	bam_pipe->desc_size = hw_params.desc_size;
 	bam_pipe->num_descs = bam_pipe->desc_size / sizeof(struct sps_iovec);
@@ -1072,7 +1072,7 @@ int sps_bam_pipe_set_params(struct sps_bam *dev, u32 pipe_index, u32 options)
 	    (no_queue != pipe->sys.no_queue
 	     || ack_xfers != pipe->sys.ack_xfers)) {
 		SPS_ERR(
-			"sps:Queue/ack mode change after transfer: BAM %pa pipe %d opt 0x%d\n",
+			"sps:Queue/ack mode change after transfer: BAM %pa pipe %d opt 0x%x\n",
 			BAM_ID(dev), pipe_index, options);
 		return SPS_ERROR;
 	}
@@ -1082,7 +1082,7 @@ int sps_bam_pipe_set_params(struct sps_bam *dev, u32 pipe_index, u32 options)
 	if ((pipe->state & BAM_STATE_BAM2BAM) &&
 	    (options & BAM2BAM_O_INVALID)) {
 		SPS_ERR(
-			"sps:Invalid option for BAM-to-BAM: BAM %pa pipe %d opt 0x%d\n",
+			"sps:Invalid option for BAM-to-BAM: BAM %pa pipe %d opt 0x%x\n",
 			BAM_ID(dev), pipe_index, options);
 		return SPS_ERROR;
 	}
@@ -1113,7 +1113,7 @@ int sps_bam_pipe_set_params(struct sps_bam *dev, u32 pipe_index, u32 options)
 							GFP_KERNEL);
 			}
 			if (pipe->sys.desc_cache == NULL) {
-				SPS_ERR("sps:No memory for pipe%d of BAM 0x%x\n",
+				SPS_ERR("sps:No memory for pipe%d of BAM %pa\n",
 						pipe_index, BAM_ID(dev));
 				return -ENOMEM;
 			}
@@ -1122,7 +1122,7 @@ int sps_bam_pipe_set_params(struct sps_bam *dev, u32 pipe_index, u32 options)
 				vmalloc(pipe->desc_size + size);
 
 			if (pipe->sys.desc_cache == NULL) {
-				SPS_ERR("sps:No memory for pipe %d of BAM 0x%x\n",
+				SPS_ERR("sps:No memory for pipe %d of BAM %pa\n",
 						pipe_index, BAM_ID(dev));
 				return -ENOMEM;
 			}
