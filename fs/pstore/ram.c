@@ -61,10 +61,10 @@ module_param(mem_size, ulong, 0400);
 MODULE_PARM_DESC(mem_size,
 		"size of reserved RAM used to store oops/panic logs");
 
-static int dump_oops = 1;
-module_param(dump_oops, int, 0600);
-MODULE_PARM_DESC(dump_oops,
-		"set to 1 to dump oopses, 0 to only dump panics (default 1)");
+static int log_level = 1;
+module_param(log_level, int, 0600);
+MODULE_PARM_DESC(log_level,
+		"0: panic 1:oops 2:emerg 3:restart 4:halt (default 1)");
 
 static int ramoops_ecc;
 module_param_named(ecc, ramoops_ecc, int, 0600);
@@ -82,10 +82,11 @@ struct ramoops_context {
 	size_t record_size;
 	size_t console_size;
 	size_t ftrace_size;
-	int dump_oops;
+	int log_level;
 	struct persistent_ram_ecc_info ecc_info;
 	unsigned int max_dump_cnt;
 	unsigned int dump_write_cnt;
+	/* _read_cnt need clear on ramoops_pstore_open */
 	unsigned int dump_read_cnt;
 	unsigned int console_read_cnt;
 	unsigned int ftrace_read_cnt;
@@ -101,6 +102,7 @@ static int ramoops_pstore_open(struct pstore_info *psi)
 
 	cxt->dump_read_cnt = 0;
 	cxt->console_read_cnt = 0;
+	cxt->ftrace_read_cnt = 0;
 	return 0;
 }
 
@@ -131,6 +133,12 @@ ramoops_get_next_prz(struct persistent_ram_zone *przs[], uint *c, uint max,
 	return prz;
 }
 
+static bool prz_ok(struct persistent_ram_zone *prz)
+{
+	return !!prz && !!(persistent_ram_old_size(prz) +
+			   persistent_ram_ecc_string(prz, NULL, 0));
+}
+
 static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 				   int *count, struct timespec *time,
 				   char **buf, struct pstore_info *psi)
@@ -143,13 +151,13 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 	prz = ramoops_get_next_prz(cxt->przs, &cxt->dump_read_cnt,
 				   cxt->max_dump_cnt, id, type,
 				   PSTORE_TYPE_DMESG, 1);
-	if (!prz)
+	if (!prz_ok(prz))
 		prz = ramoops_get_next_prz(&cxt->cprz, &cxt->console_read_cnt,
 					   1, id, type, PSTORE_TYPE_CONSOLE, 0);
-	if (!prz)
+	if (!prz_ok(prz))
 		prz = ramoops_get_next_prz(&cxt->fprz, &cxt->ftrace_read_cnt,
 					   1, id, type, PSTORE_TYPE_FTRACE, 0);
-	if (!prz)
+	if (!prz_ok(prz))
 		return 0;
 
 	/* TODO(kees): Bogus time for the moment. */
@@ -221,11 +229,23 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 	 * to only store crash logs, rather than storing general kernel logs.
 	 */
 	if (reason != KMSG_DUMP_OOPS &&
+	    reason != KMSG_DUMP_RESTART &&
+	    reason != KMSG_DUMP_EMERG &&
+	    reason != KMSG_DUMP_HALT &&
 	    reason != KMSG_DUMP_PANIC)
 		return -EINVAL;
 
 	/* Skip Oopes when configured to do so. */
-	if (reason == KMSG_DUMP_OOPS && !cxt->dump_oops)
+	if (reason == KMSG_DUMP_OOPS && !cxt->log_level)
+		return -EINVAL;
+
+	if (reason == KMSG_DUMP_EMERG && cxt->log_level < 2)
+		return -EINVAL;
+
+	if (reason == KMSG_DUMP_RESTART && cxt->log_level < 3)
+		return -EINVAL;
+
+	if (reason == KMSG_DUMP_HALT && cxt->log_level < 4)
 		return -EINVAL;
 
 	/* Explicitly only take the first part of any new crash.
@@ -414,13 +434,12 @@ static int ramoops_probe(struct platform_device *pdev)
 	if (!is_power_of_2(pdata->ftrace_size))
 		pdata->ftrace_size = rounddown_pow_of_two(pdata->ftrace_size);
 
-	cxt->dump_read_cnt = 0;
 	cxt->size = pdata->mem_size;
 	cxt->phys_addr = pdata->mem_address;
 	cxt->record_size = pdata->record_size;
 	cxt->console_size = pdata->console_size;
 	cxt->ftrace_size = pdata->ftrace_size;
-	cxt->dump_oops = pdata->dump_oops;
+	cxt->log_level = pdata->log_level;
 	cxt->ecc_info = pdata->ecc_info;
 
 	paddr = cxt->phys_addr;
@@ -439,14 +458,6 @@ static int ramoops_probe(struct platform_device *pdev)
 			       LINUX_VERSION_CODE);
 	if (err)
 		goto fail_init_fprz;
-
-	if (!cxt->przs && !cxt->cprz && !cxt->fprz) {
-		pr_err("memory size too small, minimum is %zu\n",
-			cxt->console_size + cxt->record_size +
-			cxt->ftrace_size);
-		err = -EINVAL;
-		goto fail_cnt;
-	}
 
 	cxt->pstore.data = cxt;
 	/*
@@ -479,7 +490,7 @@ static int ramoops_probe(struct platform_device *pdev)
 	mem_size = pdata->mem_size;
 	mem_address = pdata->mem_address;
 	record_size = pdata->record_size;
-	dump_oops = pdata->dump_oops;
+	log_level = pdata->log_level;
 
 	pr_info("attached 0x%lx@0x%llx, ecc: %d/%d\n",
 		cxt->size, (unsigned long long)cxt->phys_addr,
@@ -492,7 +503,6 @@ fail_buf:
 fail_clear:
 	cxt->pstore.bufsize = 0;
 	cxt->max_dump_cnt = 0;
-fail_cnt:
 	kfree(cxt->fprz);
 fail_init_fprz:
 	kfree(cxt->cprz);
@@ -550,7 +560,7 @@ static void ramoops_register_dummy(void)
 	dummy_data->record_size = record_size;
 	dummy_data->console_size = ramoops_console_size;
 	dummy_data->ftrace_size = ramoops_ftrace_size;
-	dummy_data->dump_oops = dump_oops;
+	dummy_data->log_level = log_level;
 	/*
 	 * For backwards compatibility ramoops.ecc=1 means 16 bytes ECC
 	 * (using 1 byte for ECC isn't much of use anyway).
