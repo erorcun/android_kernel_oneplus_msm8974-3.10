@@ -40,7 +40,6 @@ struct hwmon_node {
 	unsigned long prev_ab;
 	unsigned long *dev_ab;
 	ktime_t prev_ts;
-	bool mon_started;
 	struct list_head list;
 	void *orig_data;
 	struct bw_hwmon *hw;
@@ -141,45 +140,19 @@ static void compute_bw(struct hwmon_node *node, int mbps,
 	*freq = (new_bw * 100) / node->io_percent;
 }
 
-static struct hwmon_node *find_hwmon_node(struct devfreq *df)
-{
-	struct hwmon_node *node, *found = NULL;
-
-	mutex_lock(&list_lock);
-	list_for_each_entry(node, &hwmon_list, list)
-		if (node->hw->dev == df->dev.parent ||
-		    node->hw->of_node == df->dev.parent->of_node ||
-		    node->gov == df->governor) {
-			found = node;
-			break;
-		}
-	mutex_unlock(&list_lock);
-
-	return found;
-}
-
 #define TOO_SOON_US	(1 * USEC_PER_MSEC)
-int update_bw_hwmon(struct bw_hwmon *hwmon)
+static irqreturn_t mon_intr_handler(int irq, void *dev)
 {
-	struct devfreq *df;
-	struct hwmon_node *node;
+	struct hwmon_node *node = dev;
+	struct devfreq *df = node->hw->df;
 	ktime_t ts;
 	unsigned int us;
 	int ret;
 
-	if (!hwmon)
-		return -EINVAL;
-	df = hwmon->df;
-	if (!df)
-		return -ENODEV;
-	node = find_hwmon_node(df);
-	if (!node)
-		return -ENODEV;
+	if (!node->hw->is_valid_irq(node->hw))
+		return IRQ_NONE;
 
-	if (!node->mon_started)
-		return -EBUSY;
-
-	dev_dbg(df->dev.parent, "Got update request\n");
+	dev_dbg(df->dev.parent, "Got interrupt\n");
 	devfreq_monitor_stop(df);
 
 	/*
@@ -199,13 +172,30 @@ int update_bw_hwmon(struct bw_hwmon *hwmon)
 		ret = update_devfreq(df);
 		if (ret)
 			dev_err(df->dev.parent,
-				"Unable to update freq on request!\n");
+				"Unable to update freq on IRQ!\n");
 		mutex_unlock(&df->lock);
 	}
 
 	devfreq_monitor_start(df);
 
-	return 0;
+	return IRQ_HANDLED;
+}
+
+static struct hwmon_node *find_hwmon_node(struct devfreq *df)
+{
+	struct hwmon_node *node, *found = NULL;
+
+	mutex_lock(&list_lock);
+	list_for_each_entry(node, &hwmon_list, list)
+		if (node->hw->dev == df->dev.parent ||
+		    node->hw->of_node == df->dev.parent->of_node ||
+		    node->gov == df->governor) {
+			found = node;
+			break;
+		}
+	mutex_unlock(&list_lock);
+
+	return found;
 }
 
 static int start_monitoring(struct devfreq *df)
@@ -246,7 +236,15 @@ static int start_monitoring(struct devfreq *df)
 	}
 
 	devfreq_monitor_start(df);
-	node->mon_started = true;
+
+	if (hw->irq)
+		ret = request_threaded_irq(hw->irq, NULL, mon_intr_handler,
+				  IRQF_ONESHOT | IRQF_SHARED,
+				  "bw_hwmon", node);
+	if (ret) {
+		dev_err(dev, "Unable to register interrupt handler!\n");
+		goto err_req_irq;
+	}
 
 	ret = sysfs_create_group(&df->dev.kobj, node->attr_grp);
 	if (ret)
@@ -255,7 +253,11 @@ static int start_monitoring(struct devfreq *df)
 	return 0;
 
 err_sysfs:
-	node->mon_started = false;
+	if (hw->irq) {
+		disable_irq(hw->irq);
+		free_irq(hw->irq, node);
+	}
+err_req_irq:
 	devfreq_monitor_stop(df);
 	hw->stop_hwmon(hw);
 err_start:
@@ -272,7 +274,10 @@ static void stop_monitoring(struct devfreq *df)
 	struct bw_hwmon *hw = node->hw;
 
 	sysfs_remove_group(&df->dev.kobj, node->attr_grp);
-	node->mon_started = false;
+	if (hw->irq) {
+		disable_irq(hw->irq);
+		free_irq(hw->irq, node);
+	}
 	devfreq_monitor_stop(df);
 	hw->stop_hwmon(hw);
 	df->data = node->orig_data;
