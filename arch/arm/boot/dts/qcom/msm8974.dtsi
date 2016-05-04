@@ -324,11 +324,21 @@
 	msm_vidc: qcom,vidc@fdc00000 {
 		compatible = "qcom,msm-vidc";
 		reg = <0xfdc00000 0xff000>;
+		qcom,qdss-presets = <0xfc307000 0x1000>,
+			<0xfc322000 0x1000>,
+			<0xfc319000 0x1000>,
+			<0xfc31a000 0x1000>,
+			<0xfc31b000 0x1000>,
+			<0xfc321000 0x1000>,
+			<0xfa180000 0x1000>,
+			<0xfa181000 0x1000>;
 		interrupts = <0 44 0>;
-		venus-supply = <&gdsc_venus>;
+//		venus-supply = <&gdsc_venus>;
+		vdd-supply = <&gdsc_venus>;
 		qcom,hfi = "venus";
 		qcom,ocmem-size = <524288>; /* 512 * 1024*/
 		qcom,max-hw-load = <1216800>; /* 3840 x 2160 @ 30 + 1080p @ 30*/
+		qcom,clock-names = "core_clk", "iface_clk", "bus_clk", "mem_clk";
 		clock-names = "core_clk", "iface_clk", "bus_clk", "mem_clk";
 		qcom,clock-configs = <0x3 0x0 0x0 0x0>;
 		qcom,sw-power-collapse;
@@ -430,7 +440,7 @@
 		qcom,cpu-dma-latency-us = <200>;
 
 		qcom,msm-bus,name = "sdhc1";
-		qcom,msm-bus,num-cases = <8>;
+		qcom,msm-bus,num-cases = <9>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps = <78 512 0 0>, /* No vote */
 				<78 512 1600 3200>,    /* 400 KB/s*/
@@ -439,8 +449,11 @@
 				<78 512 200000 400000>, /* 50 MB/s */
 				<78 512 400000 800000>, /* 100 MB/s */
 				<78 512 800000 1600000>, /* 200 MB/s */
+				<78 512 800000 1600000>, /* 400 MB/s */
 				<78 512 2048000 4096000>; /* Max. bandwidth */
-		qcom,bus-bw-vectors-bps = <0 400000 20000000 25000000 50000000 100000000 200000000 4294967295>;
+		qcom,bus-bw-vectors-bps = <0 400000 20000000 25000000 50000000
+						100000000 200000000 400000000
+						4294967295>;
 		qcom,dat1-mpm-int = <42>;
 		status = "disable";
 	};
@@ -1805,6 +1818,11 @@
 			compatible = "qcom,msm-dai-q6-dev";
 			qcom,msm-dai-q6-dev-id = <32773>;
 		};
+
+		qcom,msm-dai-q6-incall-music-2-rx {
+			compatible = "qcom,msm-dai-q6-dev";
+			qcom,msm-dai-q6-dev-id = <32770>;
+		};
 	};
 
 	qcom,msm-pri-auxpcm {
@@ -2029,9 +2047,12 @@
 
 		vdd-supply = <&gdsc_venus>;
 		proxy-reg-names = "vdd";
+		qcom,proxy-reg-names = "vdd";
 		clock-names = "core_clk", "iface_clk",
 				"bus_clk", "mem_clk";
 		proxy-clock-names = "core_clk", "iface_clk",
+					"bus_clk", "mem_clk";
+		qcom,proxy-clock-names = "core_clk", "iface_clk",
 					"bus_clk", "mem_clk";
 
 		qcom,msm-bus,name = "pil-venus";
@@ -2684,6 +2705,7 @@
 };
 
 &gdsc_venus {
+	qcom,clock-names = "core_clk";
 	clock-names = "core_clk";
 	clocks = <&clock_mmss clk_venus0_vcodec0_clk>;
 	status = "ok";
@@ -2691,6 +2713,7 @@
 
 &gdsc_mdss {
 	clock-names = "core_clk", "lut_clk";
+	qcom,clock-names = "core_clk", "lut_clk";
 	clocks = <&clock_mmss clk_mdss_mdp_clk>,
 	         <&clock_mmss clk_mdss_mdp_lut_clk>;
 	status = "ok";
