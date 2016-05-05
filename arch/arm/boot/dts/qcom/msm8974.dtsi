@@ -1484,10 +1484,10 @@
 			< 2265600000  925000 691 >;
 	};
 
-	cache: qcom,cache {
+	cache: qcom,cache@0 {
+		reg = <0 4>;
 		compatible = "devfreq-simple-dev";
-		clock-names = "devfreq_clk";
-		clocks = <&clock_krait clk_l2_clk>;
+		clock-name = "l2_clk";
 		governor = "cpufreq";
 		freq-tbl-khz =
 			<  300000 >,
@@ -2773,7 +2773,6 @@
 
 &gdsc_mdss {
 	clock-names = "core_clk", "lut_clk";
-	qcom,clock-names = "core_clk", "lut_clk";
 	clocks = <&clock_mmss clk_mdss_mdp_clk>,
 	         <&clock_mmss clk_mdss_mdp_lut_clk>;
 	status = "ok";
