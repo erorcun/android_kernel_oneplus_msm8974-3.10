@@ -32,7 +32,7 @@
 			};
 		};
 
-		sdhc2_cd_pin {
+		sdhc2_cd: sdhc2_cd_pin {
 			/* check that this is indeed gpio 38 */
 			qcom,pins = <&gp 62>;
 			qcom,num-grp-pins = <1>;
