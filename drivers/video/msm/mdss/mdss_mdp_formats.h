@@ -19,16 +19,14 @@
 #include "mdss_mdp.h"
 
 	/*
-	 * Value of enum choosen to fit the number of bits
-	 * expected by the HW programming.
+	 * number of bits for source component,
+	 * 0 = 1 bit, 1 = 2 bits, 2 = 6 bits, 3 = 8 bits
 	 */
 enum {
 	COLOR_4BIT,
 	COLOR_5BIT,
 	COLOR_6BIT,
 	COLOR_8BIT,
-	COLOR_ALPHA_1BIT = 0,
-	COLOR_ALPHA_4BIT = 1,
 };
 
 #define FMT_RGB_565(fmt, e0, e1, e2)				\
@@ -47,25 +45,6 @@ enum {
 			[C1_B_Cb] = COLOR_5BIT,			\
 		},						\
 	}
-
-#define FMT_RGB_565_TILE(fmt, e0, e1, e2)				\
-	{							\
-		.format = (fmt),				\
-		.fetch_planes = MDSS_MDP_PLANE_INTERLEAVED,	\
-		.unpack_tight = 1,				\
-		.unpack_align_msb = 0,				\
-		.alpha_enable = 0,				\
-		.unpack_count = 3,				\
-		.bpp = 2,					\
-		.tile = 1,					\
-		.element = { (e0), (e1), (e2) },		\
-		.bits = {					\
-			[C2_R_Cr] = COLOR_5BIT,			\
-			[C0_G_Y] = COLOR_6BIT,			\
-			[C1_B_Cb] = COLOR_5BIT,			\
-		},						\
-	}
-
 
 #define FMT_RGB_888(fmt, e0, e1, e2)				\
 	{							\
@@ -153,47 +132,9 @@ enum {
 		.element = { (e0), (e1) }			\
 	}
 
-#define FMT_RGB_1555(fmt, alpha_en, e0, e1, e2, e3)		\
-	{							\
-		.format = (fmt),				\
-		.fetch_planes = MDSS_MDP_PLANE_INTERLEAVED,	\
-		.unpack_tight = 1,				\
-		.unpack_align_msb = 0,				\
-		.alpha_enable = (alpha_en),			\
-		.unpack_count = 4,				\
-		.bpp = 2,					\
-		.element = { (e0), (e1), (e2), (e3) },		\
-		.bits = {					\
-			[C3_ALPHA] = COLOR_ALPHA_1BIT,		\
-			[C2_R_Cr] = COLOR_5BIT,			\
-			[C0_G_Y] = COLOR_5BIT,			\
-			[C1_B_Cb] = COLOR_5BIT,			\
-		},						\
-	}
-
-#define FMT_RGB_4444(fmt, alpha_en, e0, e1, e2, e3)		\
-	{							\
-		.format = (fmt),				\
-		.fetch_planes = MDSS_MDP_PLANE_INTERLEAVED,	\
-		.unpack_tight = 1,				\
-		.unpack_align_msb = 0,				\
-		.alpha_enable = (alpha_en),			\
-		.unpack_count = 4,				\
-		.bpp = 2,					\
-		.element = { (e0), (e1), (e2), (e3) },		\
-		.bits = {					\
-			[C3_ALPHA] = COLOR_ALPHA_4BIT,		\
-			[C2_R_Cr] = COLOR_4BIT,			\
-			[C0_G_Y] = COLOR_4BIT,			\
-			[C1_B_Cb] = COLOR_4BIT,			\
-		},						\
-	}
-
 static struct mdss_mdp_format_params mdss_mdp_format_map[] = {
 	FMT_RGB_565(MDP_RGB_565, C1_B_Cb, C0_G_Y, C2_R_Cr),
 	FMT_RGB_565(MDP_BGR_565, C2_R_Cr, C0_G_Y, C1_B_Cb),
-	FMT_RGB_565_TILE(MDP_RGB_565_TILE, C1_B_Cb, C0_G_Y, C2_R_Cr),
-	FMT_RGB_565_TILE(MDP_BGR_565_TILE, C2_R_Cr, C0_G_Y, C1_B_Cb),
 	FMT_RGB_888(MDP_RGB_888, C2_R_Cr, C0_G_Y, C1_B_Cb),
 	FMT_RGB_888(MDP_BGR_888, C1_B_Cb, C0_G_Y, C2_R_Cr),
 
@@ -267,10 +208,6 @@ static struct mdss_mdp_format_params mdss_mdp_format_map[] = {
 		.bpp = 2,
 		.element = { C2_R_Cr, C0_G_Y, C1_B_Cb, C0_G_Y },
 	},
-	FMT_RGB_1555(MDP_RGBA_5551, 1, C3_ALPHA, C1_B_Cb, C0_G_Y, C2_R_Cr),
-	FMT_RGB_1555(MDP_ARGB_1555, 1, C1_B_Cb, C0_G_Y, C2_R_Cr, C3_ALPHA),
-	FMT_RGB_4444(MDP_RGBA_4444, 1, C3_ALPHA, C1_B_Cb, C0_G_Y, C2_R_Cr),
-	FMT_RGB_4444(MDP_ARGB_4444, 1, C1_B_Cb, C0_G_Y, C2_R_Cr, C3_ALPHA),
 
 };
 #endif

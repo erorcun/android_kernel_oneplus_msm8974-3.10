@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,7 +23,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/uaccess.h>
 
-#include <linux/msm-sps.h>
+#include <mach/sps.h>
 
 #include "mdss.h"
 #include "mdss_panel.h"
@@ -192,7 +192,7 @@ static int mdss_panel_parse_dt(struct platform_device *pdev,
 	return rc;
 }
 
-static int mdss_qpic_panel_probe(struct platform_device *pdev)
+static int __devinit mdss_qpic_panel_probe(struct platform_device *pdev)
 {
 	int rc = 0;
 	static struct mdss_panel_data vendor_pdata;

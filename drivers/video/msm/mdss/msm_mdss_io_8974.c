@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,8 +15,8 @@
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/io.h>
-#include <linux/clk/msm-clk.h>
 
+#include <linux/clk/msm-clk.h>
 #include <mach/msm_iomap.h>
 
 #include "mdss_dsi.h"
@@ -30,7 +30,7 @@ static struct dsi_clk_desc dsi_pclk;
 
 static void mdss_dsi_phy_sw_reset(unsigned char *ctrl_base)
 {
-	/* start phy sw reset */
+        /* start phy sw reset */
 	MIPI_OUTP(ctrl_base + 0x12c, 0x0001);
 	udelay(1000);
 	wmb();
@@ -45,8 +45,8 @@ void mdss_dsi_phy_disable(struct mdss_dsi_ctrl_pdata *ctrl)
 	struct mdss_dsi_ctrl_pdata *ctrl0 = NULL;
 
 	if (ctrl == NULL) {
-		pr_err("%s: Invalid input data\n", __func__);
-		return;
+	        pr_err("%s: Invalid input data\n", __func__);
+	        return;
 	}
 
 	/*
@@ -56,21 +56,21 @@ void mdss_dsi_phy_disable(struct mdss_dsi_ctrl_pdata *ctrl)
 	 * or not.
 	 */
 	if ((ctrl->ndx == DSI_CTRL_0) &&
-		mdss_dsi_get_ctrl_by_index(DSI_CTRL_1)) {
-		pr_debug("%s: Dual dsi detected. skipping config for ctrl%d\n",
-			__func__, ctrl->ndx);
-		return;
+	        mdss_dsi_get_ctrl_by_index(DSI_CTRL_1)) {
+	        pr_debug("%s: Dual dsi detected. skipping config for ctrl%d\n",
+	                __func__, ctrl->ndx);
+	        return;
 	}
 
 	if (ctrl->ndx == DSI_CTRL_1) {
-		ctrl0 = mdss_dsi_get_ctrl_by_index(DSI_CTRL_0);
-		if (ctrl0) {
-			MIPI_OUTP(ctrl0->phy_io.base + 0x0170, 0x000);
-			MIPI_OUTP(ctrl0->phy_io.base + 0x0298, 0x000);
-		} else {
-			pr_warn("%s: Unable to get control%d\n",
-				__func__, DSI_CTRL_0);
-		}
+	        ctrl0 = mdss_dsi_get_ctrl_by_index(DSI_CTRL_0);
+	        if (ctrl0) {
+	                MIPI_OUTP(ctrl0->phy_io.base + 0x0170, 0x000);
+	                MIPI_OUTP(ctrl0->phy_io.base + 0x0298, 0x000);
+	        } else {
+	                pr_warn("%s: Unable to get control%d\n",
+	                        __func__, DSI_CTRL_0);
+	        }
 	}
 
 	MIPI_OUTP(ctrl->phy_io.base + 0x0170, 0x000);
@@ -83,11 +83,30 @@ void mdss_dsi_phy_disable(struct mdss_dsi_ctrl_pdata *ctrl)
 	wmb();
 }
 
-static void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+/**
+ * mdss_dsi_lp_cd_rx() -- enable LP and CD at receiving
+ * @ctrl: pointer to DSI controller structure
+ *
+ * LP: low power
+ * CD: contention detection
+ */
+void mdss_dsi_lp_cd_rx(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	struct mdss_dsi_phy_ctrl *pd;
+
+	pd = &(((ctrl->panel_data).panel_info.mipi).dsi_phy_db);
+
+	/* Strength ctrl 1, LP Rx + CD Rxcontention detection */
+	MIPI_OUTP((ctrl->phy_io.base) + 0x0188, pd->strength[1]);
+	wmb();
+}
+
+static void mdss_dsi_28nm_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	struct mdss_dsi_phy_ctrl *pd;
 	int i, off, ln, offset;
 	struct mdss_dsi_ctrl_pdata *temp_ctrl = NULL;
+	u32 ctrl_rev;
 
 	if (!ctrl_pdata) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -132,9 +151,9 @@ static void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	/* Regulator ctrl 4 */
 	MIPI_OUTP((temp_ctrl->phy_io.base) + 0x290, pd->regulator[4]);
 
-	/* LDO ctrl 0 */
-	if ((ctrl_pdata->panel_data).panel_info.pdest == DISPLAY_1)
-		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x00);
+	/* LDO ctrl */
+	if (pd->reg_ldo_mode)
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x25);
 	else
 		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x00);
 
@@ -149,10 +168,6 @@ static void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0174, 0x00);
 	/* MMSS_DSI_0_PHY_DSIPHY_CTRL_0 */
 	MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0170, 0x5f);
-	wmb();
-
-	/* Strength ctrl 1 */
-	MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0188, pd->strength[1]);
 	wmb();
 
 	/* 4 lanes + clk lane configuration */
@@ -172,8 +187,11 @@ static void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0170, 0x5f);
 	wmb();
 
+	ctrl_rev = MIPI_INP(ctrl_pdata->ctrl_base);
+
 	/* DSI_0_PHY_DSIPHY_GLBL_TEST_CTRL */
-	if ((ctrl_pdata->panel_data).panel_info.pdest == DISPLAY_1)
+	if (((ctrl_pdata->panel_data).panel_info.pdest == DISPLAY_1) ||
+			(ctrl_rev == MDSS_DSI_HW_REV_103_1))
 		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x01d4, 0x01);
 	else
 		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x01d4, 0x00);
@@ -188,8 +206,143 @@ static void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 
 }
 
+static void mdss_dsi_20nm_phy_init(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+	struct mdss_dsi_phy_ctrl *pd;
+	int i, off, ln, offset;
+	struct mdss_dsi_ctrl_pdata *temp_ctrl = NULL;
+
+	if (!ctrl_pdata) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return;
+	}
+	temp_ctrl = ctrl_pdata;
+	pd = &(((ctrl_pdata->panel_data).panel_info.mipi).dsi_phy_db);
+
+	/* Strength ctrl 0 */
+	MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0184, pd->strength[0]);
+
+	/*
+	 * Phy regulator ctrl settings.
+	 * In dual dsi configuration, the second controller also uses
+	 * the regulators of the first controller, irrespective of whether
+	 * broadcast mode is enabled or not.
+	 */
+	if (ctrl_pdata->ndx == DSI_CTRL_1) {
+		temp_ctrl = mdss_dsi_get_ctrl_by_index(DSI_CTRL_0);
+		if (!temp_ctrl) {
+			pr_err("%s: Unable to get master ctrl\n", __func__);
+			return;
+		}
+	}
+
+	if (pd->reg_ldo_mode) {
+		/* Regulator ctrl 0 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x280, 0x0);
+		/* Regulator ctrl - CAL_PWR_CFG */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x298, pd->regulator[6]);
+		udelay(1000);
+		/* Regulator ctrl - TEST */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x294, pd->regulator[5]);
+		/* Regulator ctrl 3 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x28c, pd->regulator[3]);
+		/* Regulator ctrl 2 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x288, pd->regulator[2]);
+		/* Regulator ctrl 1 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x284, pd->regulator[1]);
+		/* Regulator ctrl 4 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x290, pd->regulator[4]);
+		/* LDO ctrl */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x1d);
+	} else {
+		/* Regulator ctrl 0 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x280, 0x0);
+		/* Regulator ctrl - CAL_PWR_CFG */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x298, pd->regulator[6]);
+		udelay(1000);
+		/* Regulator ctrl 1 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x284, pd->regulator[1]);
+		/* Regulator ctrl 2 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x288, pd->regulator[2]);
+		/* Regulator ctrl 3 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x28c, pd->regulator[3]);
+		/* Regulator ctrl 4 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x290, pd->regulator[4]);
+		/* LDO ctrl */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x1dc, 0x00);
+		/* Regulator ctrl 0 */
+		MIPI_OUTP((temp_ctrl->phy_io.base) + 0x280, pd->regulator[0]);
+	}
+
+	off = 0x0140;	/* phy timing ctrl 0 - 11 */
+	for (i = 0; i < 12; i++) {
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + off, pd->timing[i]);
+		wmb();
+		off += 4;
+	}
+
+	/* Currently the Phy settings for the DSI 0 is done in clk prepare*/
+	if (ctrl_pdata->ndx == DSI_CTRL_1) {
+		/* MMSS_DSI_0_PHY_DSIPHY_CTRL_1 */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0174, 0x00);
+		/* MMSS_DSI_0_PHY_DSIPHY_CTRL_0 */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0170, 0x5f);
+		wmb();
+
+		/* MMSS_DSI_0_PHY_DSIPHY_CTRL_0 */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0170, 0x7f);
+		wmb();
+
+		/* DSI_0_PHY_DSIPHY_GLBL_TEST_CTRL */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x01d4, 0x00);
+
+		/* MMSS_DSI_0_PHY_DSIPHY_CTRL_2 */
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0178, 0x00);
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0178, 0x02);
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + 0x0178, 0x03);
+		wmb();
+	}
+
+	/* 4 lanes + clk lane configuration */
+	/* lane config n * (0 - 4) & DataPath setup */
+	for (ln = 0; ln < 5; ln++) {
+		off = (ln * 0x40);
+		for (i = 0; i < 9; i++) {
+			offset = i + (ln * 9);
+			MIPI_OUTP((ctrl_pdata->phy_io.base) + off,
+							pd->lanecfg[offset]);
+			wmb();
+			off += 4;
+		}
+	}
+
+	off = 0x01b4;	/* phy BIST ctrl 0 - 5 */
+	for (i = 0; i < 6; i++) {
+		MIPI_OUTP((ctrl_pdata->phy_io.base) + off, pd->bistctrl[i]);
+		wmb();
+		off += 4;
+	}
+
+}
+
+static void mdss_dsi_phy_init(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	u32 ctrl_rev;
+
+	if (!ctrl) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return;
+	}
+
+	ctrl_rev = MIPI_INP(ctrl->ctrl_base);
+	if (ctrl_rev == MDSS_DSI_HW_REV_103)
+		mdss_dsi_20nm_phy_init(ctrl);
+	else
+		mdss_dsi_28nm_phy_init(ctrl);
+}
+
 int mdss_dsi_clk_init(struct platform_device *pdev,
-	struct mdss_dsi_ctrl_pdata *ctrl)
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	struct device *dev = NULL;
 	int rc = 0;
@@ -200,89 +353,90 @@ int mdss_dsi_clk_init(struct platform_device *pdev,
 	}
 
 	dev = &pdev->dev;
-	ctrl->mdp_core_clk = clk_get(dev, "mdp_core_clk");
-	if (IS_ERR(ctrl->mdp_core_clk)) {
-		rc = PTR_ERR(ctrl->mdp_core_clk);
+	ctrl_pdata->mdp_core_clk = clk_get(dev, "mdp_core_clk");
+	if (IS_ERR(ctrl_pdata->mdp_core_clk)) {
+		rc = PTR_ERR(ctrl_pdata->mdp_core_clk);
 		pr_err("%s: Unable to get mdp core clk. rc=%d\n",
 			__func__, rc);
 		goto mdss_dsi_clk_err;
 	}
 
-	ctrl->ahb_clk = clk_get(dev, "iface_clk");
-	if (IS_ERR(ctrl->ahb_clk)) {
-		rc = PTR_ERR(ctrl->ahb_clk);
+	ctrl_pdata->ahb_clk = clk_get(dev, "iface_clk");
+	if (IS_ERR(ctrl_pdata->ahb_clk)) {
+		rc = PTR_ERR(ctrl_pdata->ahb_clk);
 		pr_err("%s: Unable to get mdss ahb clk. rc=%d\n",
 			__func__, rc);
 		goto mdss_dsi_clk_err;
 	}
 
-	ctrl->axi_clk = clk_get(dev, "bus_clk");
-	if (IS_ERR(ctrl->axi_clk)) {
-		rc = PTR_ERR(ctrl->axi_clk);
+	ctrl_pdata->axi_clk = clk_get(dev, "bus_clk");
+	if (IS_ERR(ctrl_pdata->axi_clk)) {
+		rc = PTR_ERR(ctrl_pdata->axi_clk);
 		pr_err("%s: Unable to get axi bus clk. rc=%d\n",
 			__func__, rc);
 		goto mdss_dsi_clk_err;
 	}
 
-	if (ctrl->panel_data.panel_info.type == MIPI_CMD_PANEL) {
-		ctrl->mmss_misc_ahb_clk = clk_get(dev, "core_mmss_clk");
-		if (IS_ERR(ctrl->mmss_misc_ahb_clk)) {
-			rc = PTR_ERR(ctrl->mmss_misc_ahb_clk);
+	if ((ctrl_pdata->panel_data.panel_info.type == MIPI_CMD_PANEL) ||
+		ctrl_pdata->panel_data.panel_info.mipi.dynamic_switch_enabled) {
+		ctrl_pdata->mmss_misc_ahb_clk = clk_get(dev, "core_mmss_clk");
+		if (IS_ERR(ctrl_pdata->mmss_misc_ahb_clk)) {
+			rc = PTR_ERR(ctrl_pdata->mmss_misc_ahb_clk);
 			pr_err("%s: Unable to get mmss misc ahb clk. rc=%d\n",
 				__func__, rc);
 			goto mdss_dsi_clk_err;
 		}
 	}
 
-	ctrl->byte_clk = clk_get(dev, "byte_clk");
-	if (IS_ERR(ctrl->byte_clk)) {
-		rc = PTR_ERR(ctrl->byte_clk);
+	ctrl_pdata->byte_clk = clk_get(dev, "byte_clk");
+	if (IS_ERR(ctrl_pdata->byte_clk)) {
+		rc = PTR_ERR(ctrl_pdata->byte_clk);
 		pr_err("%s: can't find dsi_byte_clk. rc=%d\n",
 			__func__, rc);
-		ctrl->byte_clk = NULL;
+		ctrl_pdata->byte_clk = NULL;
 		goto mdss_dsi_clk_err;
 	}
 
-	ctrl->pixel_clk = clk_get(dev, "pixel_clk");
-	if (IS_ERR(ctrl->pixel_clk)) {
-		rc = PTR_ERR(ctrl->pixel_clk);
+	ctrl_pdata->pixel_clk = clk_get(dev, "pixel_clk");
+	if (IS_ERR(ctrl_pdata->pixel_clk)) {
+		rc = PTR_ERR(ctrl_pdata->pixel_clk);
 		pr_err("%s: can't find dsi_pixel_clk. rc=%d\n",
 			__func__, rc);
-		ctrl->pixel_clk = NULL;
+		ctrl_pdata->pixel_clk = NULL;
 		goto mdss_dsi_clk_err;
 	}
 
-	ctrl->esc_clk = clk_get(dev, "core_clk");
-	if (IS_ERR(ctrl->esc_clk)) {
-		rc = PTR_ERR(ctrl->esc_clk);
+	ctrl_pdata->esc_clk = clk_get(dev, "core_clk");
+	if (IS_ERR(ctrl_pdata->esc_clk)) {
+		rc = PTR_ERR(ctrl_pdata->esc_clk);
 		pr_err("%s: can't find dsi_esc_clk. rc=%d\n",
 			__func__, rc);
-		ctrl->esc_clk = NULL;
+		ctrl_pdata->esc_clk = NULL;
 		goto mdss_dsi_clk_err;
 	}
 
 mdss_dsi_clk_err:
 	if (rc)
-		mdss_dsi_clk_deinit(ctrl);
+		mdss_dsi_clk_deinit(ctrl_pdata);
 	return rc;
 }
 
-void mdss_dsi_clk_deinit(struct mdss_dsi_ctrl_pdata  *ctrl)
+void mdss_dsi_clk_deinit(struct mdss_dsi_ctrl_pdata  *ctrl_pdata)
 {
-	if (ctrl->byte_clk)
-		clk_put(ctrl->byte_clk);
-	if (ctrl->esc_clk)
-		clk_put(ctrl->esc_clk);
-	if (ctrl->pixel_clk)
-		clk_put(ctrl->pixel_clk);
-	if (ctrl->mmss_misc_ahb_clk)
-		clk_put(ctrl->mmss_misc_ahb_clk);
-	if (ctrl->axi_clk)
-		clk_put(ctrl->axi_clk);
-	if (ctrl->ahb_clk)
-		clk_put(ctrl->ahb_clk);
-	if (ctrl->mdp_core_clk)
-		clk_put(ctrl->mdp_core_clk);
+	if (ctrl_pdata->byte_clk)
+		clk_put(ctrl_pdata->byte_clk);
+	if (ctrl_pdata->esc_clk)
+		clk_put(ctrl_pdata->esc_clk);
+	if (ctrl_pdata->pixel_clk)
+		clk_put(ctrl_pdata->pixel_clk);
+	if (ctrl_pdata->mmss_misc_ahb_clk)
+		clk_put(ctrl_pdata->mmss_misc_ahb_clk);
+	if (ctrl_pdata->axi_clk)
+		clk_put(ctrl_pdata->axi_clk);
+	if (ctrl_pdata->ahb_clk)
+		clk_put(ctrl_pdata->ahb_clk);
+	if (ctrl_pdata->mdp_core_clk)
+		clk_put(ctrl_pdata->mdp_core_clk);
 }
 
 #define PREF_DIV_RATIO 27
@@ -646,6 +800,7 @@ static void mdss_dsi_link_clk_stop(struct mdss_dsi_ctrl_pdata *ctrl)
 	mdss_dsi_link_clk_unprepare(ctrl);
 }
 
+
 /**
  * mdss_dsi_ulps_config() - Program DSI lanes to enter/exit ULPS mode
  * @ctrl: pointer to DSI controller structure
@@ -711,7 +866,8 @@ static int mdss_dsi_ulps_config(struct mdss_dsi_ctrl_pdata *ctrl,
 		active_lanes |= BIT(3);
 
 	pr_debug("%s: configuring ulps (%s) for ctrl%d, active lanes=0x%08x\n",
-		__func__, (enable ? "on" : "off"), ctrl->ndx, active_lanes);
+		__func__, (enable ? "on" : "off"), ctrl->ndx,
+		active_lanes);
 
 	if (enable && !ctrl->ulps) {
 		/*
@@ -785,7 +941,7 @@ error:
  *
  * For idle-screen usecases with command mode panels, MDSS can be power
  * collapsed. However, DSI phy needs to remain on. To avoid any mismatch
- * between the DSI controller state the DSI phy needs to be clamped before
+ * between the DSI controller state, DSI phy needs to be clamped before
  * power collapsing. This function executes the required programming
  * sequence to configure these DSI clamps. This function should only be called
  * when the DSI link clocks are disabled.
@@ -794,6 +950,7 @@ static int mdss_dsi_clamp_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 {
 	struct mipi_panel_info *mipi = NULL;
 	u32 clamp_reg, regval = 0;
+	u32 clamp_reg_off, phyrst_reg_off;
 
 	if (!ctrl) {
 		pr_err("%s: invalid input\n", __func__);
@@ -805,6 +962,8 @@ static int mdss_dsi_clamp_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 		return -EINVAL;
 	}
 
+	clamp_reg_off = ctrl->ulps_clamp_ctrl_off;
+	phyrst_reg_off = ctrl->ulps_phyrst_ctrl_off;
 	mipi = &ctrl->panel_data.panel_info.mipi;
 
 	/* clock lane will always be clamped */
@@ -837,16 +996,18 @@ static int mdss_dsi_clamp_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 	if (enable && !ctrl->mmss_clamp) {
 		/* Enable MMSS DSI Clamps */
 		if (ctrl->ndx == DSI_CTRL_0) {
-			regval = MIPI_INP(ctrl->mmss_misc_io.base + 0x14);
-			MIPI_OUTP(ctrl->mmss_misc_io.base + 0x14,
+			regval = MIPI_INP(ctrl->mmss_misc_io.base +
+				clamp_reg_off);
+			MIPI_OUTP(ctrl->mmss_misc_io.base + clamp_reg_off,
 				regval | clamp_reg);
-			MIPI_OUTP(ctrl->mmss_misc_io.base + 0x14,
+			MIPI_OUTP(ctrl->mmss_misc_io.base + clamp_reg_off,
 				regval | (clamp_reg | BIT(15)));
 		} else if (ctrl->ndx == DSI_CTRL_1) {
-			regval = MIPI_INP(ctrl->mmss_misc_io.base + 0x14);
-			MIPI_OUTP(ctrl->mmss_misc_io.base + 0x14,
+			regval = MIPI_INP(ctrl->mmss_misc_io.base +
+				clamp_reg_off);
+			MIPI_OUTP(ctrl->mmss_misc_io.base + clamp_reg_off,
 				regval | (clamp_reg << 16));
-			MIPI_OUTP(ctrl->mmss_misc_io.base + 0x14,
+			MIPI_OUTP(ctrl->mmss_misc_io.base + clamp_reg_off,
 				regval | ((clamp_reg << 16) | BIT(31)));
 		}
 
@@ -855,18 +1016,20 @@ static int mdss_dsi_clamp_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, int enable)
 		 * reset when mdss ahb clock reset is asserted while coming
 		 * out of power collapse
 		 */
-		MIPI_OUTP(ctrl->mmss_misc_io.base + 0x108, 0x1);
+		MIPI_OUTP(ctrl->mmss_misc_io.base + phyrst_reg_off, 0x1);
 		ctrl->mmss_clamp = true;
 	} else if (!enable && ctrl->mmss_clamp) {
-		MIPI_OUTP(ctrl->mmss_misc_io.base + 0x108, 0x0);
+		MIPI_OUTP(ctrl->mmss_misc_io.base + phyrst_reg_off, 0x0);
 		/* Disable MMSS DSI Clamps */
 		if (ctrl->ndx == DSI_CTRL_0) {
-			regval = MIPI_INP(ctrl->mmss_misc_io.base + 0x14);
-			MIPI_OUTP(ctrl->mmss_misc_io.base + 0x14,
+			regval = MIPI_INP(ctrl->mmss_misc_io.base +
+				clamp_reg_off);
+			MIPI_OUTP(ctrl->mmss_misc_io.base + clamp_reg_off,
 				regval & ~(clamp_reg | BIT(15)));
 		} else if (ctrl->ndx == DSI_CTRL_1) {
-			regval = MIPI_INP(ctrl->mmss_misc_io.base + 0x14);
-			MIPI_OUTP(ctrl->mmss_misc_io.base + 0x14,
+			regval = MIPI_INP(ctrl->mmss_misc_io.base +
+				clamp_reg_off);
+			MIPI_OUTP(ctrl->mmss_misc_io.base + clamp_reg_off,
 				regval & ~((clamp_reg << 16) | BIT(31)));
 		}
 		ctrl->mmss_clamp = false;
@@ -922,6 +1085,15 @@ static int mdss_dsi_core_power_ctrl(struct mdss_dsi_ctrl_pdata *ctrl,
 			}
 			ctrl->core_power = true;
 		}
+
+		/*
+		 * temp workaround until framework issues pertaining to LP2
+		 * power state transitions are fixed. For now, if we intend to
+		 * send a frame update when in LP1, we have to explicitly exit
+		 * LP2 state here
+		 */
+		if (mdss_dsi_is_panel_on_ulp(pdata))
+			mdss_dsi_panel_power_ctrl(pdata, MDSS_PANEL_POWER_LP1);
 
 		rc = mdss_dsi_bus_clk_start(ctrl);
 		if (rc) {
@@ -1009,6 +1181,15 @@ static int mdss_dsi_core_power_ctrl(struct mdss_dsi_ctrl_pdata *ctrl,
 				ctrl->core_power = false;
 			}
 		}
+
+		/*
+		 * temp workaround until framework issues pertaining to LP2
+		 * power state transitions are fixed. For now, we internally
+		 * transition to LP2 state whenever core power is turned off
+		 * in LP1 state
+		 */
+		if (mdss_dsi_is_panel_on_lp(pdata))
+			mdss_dsi_panel_power_ctrl(pdata, MDSS_PANEL_POWER_LP2);
 	}
 	return rc;
 
@@ -1154,26 +1335,14 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl,
 	}
 
 	/*
-	 * In sync_wait_broadcast mode, we need to enable clocks
-	 * for the other controller as well when enabling clocks
-	 * for the trigger controller.
-	 *
-	 * If sync wait_broadcase mode is not enabled, but if split display
-	 * mode is enabled where both DSI controller's branch clocks are
-	 * sourced out of a single PLL, then we need to ensure that the
-	 * controller associated with that PLL also has it's clocks turned
-	 * on. This is required to make sure that if that controller's PLL/PHY
-	 * are clamped then they can be removed.
+	 * In broadcast mode, we need to enable clocks for the
+	 * master controller as well when enabling clocks for the
+	 * slave controller
 	 */
-	if (mdss_dsi_sync_wait_trigger(ctrl)) {
-		mctrl = mdss_dsi_get_other_ctrl(ctrl);
+	if (mdss_dsi_is_slave_ctrl(ctrl)) {
+		mctrl = mdss_dsi_get_master_ctrl();
 		if (!mctrl)
-			pr_warn("%s: Unable to get other control\n", __func__);
-	} else if (mdss_dsi_is_ctrl_clk_slave(ctrl)) {
-		mctrl = mdss_dsi_get_ctrl_clk_master();
-		if (!mctrl)
-			pr_warn("%s: Unable to get clk master control\n",
-				__func__);
+			pr_warn("%s: Unable to get master control\n", __func__);
 	}
 
 	pr_debug("%s++: ndx=%d clk_type=%d bus_clk_cnt=%d link_clk_cnt=%d\n",
@@ -1381,17 +1550,6 @@ void mdss_edp_aux_clk_disable(struct mdss_edp_drv_pdata *edp_drv)
 	clk_disable(edp_drv->mdp_core_clk);
 }
 
-static void mdss_edp_clk_set_rate(struct mdss_edp_drv_pdata *edp_drv)
-{
-	if (clk_set_rate(edp_drv->link_clk, edp_drv->link_rate * 27000000) < 0)
-		pr_err("%s: link_clk - clk_set_rate failed\n",
-					__func__);
-
-	if (clk_set_rate(edp_drv->pixel_clk, edp_drv->pixel_rate) < 0)
-		pr_err("%s: pixel_clk - clk_set_rate failed\n",
-					__func__);
-}
-
 int mdss_edp_clk_enable(struct mdss_edp_drv_pdata *edp_drv)
 {
 	int ret;
@@ -1514,8 +1672,6 @@ void mdss_edp_unprepare_aux_clocks(struct mdss_edp_drv_pdata *edp_drv)
 int mdss_edp_prepare_clocks(struct mdss_edp_drv_pdata *edp_drv)
 {
 	int ret;
-
-	mdss_edp_clk_set_rate(edp_drv);
 
 	/* ahb clock should be prepared first */
 	ret = clk_prepare(edp_drv->ahb_clk);

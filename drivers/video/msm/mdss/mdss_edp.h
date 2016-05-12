@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -262,8 +262,6 @@ struct mdss_edp_drv_pdata {
 	struct mutex emutex;
 	int clk_cnt;
 	int cont_splash;
-	bool inited;
-	int delay_link_train;
 
 	/* edp specific */
 	unsigned char *base;
@@ -300,11 +298,9 @@ struct mdss_edp_drv_pdata {
 
 	/* gpios */
 	int gpio_panel_en;
-	int gpio_lvl_en;
 
 	/* backlight */
 	struct pwm_device *bl_pwm;
-	bool is_pwm_enabled;
 	int lpg_channel;
 	int pwm_period;
 

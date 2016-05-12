@@ -106,23 +106,16 @@ struct mdss_mdp_data *mdss_mdp_wb_debug_buffer(struct msm_fb_data_type *mfd)
 			rc = ion_map_iommu(iclient, ihdl,
 					   mdss_get_iommu_domain(domain),
 					   0, SZ_4K, 0,
-					   &img->addr,
+					   (unsigned long *) &img->addr,
 					   (unsigned long *) &img->len,
 					   0, 0);
 		} else {
-			if (MDSS_LPAE_CHECK(mdss_wb_mem)) {
-				pr_err("Can't use phys mem %pa>4Gb w/o IOMMU\n",
-					&mdss_wb_mem);
-				ion_free(iclient, ihdl);
-				return NULL;
-			}
-
 			img->addr = mdss_wb_mem;
 			img->len = img_size;
 		}
 
-		pr_debug("ihdl=%p virt=%p phys=0x%pa iova=0x%pa size=%u\n",
-			 ihdl, videomemory, &mdss_wb_mem, &img->addr, img_size);
+		pr_debug("ihdl=%p virt=%p phys=0x%lx iova=0x%x size=%u\n",
+			 ihdl, videomemory, mdss_wb_mem, img->addr, img_size);
 	}
 	return &mdss_wb_buffer;
 }
@@ -197,7 +190,7 @@ int mdss_mdp_wb_set_secure(struct msm_fb_data_type *mfd, int enable)
 	if (!enable) {
 		if (pipe) {
 			/* unset pipe */
-			mdss_mdp_mixer_pipe_unstage(pipe, pipe->mixer_left);
+			mdss_mdp_mixer_pipe_unstage(pipe);
 			mdss_mdp_pipe_destroy(pipe);
 			wb->secure_pipe = NULL;
 		}
@@ -211,11 +204,10 @@ int mdss_mdp_wb_set_secure(struct msm_fb_data_type *mfd, int enable)
 	}
 
 	if (!pipe) {
-		pipe = mdss_mdp_pipe_alloc(mixer, MDSS_MDP_PIPE_TYPE_RGB,
-			NULL);
+		pipe = mdss_mdp_pipe_alloc(mixer, MDSS_MDP_PIPE_TYPE_RGB);
 		if (!pipe)
 			pipe = mdss_mdp_pipe_alloc(mixer,
-				MDSS_MDP_PIPE_TYPE_VIG, NULL);
+					MDSS_MDP_PIPE_TYPE_VIG);
 		if (!pipe) {
 			pr_err("Unable to get pipe to set secure session\n");
 			return -ENOMEM;
@@ -435,9 +427,8 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 		list_for_each_entry(node, &wb->register_queue, registered_entry)
 			if ((node->buf_data.p[0].srcp_ihdl == ihdl) &&
 				    (node->buf_info.offset == data->offset)) {
-				pr_debug("found fd=%d hdl=%p off=%x addr=%pa\n",
-						data->memory_id, ihdl,
-						data->offset,
+				pr_debug("found node fd=%x off=%x addr=%pa\n",
+						data->memory_id, data->offset,
 						&node->buf_data.p[0].addr);
 				return node;
 			}
@@ -452,7 +443,6 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 	node->user_alloc = true;
 	if (wb->is_secure)
 		flags |= MDP_SECURE_OVERLAY_SESSION;
-
 
 	ret = mdss_mdp_data_get(&node->buf_data, data, 1, flags);
 	if (IS_ERR_VALUE(ret)) {
@@ -484,7 +474,7 @@ static struct mdss_mdp_wb_data *get_user_node(struct msm_fb_data_type *mfd,
 	}
 
 	buf = &node->buf_data.p[0];
-	pr_debug("register node mem_id=%d offset=%u addr=0x%pa len=%lu\n",
+	pr_debug("register node mem_id=%d offset=%u addr=0x%pa len=%u\n",
 		 data->memory_id, data->offset, &buf->addr, buf->len);
 
 	return node;
@@ -501,7 +491,6 @@ static void mdss_mdp_wb_free_node(struct mdss_mdp_wb_data *node)
 
 	if (node->user_alloc) {
 		buf = &node->buf_data.p[0];
-
 		pr_debug("free user mem_id=%d ihdl=%p, offset=%u addr=0x%pa\n",
 				node->buf_info.memory_id,
 				buf->srcp_ihdl,
@@ -620,7 +609,7 @@ static int mdss_mdp_wb_dequeue(struct msm_fb_data_type *mfd,
 		memcpy(data, &node->buf_info, sizeof(*data));
 
 		buf = &node->buf_data.p[0];
-		pr_debug("found node addr=%pa len=%lu\n", &buf->addr, buf->len);
+		pr_debug("found node addr=%pa len=%d\n", &buf->addr, buf->len);
 	} else {
 		pr_debug("node is NULL, wait for next\n");
 		ret = -ENOBUFS;
@@ -629,18 +618,14 @@ static int mdss_mdp_wb_dequeue(struct msm_fb_data_type *mfd,
 	return ret;
 }
 
-int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
+int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd,
+		struct mdss_mdp_commit_cb *commit_cb)
 {
 	struct mdss_mdp_wb *wb = mfd_to_wb(mfd);
 	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
 	struct mdss_mdp_wb_data *node = NULL;
 	int ret = 0;
 	struct mdss_mdp_writeback_arg wb_args;
-
-	if (!ctl) {
-		pr_err("no ctl attached to fb=%d devicet\n", mfd->index);
-		return -ENODEV;
-	}
 
 	if (!mdss_mdp_ctl_is_power_on(ctl))
 		return 0;
@@ -683,7 +668,17 @@ int mdss_mdp_wb_kickoff(struct msm_fb_data_type *mfd)
 		pr_err("error on commit ctl=%d\n", ctl->num);
 		goto kickoff_fail;
 	}
+
+	if (commit_cb)
+		commit_cb->commit_cb_fnc(
+			MDP_COMMIT_STAGE_SETUP_DONE,
+			commit_cb->data);
+
 	mdss_mdp_display_wait4comp(ctl);
+
+	if (commit_cb)
+		commit_cb->commit_cb_fnc(MDP_COMMIT_STAGE_READY_FOR_KICKOFF,
+			commit_cb->data);
 
 	if (wb && node) {
 		mutex_lock(&wb->lock);
@@ -792,6 +787,10 @@ int mdss_mdp_wb_ioctl_handler(struct msm_fb_data_type *mfd, u32 cmd,
 		}
 		break;
 	case MSMFB_WRITEBACK_TERMINATE:
+		if (IS_ERR_VALUE(ret)) {
+			pr_err("IOMMU attach failed\n");
+			return ret;
+		}
 		ret = mdss_mdp_wb_terminate(mfd);
 		break;
 	case MSMFB_WRITEBACK_SET_MIRRORING_HINT:

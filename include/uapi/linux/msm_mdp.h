@@ -67,7 +67,7 @@
 #define MSMFB_ASYNC_BLIT              _IOW(MSMFB_IOCTL_MAGIC, 168, unsigned int)
 #define MSMFB_OVERLAY_PREPARE		_IOWR(MSMFB_IOCTL_MAGIC, 169, \
 						struct mdp_overlay_list)
-
+#define MSMFB_LPM_ENABLE        _IOWR(MSMFB_IOCTL_MAGIC, 170, unsigned int)
 #define FB_TYPE_3D_PANEL 0x10101010
 #define MDP_IMGTYPE2_START 0x10000
 #define MSMFB_DRIVER_VERSION	0xF9E8D701
@@ -141,21 +141,15 @@ enum {
 	MDP_BGR_888,      /* BGR 888 */
 	MDP_Y_CBCR_H2V2_VENUS,
 	MDP_BGRX_8888,   /* BGRX 8888 */
-	MDP_RGBA_8888_TILE,	  /* RGBA 8888 in tile format */
-	MDP_ARGB_8888_TILE,	  /* ARGB 8888 in tile format */
-	MDP_ABGR_8888_TILE,	  /* ABGR 8888 in tile format */
-	MDP_BGRA_8888_TILE,	  /* BGRA 8888 in tile format */
-	MDP_RGBX_8888_TILE,	  /* RGBX 8888 in tile format */
-	MDP_XRGB_8888_TILE,	  /* XRGB 8888 in tile format */
-	MDP_XBGR_8888_TILE,	  /* XBGR 8888 in tile format */
-	MDP_BGRX_8888_TILE,	  /* BGRX 8888 in tile format */
+	MDP_RGBA_8888_TILE,	/* RGBA 8888 in tile format */
+	MDP_ARGB_8888_TILE,	/* ARGB 8888 in tile format */
+	MDP_ABGR_8888_TILE,	/* ABGR 8888 in tile format */
+	MDP_BGRA_8888_TILE,	/* BGRA 8888 in tile format */
+	MDP_RGBX_8888_TILE,	/* RGBX 8888 in tile format */
+	MDP_XRGB_8888_TILE,	/* XRGB 8888 in tile format */
+	MDP_XBGR_8888_TILE,	/* XBGR 8888 in tile format */
+	MDP_BGRX_8888_TILE,	/* BGRX 8888 in tile format */
 	MDP_YCBYCR_H2V1,  /* YCbYCr interleave */
-	MDP_RGB_565_TILE,	  /* RGB 565 in tile format */
-	MDP_BGR_565_TILE,	  /* BGR 565 in tile format */
-	MDP_ARGB_1555,	/*ARGB 1555*/
-	MDP_RGBA_5551,	/*RGBA 5551*/
-	MDP_ARGB_4444,	/*ARGB 4444*/
-	MDP_RGBA_4444,	/*RGBA 4444*/
 	MDP_IMGTYPE_LIMIT,
 	MDP_RGB_BORDERFILL,	/* border fill pipe */
 	MDP_FB_FORMAT = MDP_IMGTYPE2_START,    /* framebuffer format */
@@ -191,7 +185,6 @@ enum {
 #define MDP_BLEND_FG_PREMULT 0x20000
 #define MDP_IS_FG 0x40000
 #define MDP_SOLID_FILL 0x00000020
-#define MDP_VPU_PIPE 0x00000040
 #define MDP_DEINTERLACE 0x80000000
 #define MDP_SHARPENING  0x40000000
 #define MDP_NO_DMA_BARRIER_START	0x20000000
@@ -216,6 +209,7 @@ enum {
 #define MDP_MEMORY_ID_TYPE_FB		0x00001000
 #define MDP_BWC_EN			0x00000400
 #define MDP_DECIMATION_EN		0x00000800
+#define MDP_SMP_FORCE_ALLOC            0x00200000
 #define MDP_TRANSP_NOP 0xffffffff
 #define MDP_ALPHA_NOP 0xff
 
@@ -523,6 +517,7 @@ enum mdss_mdp_blend_op {
 	BLEND_OP_MAX,
 };
 
+#define DECIMATED_DIMENSION(dim, deci) (((dim) + ((1 << (deci)) - 1)) >> (deci))
 #define MAX_PLANES	4
 struct mdp_scale_data {
 	uint8_t enable_pxl_ext;
@@ -560,11 +555,11 @@ struct mdp_scale_data {
  * @PIPE_TYPE_MAX:     Used to track maximum number of pipe type.
  */
 enum mdp_overlay_pipe_type {
-	PIPE_TYPE_AUTO = 0,
-	PIPE_TYPE_VIG,
-	PIPE_TYPE_RGB,
-	PIPE_TYPE_DMA,
-	PIPE_TYPE_MAX,
+        PIPE_TYPE_AUTO = 0,
+        PIPE_TYPE_VIG,
+        PIPE_TYPE_RGB,
+        PIPE_TYPE_DMA,
+        PIPE_TYPE_MAX,
 };
 
 /**
@@ -657,7 +652,7 @@ struct mdp_histogram {
 
 #define MISR_CRC_BATCH_SIZE 32
 enum {
-	DISPLAY_MISR_EDP,
+	DISPLAY_MISR_EDP = 0,
 	DISPLAY_MISR_DSI0,
 	DISPLAY_MISR_DSI1,
 	DISPLAY_MISR_HDMI,
@@ -669,7 +664,7 @@ enum {
 };
 
 enum {
-	MISR_OP_NONE,
+	MISR_OP_NONE = 0,
 	MISR_OP_SFM,
 	MISR_OP_MFM,
 	MISR_OP_BM,
@@ -1057,21 +1052,20 @@ struct mdp_display_commit {
 	uint32_t flags;
 	uint32_t wait_for_finish;
 	struct fb_var_screeninfo var;
-	struct mdp_rect l_roi;
-//	struct mdp_rect r_roi;
+	struct mdp_rect roi;
 };
 
 /**
- * struct mdp_overlay_list - argument for ioctl MSMFB_OVERLAY_PREPARE
- * @num_overlays:	Number of overlay layers as part of the frame.
- * @overlay_list:	Pointer to a list of overlay structures identifying
- *			the layers as part of the frame
- * @flags:		Flags can be used to extend behavior.
- * @processed_overlays:	Output parameter indicating how many pipes were
- *			successful. If there are no errors this number should
- *			match num_overlays. Otherwise it will indicate the last
- *			successful index for overlay that couldn't be set.
- */
+* struct mdp_overlay_list - argument for ioctl MSMFB_OVERLAY_PREPARE
+* @num_overlays:	Number of overlay layers as part of the frame.
+* @overlay_list:	Pointer to a list of overlay structures identifying
+*			the layers as part of the frame
+* @flags:		Flags can be used to extend behavior.
+* @processed_overlays:	Output parameter indicating how many pipes were
+*			successful. If there are no errors this number should
+*			match num_overlays. Otherwise it will indicate the last
+*			successful index for overlay that couldn't be set.
+*/
 struct mdp_overlay_list {
 	uint32_t num_overlays;
 	struct mdp_overlay **overlay_list;
@@ -1117,3 +1111,4 @@ enum {
 	MDP_WRITEBACK_MIRROR_RESUME,
 };
 #endif /*_UAPI_MSM_MDP_H_*/
+

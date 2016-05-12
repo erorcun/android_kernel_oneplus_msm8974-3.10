@@ -73,6 +73,9 @@ struct mdp3_bus_handle_map {
 	struct msm_bus_paths *usecases;
 	struct msm_bus_scale_pdata *scale_pdata;
 	int current_bus_idx;
+	int ref_cnt;
+	u64 restore_ab;
+	u64 restore_ib;
 	u32 handle;
 };
 
@@ -102,7 +105,7 @@ struct mdp3_iommu_meta {
 	struct dma_buf *dbuf;
 	int mapped_size;
 	unsigned long size;
-	dma_addr_t iova_addr;
+	unsigned long iova_addr;
 	unsigned long flags;
 };
 
@@ -133,6 +136,7 @@ struct mdp3_hw_resource {
 	struct ion_client *ion_client;
 	struct mdp3_iommu_domain_map *domains;
 	struct mdp3_iommu_ctx_map *iommu_contexts;
+	bool allow_iommu_update;
 	struct ion_handle *ion_handle;
 	struct mutex iommu_lock;
 	struct rb_root iommu_root;
@@ -143,20 +147,22 @@ struct mdp3_hw_resource {
 	spinlock_t irq_lock;
 	u32 irq_ref_count[MDP3_MAX_INTR];
 	u32 irq_mask;
+	int irq_ref_cnt;
 	struct mdp3_intr_cb callbacks[MDP3_MAX_INTR];
 	u32 underrun_cnt;
 
 	int irq_registered;
 
+	struct mdss_panel_cfg pan_cfg;
 	unsigned long splash_mem_addr;
 	u32 splash_mem_size;
-	struct mdss_panel_cfg pan_cfg;
 
 	int clk_prepare_count;
 	int cont_splash_en;
 
 	bool batfet_required;
 	struct regulator *batfet;
+	struct regulator *vdd_cx;
 };
 
 struct mdp3_img_data {
@@ -181,8 +187,7 @@ void mdp3_irq_register(void);
 void mdp3_irq_deregister(void);
 int mdp3_clk_set_rate(int clk_type, unsigned long clk_rate, int client);
 int mdp3_clk_enable(int enable, int dsi_clk);
-int mdp3_clk_prepare(void);
-void mdp3_clk_unprepare(void);
+int mdp3_res_update(int enable, int dsi_clk, int client);
 int mdp3_bus_scale_set_quota(int client, u64 ab_quota, u64 ib_quota);
 int mdp3_put_img(struct mdp3_img_data *data, int client);
 int mdp3_get_img(struct msmfb_data *img, struct mdp3_img_data *data,
@@ -197,10 +202,13 @@ int mdp3_create_sysfs_link(struct device *dev);
 int mdp3_get_cont_spash_en(void);
 int mdp3_get_mdp_dsi_clk(void);
 int mdp3_put_mdp_dsi_clk(void);
+void mdp3_batfet_ctrl(int enable);
 
 int mdp3_misr_set(struct mdp_misr *misr_req);
 int mdp3_misr_get(struct mdp_misr *misr_resp);
-void mdp3_batfet_ctrl(int enable);
+void mdp3_enable_regulator(int enable);
+void mdp3_check_dsi_ctrl_status(struct work_struct *work,
+				uint32_t interval);
 
 #define MDP3_REG_WRITE(addr, val) writel_relaxed(val, mdp3_res->mdp_base + addr)
 #define MDP3_REG_READ(addr) readl_relaxed(mdp3_res->mdp_base + addr)

@@ -30,7 +30,7 @@ struct mdss_dsi_ctrl_pdata;
 
 #define MDSS_DSI_MRPS	0x04  /* Maximum Return Packet Size */
 
-#define MDSS_DSI_LEN 8 /* 4 x 4 - 6 - 2, bytes dcs header+crc-align  */
+#define MDSS_DSI_LEN 10 /* 4 x 4 - 4 - 2, bytes dcs header+crc-align  */
 
 struct dsi_buf {
 	u32 *hdr;	/* dsi host header */
@@ -40,6 +40,7 @@ struct dsi_buf {
 	char *data;	/* buffer */
 	int len;	/* data length */
 	dma_addr_t dmap; /* mapped dma addr */
+	int read_cnt;
 };
 
 /* dcs read/write */
@@ -97,9 +98,9 @@ struct dsi_cmd_desc {
 #define CMD_REQ_RX      0x0001
 #define CMD_REQ_COMMIT  0x0002
 #define CMD_CLK_CTRL    0x0004
-#define CMD_REQ_UNICAST 0x0008
 #define CMD_REQ_NO_MAX_PKT_SIZE 0x0008
 #define CMD_REQ_LP_MODE 0x0010
+#define CMD_REQ_HS_MODE 0x0020
 
 struct dcs_cmd_req {
 	struct dsi_cmd_desc *cmds;
@@ -122,7 +123,7 @@ char *mdss_dsi_buf_unreserve(struct dsi_buf *dp, int len);
 char *mdss_dsi_buf_push(struct dsi_buf *dp, int len);
 char *mdss_dsi_buf_reserve_hdr(struct dsi_buf *dp, int hlen);
 char *mdss_dsi_buf_init(struct dsi_buf *dp);
-int mdss_dsi_buf_alloc(struct dsi_buf *dp, int size);
+int mdss_dsi_buf_alloc(struct device *ctrl_dev, struct dsi_buf *dp, int size);
 int mdss_dsi_cmd_dma_add(struct dsi_buf *dp, struct dsi_cmd_desc *cm);
 int mdss_dsi_short_read1_resp(struct dsi_buf *rp);
 int mdss_dsi_short_read2_resp(struct dsi_buf *rp);

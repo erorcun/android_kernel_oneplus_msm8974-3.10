@@ -44,13 +44,11 @@ DECLARE_EVENT_CLASS(mdp_sspp_template,
 			__field(u16, dst_y)
 			__field(u16, dst_w)
 			__field(u16, dst_h)
-			__field(u16, vert_deci)
-			__field(u16, horz_deci)
 	),
 	TP_fast_assign(
 			__entry->num = pipe->num;
 			__entry->play_cnt = pipe->play_cnt;
-			__entry->mixer = pipe->mixer_left->num;
+			__entry->mixer = pipe->mixer->num;
 			__entry->stage = pipe->mixer_stage;
 			__entry->flags = pipe->flags;
 			__entry->format = pipe->src_fmt ?
@@ -65,19 +63,16 @@ DECLARE_EVENT_CLASS(mdp_sspp_template,
 			__entry->dst_y = pipe->dst.y;
 			__entry->dst_w = pipe->dst.w;
 			__entry->dst_h = pipe->dst.h;
-			__entry->vert_deci = pipe->vert_deci;
-			__entry->horz_deci = pipe->horz_deci;
 	),
 
-	TP_printk("num=%d mixer=%d play_cnt=%d flags=0x%x stage=%d format=%d img=%dx%d src=[%d,%d,%d,%d] dst=[%d,%d,%d,%d] v:%d h:%d",
+	TP_printk("num=%d mixer=%d play_cnt=%d flags=0x%x stage=%d format=%d img=%dx%d src=[%d,%d,%d,%d] dst=[%d,%d,%d,%d]",
 			__entry->num, __entry->mixer, __entry->play_cnt,
 			__entry->flags, __entry->stage,
 			__entry->format, __entry->img_w, __entry->img_h,
 			__entry->src_x, __entry->src_y,
 			__entry->src_w, __entry->src_h,
 			__entry->dst_x, __entry->dst_y,
-			__entry->dst_w, __entry->dst_h,
-			__entry->vert_deci, __entry->horz_deci)
+			__entry->dst_w, __entry->dst_h)
 );
 
 DEFINE_EVENT(mdp_sspp_template, mdp_sspp_set,
@@ -138,40 +133,6 @@ TRACE_EVENT(mdp_video_underrun_done,
 	),
 	TP_printk("ctl=%d count=%d",
 			__entry->ctl_num, __entry->underrun_cnt)
-);
-
-TRACE_EVENT(tracing_mark_write,
-	TP_PROTO(int pid, const char *name, bool trace_begin),
-	TP_ARGS(pid, name, trace_begin),
-	TP_STRUCT__entry(
-			__field(int, pid)
-			__string(trace_name, name)
-			__field(bool, trace_begin)
-	),
-	TP_fast_assign(
-			__entry->pid = pid;
-			__assign_str(trace_name, name);
-			__entry->trace_begin = trace_begin;
-	),
-	TP_printk("%s|%d|%s", __entry->trace_begin ? "B" : "E",
-		__entry->pid, __get_str(trace_name))
-);
-
-TRACE_EVENT(mdp_trace_counter,
-	TP_PROTO(int pid, char *name, int value),
-	TP_ARGS(pid, name, value),
-	TP_STRUCT__entry(
-			__field(int, pid)
-			__string(counter_name, name)
-			__field(int, value)
-	),
-	TP_fast_assign(
-			__entry->pid = current->tgid;
-			__assign_str(counter_name, name);
-			__entry->value = value;
-	),
-	TP_printk("%d|%s|%d", __entry->pid,
-			__get_str(counter_name), __entry->value)
 );
 
 TRACE_EVENT(mdp_perf_update_bus,
@@ -252,6 +213,40 @@ TRACE_EVENT(mdp_cmd_wait_pingpong,
 	TP_printk("pingpong ctl=%d cnt=%d",
 			__entry->ctl_num,
 			__entry->kickoff_cnt)
+);
+
+TRACE_EVENT(tracing_mark_write,
+	TP_PROTO(int pid, const char *name, bool trace_begin),
+	TP_ARGS(pid, name, trace_begin),
+	TP_STRUCT__entry(
+			__field(int, pid)
+			__string(trace_name, name)
+			__field(bool, trace_begin)
+	),
+	TP_fast_assign(
+			__entry->pid = pid;
+			__assign_str(trace_name, name);
+			__entry->trace_begin = trace_begin;
+	),
+	TP_printk("%s|%d|%s", __entry->trace_begin ? "B" : "E",
+		__entry->pid, __get_str(trace_name))
+);
+
+TRACE_EVENT(mdp_trace_counter,
+	TP_PROTO(int pid, char *name, int value),
+	TP_ARGS(pid, name, value),
+	TP_STRUCT__entry(
+			__field(int, pid)
+			__string(counter_name, name)
+			__field(int, value)
+	),
+	TP_fast_assign(
+			__entry->pid = current->tgid;
+			__assign_str(counter_name, name);
+			__entry->value = value;
+	),
+	TP_printk("%d|%s|%d", __entry->pid,
+			__get_str(counter_name), __entry->value)
 );
 
 #endif /* if !defined(TRACE_MDSS_MDP_H) || defined(TRACE_HEADER_MULTI_READ) */

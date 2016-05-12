@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,7 +25,13 @@
 
 #include "mdss_panel.h"
 
+#define MDSS_REG_WRITE(addr, val) writel_relaxed(val, mdss_res->mdp_base + addr)
+#define MDSS_REG_READ(addr) readl_relaxed(mdss_res->mdp_base + addr)
+
 #define MAX_DRV_SUP_MMB_BLKS	44
+
+#define MDSS_PINCTRL_STATE_DEFAULT "mdss_default"
+#define MDSS_PINCTRL_STATE_SLEEP  "mdss_sleep"
 
 enum mdss_mdp_clk_type {
 	MDSS_CLK_AHB,
@@ -63,18 +69,6 @@ struct mdss_debug_inf {
 	void (*debug_enable_clock)(int on);
 };
 
-struct mdss_fudge_factor {
-	u32 numer;
-	u32 denom;
-};
-
-struct mdss_perf_tune {
-	unsigned long min_mdp_clk;
-	u64 min_bus_vote;
-	u64 min_uhd_bus_vote;
-	u64 min_qhd_bus_vote;
-};
-
 #define MDSS_IRQ_SUSPEND	-1
 #define MDSS_IRQ_RESUME		1
 #define MDSS_IRQ_REQ		0
@@ -86,6 +80,11 @@ struct mdss_intr {
 	u32 curr;
 	int state;
 	spinlock_t lock;
+};
+
+struct mdss_fudge_factor {
+	u32 numer;
+	u32 denom;
 };
 
 struct mdss_prefill_data {
@@ -117,10 +116,9 @@ struct mdss_data_type {
 	u32 max_mdp_clk_rate;
 
 	struct platform_device *pdev;
-	char __iomem *mdss_base;
+	char __iomem *mdp_base;
 	size_t mdp_reg_size;
 	char __iomem *vbif_base;
-	char __iomem *mdp_base;
 
 	struct mutex reg_lock;
 
@@ -128,14 +126,12 @@ struct mdss_data_type {
 	u32 irq_mask;
 	u32 irq_ena;
 	u32 irq_buzy;
-	bool irq_wakeup_en;
 	u32 has_bwc;
 	u32 has_decimation;
-	u32 wfd_mode;
+	u8 has_wfd_blk;
+	u32 has_no_lut_read;
 	atomic_t sd_client_count;
 	u8 has_wb_ad;
-	u8 has_non_scalar_rgb;
-	bool has_src_split;
 	bool idle_pc_enabled;
 
 	u32 rotator_ot_limit;
@@ -146,6 +142,9 @@ struct mdss_data_type {
 	u8 clk_ena;
 	u8 fs_ena;
 	u8 vsync_ena;
+	unsigned long min_mdp_clk;
+
+	struct notifier_block gdsc_cb;
 
 	u32 res_init;
 
@@ -156,21 +155,21 @@ struct mdss_data_type {
 
 	u32 rot_block_size;
 
+	u32 max_bw_low;
+	u32 max_bw_high;
+
 	u32 axi_port_cnt;
 	u32 curr_bw_uc_idx;
 	u32 bus_hdl;
 	struct msm_bus_scale_pdata *bus_scale_table;
-	u32 max_bw_low;
-	u32 max_bw_high;
-	u32 max_bw_per_pipe;
 
 	struct mdss_fudge_factor ab_factor;
 	struct mdss_fudge_factor ib_factor;
 	struct mdss_fudge_factor ib_factor_overlap;
 	struct mdss_fudge_factor clk_factor;
 
-	u32 enable_bw_release;
-	u32 enable_rotator_bw_release;
+	u32 *clock_levels;
+	u32 nclk_lvl;
 
 	struct mdss_hw_settings *hw_settings;
 
@@ -187,10 +186,8 @@ struct mdss_data_type {
 	struct mdss_mdp_mixer *mixer_wb;
 	u32 nmixers_intf;
 	u32 nmixers_wb;
-
 	struct mdss_mdp_ctl *ctl_off;
 	u32 nctl;
-
 	struct mdss_mdp_dp_intf *dp_off;
 	u32 ndp;
 	void *video_intf;
@@ -212,12 +209,12 @@ struct mdss_data_type {
 	struct mdss_debug_inf debug_inf;
 	bool mixer_switched;
 	struct mdss_panel_cfg pan_cfg;
-	struct mdss_prefill_data prefill_data;
 
 	int handoff_pending;
+	struct mdss_prefill_data prefill_data;
 	bool idle_pc;
-	struct mdss_perf_tune perf_tune;
-	bool traffic_shaper_en;
+	bool allow_cx_vddmin;
+	bool vdd_cx_en;
 	int iommu_ref_cnt;
 	atomic_t active_intf_cnt;
 
@@ -239,7 +236,6 @@ void mdss_disable_irq_nosync(struct mdss_hw *hw);
 void mdss_bus_bandwidth_ctrl(int enable);
 int mdss_iommu_ctrl(int enable);
 int mdss_bus_scale_set_quota(int client, u64 ab_quota, u64 ib_quota);
-void mdss_enable_irq_wake(bool enable);
 
 static inline struct ion_client *mdss_get_ionclient(void)
 {

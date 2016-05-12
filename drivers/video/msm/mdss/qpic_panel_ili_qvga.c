@@ -25,6 +25,8 @@
 #include <linux/io.h>
 
 #include <mach/hardware.h>
+#include <asm/system.h>
+#include <asm/mach-types.h>
 
 #include "mdss_qpic.h"
 #include "mdss_qpic_panel.h"
