@@ -107,8 +107,9 @@
 		cell-index = <0>;
 		compatible = "qcom,vfe40";
 		reg = <0xfda10000 0x1000>,
-			<0xfda40000 0x200>;
-		reg-names = "vfe", "vfe_vbif";
+			<0xfda40000 0x200>,
+			<0xfd4a8000 0x4>;
+		reg-names = "vfe", "vfe_vbif", "tcsr";
 		interrupts = <0 57 0>;
 		interrupt-names = "vfe";
 		vdd-supply = <&gdsc_vfe>;
@@ -118,8 +119,9 @@
 		cell-index = <1>;
 		compatible = "qcom,vfe40";
 		reg = <0xfda14000 0x1000>,
-			<0xfda40000 0x200>;
-		reg-names = "vfe", "vfe_vbif";
+			<0xfda40000 0x200>,
+			<0xfd4a8000 0x4>;
+		reg-names = "vfe", "vfe_vbif", "tcsr";
 		interrupts = <0 58 0>;
 		interrupt-names = "vfe";
 		vdd-supply = <&gdsc_vfe>;
@@ -200,19 +202,16 @@
 				      "CCI_I2C_CLK0",
 				      "CCI_I2C_DATA1",
 				      "CCI_I2C_CLK1";
-		i2c_freq_100Khz: qcom,i2c_standard_mode {
-			status = "disabled";
-		};
-		i2c_freq_400Khz: qcom,i2c_fast_mode {
-			status = "disabled";
-		};
-		i2c_freq_custom: qcom,i2c_custom_mode {
-			status = "disabled";
-		};
+		master0: qcom,cci-master0 {
+ 			status = "disabled";
+ 		};
+		master1: qcom,cci-master1 {
+ 			status = "disabled";
+ 		};
 	};
 };
 
-&i2c_freq_100Khz {
+&master0 {
 	qcom,hw-thigh = <78>;
 	qcom,hw-tlow = <114>;
 	qcom,hw-tsu-sto = <28>;
@@ -226,30 +225,17 @@
 	status = "ok";
 };
 
-&i2c_freq_400Khz {
-	qcom,hw-thigh = <20>;
-	qcom,hw-tlow = <28>;
-	qcom,hw-tsu-sto = <21>;
-	qcom,hw-tsu-sta = <21>;
-	qcom,hw-thd-dat = <13>;
-	qcom,hw-thd-sta = <18>;
-	qcom,hw-tbuf = <25>;
+&master1 {
+	qcom,hw-thigh = <78>;
+	qcom,hw-tlow = <114>;
+	qcom,hw-tsu-sto = <28>;
+	qcom,hw-tsu-sta = <28>;
+	qcom,hw-thd-dat = <10>;
+	qcom,hw-thd-sta = <77>;
+	qcom,hw-tbuf = <118>;
 	qcom,hw-scl-stretch-en = <0>;
 	qcom,hw-trdhld = <6>;
-	qcom,hw-tsp = <3>;
+	qcom,hw-tsp = <1>;
 	status = "ok";
 };
 
-&i2c_freq_custom {
-	qcom,hw-thigh = <15>;
-	qcom,hw-tlow = <28>;
-	qcom,hw-tsu-sto = <21>;
-	qcom,hw-tsu-sta = <21>;
-	qcom,hw-thd-dat = <13>;
-	qcom,hw-thd-sta = <18>;
-	qcom,hw-tbuf = <25>;
-	qcom,hw-scl-stretch-en = <1>;
-	qcom,hw-trdhld = <6>;
-	qcom,hw-tsp = <3>;
-	status = "ok";
-};
