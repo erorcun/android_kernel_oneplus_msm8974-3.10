@@ -45,6 +45,8 @@
 #include <linux/input/mt.h>
 #endif
 
+#define PAGESIZE 512
+
 #define DRIVER_NAME "synaptics-rmi-ts"
 #define INPUT_PHYS_NAME "synaptics-rmi-ts/input0"
 
@@ -404,6 +406,17 @@ static struct device_attribute attrs[] = {
 			synaptics_rmi4_open_or_close_holster_mode_show,
 			synaptics_rmi4_open_or_close_holster_mode_store),
 };
+
+static struct proc_dir_entry *prEntry_glove = NULL;
+static struct proc_dir_entry *prEntry_coodinate  = NULL; 
+static struct proc_dir_entry *prEntry_double_tap = NULL;
+static struct proc_dir_entry *prEntry_camera = NULL;
+static struct proc_dir_entry *prEntry_music = NULL;
+static struct proc_dir_entry *prEntry_flashlight = NULL;
+static struct proc_dir_entry *prEntry_pdoze_mode = NULL;
+static struct proc_dir_entry *prEntry_smartcover_mode = NULL;
+static struct proc_dir_entry *prEntry_pdozedetect = NULL;
+static struct proc_dir_entry *prEntry_keypad = NULL;
 
 static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -1255,150 +1268,156 @@ static ssize_t synaptics_rmi4_gesture_store(struct device *dev,
 }
 
 //support tp2.0 interface, app read it to get points
-static int synaptics_rmi4_crood_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_crood_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	int len = 0;
+	int ret = 0;
+	char page[PAGESIZE];
 
-	len = sprintf(page, "%d,%d:%d,%d:%d,%d:%d,%d:%d,%d:%d,%d:%d,%d\n", syna_rmi4_data->gesturemode,
+	ret = sprintf(page, "%d,%d:%d,%d:%d,%d:%d,%d:%d,%d:%d,%d:%d,%d\n", syna_rmi4_data->gesturemode,
 			syna_rmi4_data->points[0], syna_rmi4_data->points[1], syna_rmi4_data->points[2], syna_rmi4_data->points[3],
 			syna_rmi4_data->points[4], syna_rmi4_data->points[5], syna_rmi4_data->points[6], syna_rmi4_data->points[7],
 			syna_rmi4_data->points[8], syna_rmi4_data->points[9], syna_rmi4_data->points[10], syna_rmi4_data->points[11],
 			syna_rmi4_data->points[12]);
 
-	return len;
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
 //support pdoze status
-static int synaptics_rmi4_pdoze_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_pdoze_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	int len = 0;
+	int ret = 0;
+	char page[PAGESIZE];
 
-	len = sprintf(page, "%d\n", syna_rmi4_data->pdoze_status);
-
-	return len;
+	ret = sprintf(page, "%d\n", syna_rmi4_data->pdoze_status);
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
-static int synaptics_rmi4_proc_double_tap_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_proc_double_tap_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->double_tap_enable));
+	int ret = 0;
+	char page[PAGESIZE];
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->double_tap_enable));
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
-static int synaptics_rmi4_proc_double_tap_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
+static ssize_t synaptics_rmi4_proc_double_tap_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if (copy_from_user(buf, buffer, count)) {
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
 	atomic_set(&syna_rmi4_data->double_tap_enable, enable);
 
-	return len;
+	return count;
 }
 
-static int synaptics_rmi4_proc_camera_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_proc_camera_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->camera_enable));
+	int ret = 0;
+	char page[PAGESIZE];
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->camera_enable));
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
-static int synaptics_rmi4_proc_camera_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
+static ssize_t synaptics_rmi4_proc_camera_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if (copy_from_user(buf, buffer, count)) {
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
 	atomic_set(&syna_rmi4_data->camera_enable, enable);
 
-	return len;
+	return count;
 }
 
-static int synaptics_rmi4_proc_music_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_proc_music_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->music_enable));
+	int ret = 0;
+	char page[PAGESIZE];
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->music_enable));
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
-static int synaptics_rmi4_proc_music_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
+static ssize_t synaptics_rmi4_proc_music_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if (copy_from_user(buf, buffer, count)) {
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
 	atomic_set(&syna_rmi4_data->music_enable, enable);
 
-	return len;
+	return count;
 }
 
-static int synaptics_rmi4_proc_flashlight_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_proc_flashlight_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	return sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->flashlight_enable));
+	int ret = 0;
+	char page[PAGESIZE];
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->flashlight_enable));
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
-static int synaptics_rmi4_proc_flashlight_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
+static ssize_t synaptics_rmi4_proc_flashlight_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if (copy_from_user(buf, buffer, count)) {
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
 	atomic_set(&syna_rmi4_data->flashlight_enable, enable);
 
-	return len;
+	return count;
 }
 
 //smartcover proc read function
-static int synaptics_rmi4_proc_smartcover_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data) {
-	int len = 0;
-	unsigned int enable;
-
-	enable = (syna_rmi4_data->smartcover_enable) ? 1 : 0;
-
-	len = sprintf(page, "%d\n", enable);
-
-	return len ;
+static ssize_t synaptics_rmi4_proc_smartcover_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int ret = 0;
+	char page[PAGESIZE];
+	ret = sprintf(page, "%d\n", (syna_rmi4_data->smartcover_enable) ? 1 : 0);
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
 //smartcover proc write function
@@ -1459,19 +1478,19 @@ static int synaptics_rmi4_close_smartcover(void)
 }
 
 //smartcover proc write function
-static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data) {
+static ssize_t synaptics_rmi4_proc_smartcover_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
 	int retval;
 	unsigned char bak;
 	unsigned int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if (copy_from_user(buf, buffer, count)) {
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
@@ -1480,7 +1499,7 @@ static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __
 	if (enable)
 		syna_rmi4_data->smartcover_enable |= 0x01;
 	if (bak == syna_rmi4_data->smartcover_enable)
-		return len;
+		return count;
 
 	print_ts(TS_DEBUG, KERN_ERR "smartcover enable=0x%x\n", syna_rmi4_data->smartcover_enable);
 
@@ -1490,39 +1509,39 @@ static int synaptics_rmi4_proc_smartcover_write(struct file *filp, const char __
 		retval = synaptics_rmi4_close_smartcover();
 	}
 
-	return len;
+	return count;
 }
 
 //glove proc read function
-static int synaptics_rmi4_proc_glove_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t synaptics_rmi4_proc_glove_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	int len = 0;
+	int ret = 0;
+	char page[PAGESIZE];
 	unsigned int enable;
 
 	enable = (syna_rmi4_data->glove_enable)?1:0;
 
-	len = sprintf(page, "%d\n", enable);
+	ret = sprintf(page, "%d\n", enable);
 
-	return len;
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
 //glove proc write function
-static int synaptics_rmi4_proc_glove_write(struct file *filp, const char __user *buff,
-		unsigned long len, void *data)
+static ssize_t synaptics_rmi4_proc_glove_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int retval;
 	unsigned char val[1];
 	unsigned char bak;
 	unsigned int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if ( copy_from_user ( buf, buffer, count ) ){
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
@@ -1531,7 +1550,7 @@ static int synaptics_rmi4_proc_glove_write(struct file *filp, const char __user 
 	if (enable)
 		syna_rmi4_data->glove_enable |= 0x01;
 	if (bak == syna_rmi4_data->glove_enable)
-		return len;
+		return count;
 
 	print_ts(TS_DEBUG, KERN_ERR "glove enable=0x%x\n", syna_rmi4_data->glove_enable);
 
@@ -1540,59 +1559,66 @@ static int synaptics_rmi4_proc_glove_write(struct file *filp, const char __user 
 	val[0] = syna_rmi4_data->glove_enable & 0xff;
 	retval = synaptics_rmi4_i2c_write(syna_rmi4_data,SYNA_ADDR_GLOVE_FLAG,val,sizeof(val));
 
-	return (retval == sizeof(val)) ? len : 0;
+	return (retval == sizeof(val)) ? count : 0;
 }
 
 //pdoze proc read function
-static int synaptics_rmi4_proc_pdoze_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data) {
-	int len = 0;
+static ssize_t synaptics_rmi4_proc_pdoze_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int ret = 0;
+	char page[PAGESIZE];
 	unsigned int enable;
 
 	enable = (syna_rmi4_data->pdoze_enable)?1:0;
 
-	len = sprintf(page, "%d\n", enable);
+	ret = sprintf(page, "%d\n", enable);
 
-	return len;
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
 //pdoze proc write function
-static int synaptics_rmi4_proc_pdoze_write( struct file *filp, const char __user *buff,
-		unsigned long len, void *data ) {
+static ssize_t synaptics_rmi4_proc_pdoze_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
 	unsigned int enable;
-	char buf[2];
+	char buf[10];
 
-	if (len > 2)
+	if (count > 2)
 		return 0;
 
-	if (copy_from_user(buf, buff, len)) {
+	if (copy_from_user( buf, buffer, count) ){
 		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return -EFAULT;
+		return count;
 	}
 
 	enable = (buf[0] == '0') ? 0 : 1;
 	if (enable == syna_rmi4_data->pdoze_enable)
-		return len;
+		return count;
 
 	syna_rmi4_data->pdoze_enable = enable;
 
 	print_ts(TS_DEBUG, KERN_ERR "[syna]:pdoze enable=0x%x\n", syna_rmi4_data->pdoze_enable);
 
-	return len;
+	return count;
 }
 
-static int keypad_enable_proc_read(char *page, char **start, off_t off,
-		int count, int *eof, void *data)
+static ssize_t keypad_enable_proc_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	struct synaptics_rmi4_data *ts = data;
-	return sprintf(page, "%d\n", atomic_read(&ts->keypad_enable));
+	int ret = 0;
+	char page[PAGESIZE];
+	unsigned int enable;
+
+	enable = atomic_read(&syna_rmi4_data->keypad_enable);
+
+	ret = sprintf(page, "%d\n", enable);
+
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
 }
 
-static int keypad_enable_proc_write(struct file *file, const char __user *buffer,
-		unsigned long count, void *data)
+static ssize_t keypad_enable_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
-	struct synaptics_rmi4_data *ts = data;
-	char buf[2];
+	char buf[10];
 	unsigned int val = 0;
 
 	if (count > 2)
@@ -1604,65 +1630,156 @@ static int keypad_enable_proc_write(struct file *file, const char __user *buffer
 	}
 
 	val = (buf[0] == '0' ? 0 : 1);
-	atomic_set(&ts->keypad_enable, val);
+	atomic_set(&syna_rmi4_data->keypad_enable, val);
 	if (val) {
-		set_bit(KEY_BACK, ts->input_dev->keybit);
-		set_bit(KEY_MENU, ts->input_dev->keybit);
-		set_bit(KEY_HOMEPAGE, ts->input_dev->keybit);
+		set_bit(KEY_BACK, syna_rmi4_data->input_dev->keybit);
+		set_bit(KEY_MENU, syna_rmi4_data->input_dev->keybit);
+		set_bit(KEY_HOMEPAGE, syna_rmi4_data->input_dev->keybit);
 	} else {
-		clear_bit(KEY_BACK, ts->input_dev->keybit);
-		clear_bit(KEY_MENU, ts->input_dev->keybit);
-		clear_bit(KEY_HOMEPAGE, ts->input_dev->keybit);
+		clear_bit(KEY_BACK, syna_rmi4_data->input_dev->keybit);
+		clear_bit(KEY_MENU, syna_rmi4_data->input_dev->keybit);
+		clear_bit(KEY_HOMEPAGE, syna_rmi4_data->input_dev->keybit);
 	}
-	input_sync(ts->input_dev);
+	input_sync(syna_rmi4_data->input_dev);
 
 	return count;
 }
 
+static const struct file_operations glove_proc_fops = {
+	.write = synaptics_rmi4_proc_glove_write,
+	.read =  synaptics_rmi4_proc_glove_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations double_tap_proc_fops = {
+	.write = synaptics_rmi4_proc_double_tap_write,
+	.read =  synaptics_rmi4_proc_double_tap_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations camera_proc_fops = {
+	.write = synaptics_rmi4_proc_camera_write,
+	.read =  synaptics_rmi4_proc_camera_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations music_proc_fops = {
+	.write = synaptics_rmi4_proc_music_write,
+	.read =  synaptics_rmi4_proc_music_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations flashlight_proc_fops = {
+	.write = synaptics_rmi4_proc_flashlight_write,
+	.read =  synaptics_rmi4_proc_flashlight_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations pdoze_mode_proc_fops = {
+	.write = synaptics_rmi4_proc_pdoze_write,
+	.read =  synaptics_rmi4_proc_pdoze_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations smartcover_mode_proc_fops = {
+	.write = synaptics_rmi4_proc_smartcover_write,
+	.read =  synaptics_rmi4_proc_smartcover_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations pdozedetect_proc_fops = {
+	.read =  synaptics_rmi4_pdoze_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations coordinate_proc_fops = {
+	.read =  synaptics_rmi4_crood_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations keypad_proc_fops = {
+	.write = keypad_enable_proc_write,
+	.read =  keypad_enable_proc_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
 static int synaptics_rmi4_init_touchpanel_proc(void)
 {
-	struct proc_dir_entry *proc_entry = 0;
+	int ret = 0;
 
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
 
-	//glove mode inteface
-	proc_entry = proc_create_legacy("glove_mode_enable", 0664,
-		procdir,synaptics_rmi4_proc_glove_read,synaptics_rmi4_proc_glove_write,NULL);
+	prEntry_glove = proc_create("glove_mode_enable", 0666, procdir, &glove_proc_fops);
+	if(prEntry_glove == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	// double tap to wake
-	proc_entry = proc_create_legacy("double_tap_enable", 0664, procdir,synaptics_rmi4_proc_double_tap_read,
-		synaptics_rmi4_proc_double_tap_write,NULL);
+	prEntry_double_tap= proc_create("double_tap_enable", 0666, procdir, &double_tap_proc_fops);
+	if(prEntry_double_tap == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	// wake to camera
-	proc_entry = proc_create_legacy("camera_enable", 0664, procdir,synaptics_rmi4_proc_camera_read,
-		synaptics_rmi4_proc_camera_write,NULL);
+	prEntry_camera = proc_create("camera_enable", 0666, procdir, &camera_proc_fops);
+	if(prEntry_camera == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	// wake to music
-	proc_entry = proc_create_legacy("music_enable", 0664, procdir,synaptics_rmi4_proc_music_read,
-		synaptics_rmi4_proc_music_write,NULL);
+	prEntry_music = proc_create("music_enable", 0666, procdir, &music_proc_fops);
+	if(prEntry_music == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	// wake to flashlight
-	proc_entry = proc_create_legacy("flashlight_enable", 0664, procdir,synaptics_rmi4_proc_flashlight_read,
-		synaptics_rmi4_proc_flashlight_write,NULL);
+	prEntry_flashlight = proc_create("flashlight_enable", 0666, procdir, &flashlight_proc_fops);
+	if(prEntry_flashlight == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	//for pdoze enable/disable interface
-	proc_entry = proc_create_legacy("pdoze_mode_enable", 0664, procdir,synaptics_rmi4_proc_pdoze_read,
-		synaptics_rmi4_proc_pdoze_write,NULL);
+	prEntry_pdoze_mode = proc_create("pdoze_mode_enable", 0666, procdir, &pdoze_mode_proc_fops);
+	if(prEntry_pdoze_mode == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	//for smartcover
-	proc_entry = proc_create_legacy("smartcover_mode_enable", 0664, procdir,synaptics_rmi4_proc_smartcover_read,
-		synaptics_rmi4_proc_smartcover_write,NULL);
+	prEntry_smartcover_mode = proc_create("smartcover_mode_enable", 0666, procdir, &smartcover_mode_proc_fops);
+	if(prEntry_smartcover_mode == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	//for pdoze status
-	proc_entry = proc_create_legacy("pdozedetect", 0444, procdir,synaptics_rmi4_pdoze_read,NULL,NULL);
+	prEntry_pdozedetect = proc_create("pdozedetect", 0444, procdir, &pdozedetect_proc_fops);
+	if(prEntry_pdozedetect == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	//for support tp2.0
-	proc_entry = proc_create_legacy("coordinate", 0444, procdir,synaptics_rmi4_crood_read,NULL,NULL);
+	prEntry_coodinate = proc_create("coordinate", 0444, procdir, &coordinate_proc_fops);
+	if(prEntry_coodinate == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	proc_entry = proc_create_legacy("keypad_enable", 0664,
-		procdir,keypad_enable_proc_read,keypad_enable_proc_write,syna_rmi4_data);
+	prEntry_keypad = proc_create("keypad_enable", 0666, procdir, &keypad_proc_fops);
+	if(prEntry_keypad == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
 
-	return 0;
+	return ret;
 }
 
 static inline void wait_test_cmd_finished(void)
@@ -2366,7 +2483,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 		case SYNA_ONE_FINGER_DOUBLE_TAP:
 			gesturemode = DouTap;
 			if (atomic_read(&syna_rmi4_data->double_tap_enable))
-				keyvalue = KEY_DOUBLE_TAP;
+				keyvalue = KEY_WAKEUP;
 			break;
 
 		case SYNA_ONE_FINGER_DIRECTION:
@@ -3779,7 +3896,7 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 	set_bit(KEY_MENU, rmi4_data->input_dev->keybit);
 	set_bit(KEY_HOMEPAGE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_F3, rmi4_data->input_dev->keybit);
-	set_bit(KEY_DOUBLE_TAP, rmi4_data->input_dev->keybit);
+	set_bit(KEY_WAKEUP, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_CIRCLE, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_SWIPE_DOWN, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_V, rmi4_data->input_dev->keybit);

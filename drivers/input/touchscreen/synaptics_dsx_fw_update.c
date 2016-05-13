@@ -344,6 +344,7 @@ static struct device_attribute attrs[] = {
 };
 
 static struct synaptics_rmi4_fwu_handle *fwu;
+static struct proc_dir_entry *prEntry_write = NULL;
 
 DECLARE_COMPLETION(fwu_dsx_remove_complete);
 
@@ -2013,8 +2014,7 @@ exit:
 	return;
 }
 
-static ssize_t synaptics_proc_write( struct file *filp, const char __user *buff,
-                        unsigned long len, void *data )
+static ssize_t synaptics_proc_write(struct file *filp, const char __user *buff, size_t len, loff_t *ppos)
 {
 	int copy_len = len;
 	unsigned char temp[20] ;
@@ -2070,15 +2070,20 @@ static ssize_t synaptics_proc_write( struct file *filp, const char __user *buff,
 	
 	return len ;
 }
+
+static const struct file_operations synaptics_proc = {
+	.write = synaptics_proc_write,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
 static int init_synaptics_proc(void)
 {
 	int ret=0;
 
-	struct proc_dir_entry *proc_entry = proc_create_legacy( "syna_write", 0664, NULL,NULL,synaptics_proc_write, NULL );
-
-	if (proc_entry == NULL)
-	{
-		ret = -ENOMEM;
+	prEntry_write = proc_create("syna_write", 0222, NULL, &synaptics_proc);
+	if(prEntry_write == NULL){	   
+		ret = -ENOMEM;	   
 	  	printk(KERN_INFO"init_synaptics_proc: Couldn't create proc entry\n");
 	}
 
