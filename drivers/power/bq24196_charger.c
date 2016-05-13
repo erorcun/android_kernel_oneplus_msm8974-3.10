@@ -1,4 +1,6 @@
 
+#define pr_fmt(fmt)	"%s: " fmt, __func__
+
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -369,7 +371,9 @@ bq24196_get_charge_en(struct bq24196_device_info *di)
 		
 	rc = bq24196_read(di,POWER_ON_CONF,1,&value_buf);
 	if(rc < 0) {
-		pr_err("read charge en status fail\n");
+		if(atomic_read(&di->suspended) != 1)
+			pr_err("read charge en status fail\n");
+
 		return 0;
 	}
 	if((value_buf & 0x30) == 0x0)//disable charge
@@ -400,7 +404,9 @@ static int bq24196_get_system_status(struct bq24196_device_info *di)
 		
 	rc = bq24196_read(di,SYS_STS,1,&value_buf);
 	if(rc < 0) {
-		pr_err("read system status fail\n");
+		if(atomic_read(&di->suspended) != 1)
+			pr_err("read system status fail\n");
+
 		return 0;
 	}
 	return value_buf;
