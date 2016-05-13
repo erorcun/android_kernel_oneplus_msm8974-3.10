@@ -442,6 +442,11 @@ config BQ24196_CHARGER
 	help
 	  Say Y here to enable the BQ24196 battery charger device.
 
+config PIC1503_FASTCG
+	tristate "CONFIG_PIC1503_FASTCG driver"
+	help
+	  Say Y here to enable the PIC1503 fast charger
+
 config PM8921_BMS
 	tristate "PM8921 Battery Monitoring System driver"
 	depends on MFD_PM8921_CORE

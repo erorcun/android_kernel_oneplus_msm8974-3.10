@@ -88,13 +88,8 @@ int power_supply_set_current_limit(struct power_supply *psy, int limit)
 	const union power_supply_propval ret = {limit,};
 
 	if (psy->set_property)
-#ifdef CONFIG_MACH_OPPO
-		return psy->set_property(psy, POWER_SUPPLY_PROP_POWER_NOW,		
-							&ret);
-#else
 		return psy->set_property(psy, POWER_SUPPLY_PROP_CURRENT_MAX,
 								&ret);
-#endif
 
 	return -ENXIO;
 }
@@ -213,8 +208,13 @@ int power_supply_set_supply_type(struct power_supply *psy,
 	const union power_supply_propval ret = {supply_type,};
 
 	if (psy->set_property)
+#ifdef CONFIG_MACH_OPPO
+		return psy->set_property(psy, POWER_SUPPLY_PROP_POWER_NOW,
+								&ret);
+#else
 		return psy->set_property(psy, POWER_SUPPLY_PROP_TYPE,
 								&ret);
+#endif
 
 	return -ENXIO;
 }
@@ -814,3 +814,4 @@ MODULE_AUTHOR("Ian Molton <spyro@f2s.com>, "
 	      "Szabolcs Gyurko, "
 	      "Anton Vorontsov <cbou@mail.ru>");
 MODULE_LICENSE("GPL");
+
