@@ -95,11 +95,12 @@ static void set_dload_mode(int on)
 		dload_mode_enabled = on;
 	}
 }
-
+#ifndef CONFIG_MACH_OPPO
 static bool get_dload_mode(void)
 {
 	return dload_mode_enabled;
 }
+#endif
 
 static void enable_emergency_dload_mode(void)
 {
@@ -148,10 +149,12 @@ static void enable_emergency_dload_mode(void)
 	printk(KERN_ERR "dload mode is not enabled on target\n");
 }
 
+#ifndef CONFIG_MACH_OPPO
 static bool get_dload_mode(void)
 {
 	return false;
 }
+#endif
 #endif
 
 void msm_set_restart_mode(int mode)
@@ -221,11 +224,15 @@ static void msm_restart_prepare(const char *cmd)
 
 	pm8xxx_reset_pwr_off(1);
 
+#ifdef CONFIG_MACH_OPPO
+	qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
+#else
 	/* Hard reset the PMIC unless memory contents must be maintained. */
 	if (get_dload_mode() || (cmd != NULL && cmd[0] != '\0'))
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_WARM_RESET);
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
+#endif
 
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
@@ -240,6 +247,20 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x6f656d00 | code, restart_reason);
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
+#ifdef CONFIG_MACH_OPPO
+		} else if (!strncmp(cmd, "ftm", 3)) {
+			__raw_writel(0x77665504, restart_reason);
+		} else if (!strncmp(cmd, "wlan", 4)) {
+			__raw_writel(0x77665505, restart_reason);
+		} else if (!strncmp(cmd, "rf", 2)) {
+			__raw_writel(0x77665506, restart_reason);
+		} else if (!strncmp(cmd, "kernel", 6)) {
+			__raw_writel(0x7766550a, restart_reason);
+		} else if (!strncmp(cmd, "modem", 5)) {
+			__raw_writel(0x7766550b, restart_reason);
+		} else if (!strncmp(cmd, "android", 7)) {
+			__raw_writel(0x7766550c, restart_reason);
+#endif
 		} else {
 			__raw_writel(0x77665501, restart_reason);
 		}
@@ -312,6 +333,9 @@ static int __init msm_restart_init(void)
 		ret = -ENOMEM;
 		goto err_restart_reason;
 	}
+	#ifdef CONFIG_MACH_OPPO
+		__raw_writel(0x7766550a, restart_reason);
+	#endif
 	pm_power_off = msm_power_off;
 
 	if (scm_is_call_available(SCM_SVC_PWR, SCM_IO_DISABLE_PMIC_ARBITER) > 0)
@@ -329,3 +353,4 @@ err_dl_mode:
 	return ret;
 }
 early_initcall(msm_restart_init);
+

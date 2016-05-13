@@ -17,6 +17,7 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/of.h>
+#include <linux/reboot.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/memory.h>
@@ -35,16 +36,17 @@
 #include <linux/msm_ion.h>
 #endif
 #include <mach/msm_memtypes.h>
-#include <soc/qcom/smd.h>
+#include <mach/msm_smd.h>
 #include <mach/restart.h>
-#include <soc/qcom/rpm-smd.h>
 #include <soc/qcom/socinfo.h>
+#include <soc/qcom/rpm-smd.h>
 #include <soc/qcom/smem.h>
 #include <soc/qcom/spm.h>
 #include <soc/qcom/pm.h>
 #include "board-dt.h"
 #include "clock.h"
 #include "platsmp.h"
+
 #include <linux/gpio.h>
 #include <linux/pcb_version.h>
 
@@ -56,7 +58,7 @@
 #define OPPO_RAM_CONSOLE_BASE (PLAT_PHYS_OFFSET + SZ_1G + SZ_256M)
 
 static struct ramoops_platform_data oppo_ramoops_data = {
-	.console_size = OPPO_PERSISTENT_RAM_SIZE, //(256 * SZ_1K),
+	.console_size = /* OPPO_PERSISTENT_RAM_SIZE, */ (256 * SZ_1K),
 	.mem_address  = OPPO_RAM_CONSOLE_BASE,
 	.mem_size     = OPPO_PERSISTENT_RAM_SIZE,
 	.log_level	= 4,
@@ -97,6 +99,7 @@ void __init msm_8974_reserve(void)
 	of_scan_flat_dt(dt_scan_for_memory_reserve, NULL);
 }
 
+
 static void __init msm8974_early_memory(void)
 {
 	of_scan_flat_dt(dt_scan_for_memory_hole, NULL);
@@ -111,7 +114,6 @@ static void __init msm8974_early_memory(void)
  */
 void __init msm8974_add_drivers(void)
 {
-/*	msm_init_modem_notifier_list(); */
 	msm_smd_init();
 	msm_rpm_driver_init();
 	msm_pm_sleep_status_init();
@@ -298,7 +300,8 @@ static const char *msm8974_dt_match[] __initconst = {
 	NULL
 };
 
-DT_MACHINE_START(MSM8974_DT, "Qualcomm MSM 8974 (Flattened Device Tree)")
+DT_MACHINE_START(MSM8974_DT,
+	"Qualcomm Technologies, Inc. MSM 8974 (Flattened Device Tree)")
 	.map_io			= msm8974_map_io,
 	.init_machine		= msm8974_init,
 	.dt_compat		= msm8974_dt_match,

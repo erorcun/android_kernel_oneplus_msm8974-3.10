@@ -291,6 +291,7 @@ static struct clk_lookup msm_clocks_rpm_8974[] = {
 	CLK_LOOKUP_OF("ocmem_a_clk", ocmemgx_msmbus_a_clk, "msm_bus"),
 
 	CLK_LOOKUP_OF("ref_clk",    cxo_d1_a_pin, "3-000e"),
+	CLK_LOOKUP("cxo_out_d1", cxo_d1_pin.c, "6-0028"),
 	CLK_LOOKUP_OF("ref_clk_rf", cxo_a2_a_pin, "3-000e"),
 };
 

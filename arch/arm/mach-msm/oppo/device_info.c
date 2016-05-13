@@ -14,41 +14,72 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/slab.h>
+#include <linux/fs.h>
+#include <linux/seq_file.h>
+#include "../../../fs/proc/internal.h"
 #include <mach/device_info.h>
 
 
 
 static struct proc_dir_entry *parent = NULL;
 
-static int device_proc_output (char *buf, struct manufacture_info *priv)
-{
-	char *p = buf;
-
-	p += sprintf(p, "Device version:\t\t%s\n",
-		     priv->version);
-
-	p += sprintf(p, "Device manufacture:\t\t%s\n",
-			priv->manufacture);
-
-	return p - buf;
+static void *device_seq_start(struct seq_file *s, loff_t *pos)
+{    
+	static unsigned long counter = 0;    
+	if ( *pos == 0 ) {        
+		return &counter;   
+	}else{
+		*pos = 0; 
+		return NULL;
+	}
 }
 
-static int device_read_proc(char *page, char **start, off_t off,
-			   int count, int *eof, void *data)
+static void *device_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{  
+	return NULL;
+}
+
+static void device_seq_stop(struct seq_file *s, void *v)
 {
-	struct manufacture_info *priv = data;
+	return;
+}
+
+static int device_seq_show(struct seq_file *s, void *v)
+{
+	struct proc_dir_entry *pde = s->private;
+	struct manufacture_info *info = pde->data;
+	if(info)
+	  seq_printf(s, "Device version:\t\t%s\nDevice manufacture:\t\t%s\n",
+		     info->version,	info->manufacture);	
+	return 0;
+}
+
+static struct seq_operations device_seq_ops = {
+	.start = device_seq_start,
+	.next = device_seq_next,
+	.stop = device_seq_stop,
+	.show = device_seq_show
+};
+
+static int device_proc_open(struct inode *inode,struct file *file)
+{
+	int ret = seq_open(file,&device_seq_ops);
+	pr_err("caven %s is called\n",__func__);
 	
-	int len = device_proc_output (page, priv);
-	if (len <= off+count)
-		*eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-	return len;
+	if(!ret){
+		struct seq_file *sf = file->private_data;
+		sf->private = PDE(inode);
+	}
+	
+	return ret;
 }
+static const struct file_operations device_node_fops = {
+	.read =  seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+	.open = device_proc_open,
+	.owner = THIS_MODULE,
+};
 
 int register_device_proc(char *name, char *version, char *manufacture)
 {
@@ -66,8 +97,7 @@ int register_device_proc(char *name, char *version, char *manufacture)
 	info = kzalloc(sizeof *info, GFP_KERNEL);
 	info->version = version;
 	info->manufacture = manufacture;
-
-	d_entry = proc_create_legacy(name, S_IRUGO, parent, device_read_proc, NULL, info);
+	d_entry = proc_create_data (name, S_IRUGO, parent, &device_node_fops, info);
 	if(!d_entry) {
 		pr_err("create %s proc failed.\n", name);
 		kfree(info);
