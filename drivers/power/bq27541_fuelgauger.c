@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/param.h>
 #include <linux/jiffies.h>
+#include <linux/wakelock.h>
 #include <linux/workqueue.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
@@ -32,23 +33,28 @@
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/machine.h>
 #include <linux/err.h>
-/* #include <linux/msm-charger.h> */
-#include <linux/i2c/bq27520.h> /* use the same platform data as bq27520 */
+#include <linux/qpnp-charger.h>
 #include <linux/of_gpio.h> //sjc0623 add
-#include <linux/qpnp/power-on.h>//sjc1121
 #ifdef CONFIG_VENDOR_EDIT
 /*OPPO 2013-09-22 liaofuchun add for bq27541 encryption*/
 #include <linux/random.h>
-#include <linux/pm.h>
+
 #include <linux/rtc.h>
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
-#include <linux/qpnp-charger.h>
-#endif /*CONFIG_VENDOR_EDIT*/
+
+struct bq27520_platform_data {
+	const char *name;
+	unsigned int soc_int;
+	unsigned int bi_tout;
+	unsigned int chip_en; /* CE */
+	const char *vreg_name; /* regulater used by bq27520 */
+	int vreg_value; /* its value */
+	int enable_dlog; /* if enable on-chip coulomb counter data logger */
+};
+
 extern char *BQ27541_HMACSHA1_authenticate(char *Message,char *Key,char *result);
 #endif //CONFIG_VENDOR_EDIT
 
-#if (defined(CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024))
+#ifdef CONFIG_OPPO_MSM_14021
 /* OPPO 2014-06-23 sjc Add begin for 14021 */
 static int mcu_en_gpio = 0;
 void mcu_en_gpio_set(int value)
@@ -64,7 +70,6 @@ void mcu_en_gpio_set(int value)
 		}
 	}
 }
-
 #else
 void mcu_en_gpio_set(int value)
 {
@@ -155,10 +160,10 @@ extern int pic16f_fw_update(bool pull96);
 #define CAPACITY_SALTATE_COUNTER_NOT_CHARGING	7//40sec
 #ifdef CONFIG_VENDOR_EDIT
 /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
-#define CAPACITY_SALTATE_COUNTER_60				10//	1min
-#define CAPACITY_SALTATE_COUNTER_95				25//	2.5min
-#define CAPACITY_SALTATE_COUNTER_FULL			50//	5min
-#define CAPACITY_SALTATE_COUNTER_CHARGING_TERM	10//	1min
+#define CAPACITY_SALTATE_COUNTER_60				10//40	1min
+#define CAPACITY_SALTATE_COUNTER_95				25//60	2.5min
+#define CAPACITY_SALTATE_COUNTER_FULL			50//120	5min
+#define CAPACITY_SALTATE_COUNTER_CHARGING_TERM	10//30	1min
 #endif /*CONFIG_VENDOR_EDIT*/
 
 
@@ -214,7 +219,7 @@ struct bq27541_device_info {
 
 	bool alow_reading;
 	struct timer_list watchdog;
-	struct wakeup_source fastchg_wakeup_source;
+	struct wake_lock fastchg_wake_lock;
 	bool fast_chg_allow;
 	bool fast_low_temp_full;
 /* jingchun.wang@Onlinerd.Driver, 2014/02/12  Add for retry when config fail */
@@ -223,9 +228,9 @@ struct bq27541_device_info {
 	unsigned long rtc_resume_time;
 	unsigned long rtc_suspend_time;
 	atomic_t suspended;
-	/* jingchun.wang@Onlinerd.Driver, 2015/02/10  Add for update soc */
-	struct delayed_work		update_soc_work;
-/* Fuchun.Liao@Mobile.BSP.CHG 2015-03-12 add for delay 8s to request fastcg irq*/
+	/* jingchun.wang@Onlinerd.Driver, 2015/02/10  Add for update soc */		
+	struct delayed_work		update_soc_work;		
+/* Fuchun.Liao@Mobile.BSP.CHG 2015-03-12 add for delay 8s to request fastcg irq*/		
 	struct delayed_work		fastcg_request_irq_work;
 #endif
 	bool fast_chg_ing;
@@ -291,7 +296,7 @@ static int bq27541_battery_temperature(struct bq27541_device_info *di)
 /* OPPO 2013-08-24 wangjc Add begin for add adc interface. */
 #ifdef CONFIG_VENDOR_EDIT
 #define BQ27541_REG_CC		0x2a
-static int bq27541_battery_cc(struct bq27541_device_info *di)//sjc20150105
+static int bq27541_battery_cc(struct bq27541_device_info *di)/* yangfangbiao@oneplus.cn, 2015/02/13  Add cc interface     */
 {
 	int ret;
 	int cc = 0;
@@ -318,8 +323,8 @@ static int bq27541_battery_fcc(struct bq27541_device_info *di)//sjc20150105
 	int ret;
 	int fcc = 0;
 
-	if (atomic_read(&di->suspended) == 1)
-		return di->fcc_pre;
+	if (atomic_read(&di->suspended) == 1)		
+			return di->fcc_pre;
 
 	if (di->alow_reading == true) {
 		ret = bq27541_read(BQ27541_REG_FCC, &fcc, 0, di);
@@ -327,8 +332,8 @@ static int bq27541_battery_fcc(struct bq27541_device_info *di)//sjc20150105
 			dev_err(di->dev, "error reading fcc.\n");
 			return ret;
 		}
-	} else {
-		return di->fcc_pre;
+	} else {		
+			return di->fcc_pre;
 	}
 
 	di->fcc_pre = fcc;
@@ -360,7 +365,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	unsigned int soc_calib;
 	int counter_temp = 0;
 	static int charging_status = 0;//sjc1121
-	static int charging_status_pre = 0;
+	static int charging_status_pre = 0; /* yangfangbiao@oneplus.cn, 2015/01/06  Modify for  sync with KK charge standard  */
 	int soc_load;//sjc1121
 	int soc_temp;
 	
@@ -511,11 +516,10 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	return soc_calib;
 }
 
-static int bq27541_battery_soc(struct bq27541_device_info *di, int time)
+static int bq27541_battery_soc(struct bq27541_device_info *di, bool raw)
 {
 	int ret;
 	int soc = 0;
-	int soc_delt = 0;
 
 #ifdef CONFIG_VENDOR_EDIT
 /* jingchun.wang@Onlinerd.Driver, 2014/02/27  Add for get right soc when sleep long time */
@@ -537,20 +541,15 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, int time)
 			return 0;
 	}
 
-#ifdef CONFIG_VENDOR_EDIT
-/* jingchun.wang@Onlinerd.Driver, 2014/02/27  Add for get right soc when sleep long time */
-	if(time != 0) {
-		if(soc < di->soc_pre) {
-			soc_delt  =  di->soc_pre - soc;
-			//allow capacity decrease 1% every 10minutes when sleep
-			if(time/TEN_MINUTES <  soc_delt) {
-				di->soc_pre  -=  time/TEN_MINUTES;
-			} else  {
-				di->soc_pre = soc;
-			}
+	if (raw == true) {
+		if(soc > 90) {
+			soc += 2;
+		}
+		if(soc <= di->soc_pre) {
+			di->soc_pre = soc;
 		}
 	}
-#endif /*CONFIG_VENDOR_EDIT*/
+
 	soc = bq27541_soc_calibrate(di,soc);
 	return soc;
 	
@@ -751,7 +750,7 @@ static int bq27541_is_battery_id_valid(void)
 
 /* OPPO 2013-08-24 wangjc Add begin for add adc interface. */
 #ifdef CONFIG_VENDOR_EDIT
-static int bq27541_get_batt_cc(void)//sjc20150105
+static int bq27541_get_batt_cc(void)/* yangfangbiao@oneplus.cn, 2015/02/13  Add cc interface     */
 {
 	return bq27541_battery_cc(bq27541_di);
 }
@@ -770,7 +769,7 @@ static int bq27541_get_battery_soc(void)
 {
 	if(bq27541_di) {
 		if(!bq27541_di->soc_pre)
-			return bq27541_battery_soc(bq27541_di, 0);
+			return bq27541_battery_soc(bq27541_di, false);
 		else {
 			return bq27541_di->soc_pre;
 		}
@@ -837,6 +836,7 @@ static int bq27541_set_fast_low_temp_full_false(void)
 }
 #endif
 /* OPPO 2013-08-24 wangjc Add end */
+
 /* OPPO 2013-12-12 liaofuchun add for set/get fastchg allow begin*/
 
 static int bq27541_fast_normal_to_warm(void)
@@ -882,12 +882,8 @@ static int bq27541_get_fast_chg_ing(void)
 }
 
 /* OPPO 2013-12-12 liaofuchun add for set/get fastchg allow end */
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
+
 static struct qpnp_battery_gauge bq27541_batt_gauge = {
-#else
-static struct msm_battery_gauge bq27541_batt_gauge = {
-#endif /*CONFIG_VENDOR_EDIT*/
 	.get_battery_mvolts		= bq27541_get_battery_mvolts,
 	.get_battery_temperature	= bq27541_get_battery_temperature,
 	.is_battery_present		= bq27541_is_battery_present,
@@ -895,7 +891,7 @@ static struct msm_battery_gauge bq27541_batt_gauge = {
 	.is_battery_id_valid		= bq27541_is_battery_id_valid,
 /* OPPO 2013-09-30 wangjc Add begin for add new interface */
 #ifdef CONFIG_VENDOR_EDIT
-	.get_batt_cc				= bq27541_get_batt_cc, /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
+	.get_batt_cc				= bq27541_get_batt_cc, /* yangfangbiao@oneplus.cn, 2015/02/13  Add cc interface     */
 	.get_batt_fcc				= bq27541_get_batt_fcc, /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
 	.get_batt_remaining_capacity = bq27541_get_batt_remaining_capacity,
 	.get_battery_soc			= bq27541_get_battery_soc,
@@ -916,12 +912,56 @@ static struct msm_battery_gauge bq27541_batt_gauge = {
 /* OPPO 2013-09-30 wangjc Add end */
 };
 
+static bool bq27541_authenticate(struct i2c_client *client);
+static int bq27541_batt_type_detect(struct i2c_client *client);
+
+static void bq27541_hw_config(struct work_struct *work)
+{
+	int ret = 0, flags = 0, type = 0, fw_ver = 0;
+	struct bq27541_device_info *di;
+
+	di  = container_of(work, struct bq27541_device_info, hw_config.work);
+	ret = bq27541_chip_config(di);
+	if (ret) {
+		dev_err(di->dev, "Failed to config Bq27541\n");
+#ifdef CONFIG_VENDOR_EDIT
+/* jingchun.wang@Onlinerd.Driver, 2014/02/12  Add for retry when config fail */
+		di->retry_count--;
+		if(di->retry_count > 0) {
+			schedule_delayed_work(&di->hw_config, HZ);
+		}
+#endif /*CONFIG_VENDOR_EDIT*/
+		return;
+	}
+	qpnp_battery_gauge_register(&bq27541_batt_gauge);
+
+	bq27541_cntl_cmd(di, BQ27541_SUBCMD_CTNL_STATUS);
+	udelay(66);
+	bq27541_read(BQ27541_REG_CNTL, &flags, 0, di);
+	bq27541_cntl_cmd(di, BQ27541_SUBCMD_DEVCIE_TYPE);
+	udelay(66);
+	bq27541_read(BQ27541_REG_CNTL, &type, 0, di);
+	bq27541_cntl_cmd(di, BQ27541_SUBCMD_FW_VER);
+	udelay(66);
+	bq27541_read(BQ27541_REG_CNTL, &fw_ver, 0, di);
+
+#ifdef CONFIG_VENDOR_EDIT
+/*OPPO 2013-09-18 liaofuchun add begin for check authenticate data*/
+	di->is_authenticated = bq27541_authenticate(di->client);
+	di->battery_type = bq27541_batt_type_detect(di->client);
+#endif //CONFIG_VENDOR_EDIT
+
+	dev_info(di->dev, "DEVICE_TYPE is 0x%02X, FIRMWARE_VERSION is 0x%02X\n",
+			type, fw_ver);
+	dev_info(di->dev, "Complete bq27541 configuration 0x%02X\n", flags);
+}
+
 static int bq27541_read_i2c(u8 reg, int *rt_value, int b_single,
 			struct bq27541_device_info *di)
 {
 	struct i2c_client *client = di->client;
 /* OPPO 2013-12-09 wangjc Modify begin for use standard i2c interface */
-#ifndef CONFIG_VENDOR_EDIT
+#ifndef VENDOR_EDIT
 	struct i2c_msg msg[1];
 #else
 	struct i2c_msg msg[2];
@@ -932,14 +972,10 @@ static int bq27541_read_i2c(u8 reg, int *rt_value, int b_single,
 
 	if (!client->adapter)
 		return -ENODEV;
-/* OPPO 2013-09-30 wangjc Add begin for eliminate conflict */
-#ifdef CONFIG_VENDOR_EDIT
+	
 	mutex_lock(&battery_mutex);
-#endif
-/* OPPO 2013-09-30 wangjc Add end */
-
 /* OPPO 2013-12-09 wangjc Modify begin for use standard i2c interface */
-#ifndef CONFIG_VENDOR_EDIT
+#ifndef VENDOR_EDIT
 	msg->addr = client->addr;
 	msg->flags = 0;
 	msg->len = 1;
@@ -962,10 +998,8 @@ static int bq27541_read_i2c(u8 reg, int *rt_value, int b_single,
 			else
 				*rt_value = data[0];
 
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
 			mutex_unlock(&battery_mutex);
-#endif /*CONFIG_VENDOR_EDIT*/
+
 			return 0;
 		}
 	}
@@ -1000,11 +1034,8 @@ static int bq27541_read_i2c(u8 reg, int *rt_value, int b_single,
 	}
 #endif
 /* OPPO 2013-12-09 wangjc Modify end */
-/* OPPO 2013-09-30 wangjc Add begin for eliminate conflict */
-#ifdef CONFIG_VENDOR_EDIT
 	mutex_unlock(&battery_mutex);
-#endif
-/* OPPO 2013-09-30 wangjc Add end */
+
 	return err;
 }
 
@@ -1116,7 +1147,7 @@ static struct platform_device this_device = {
 #define KEY_LEN			16
 
 /* OPPO 2014-02-25 sjc Modify begin for FIND7OP not use authenticate */
-#if defined (CONFIG_MACH_FIND7OP) || defined (CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024)
+#if defined (CONFIG_MACH_FIND7OP) || defined (CONFIG_OPPO_MSM_14021)
 static bool bq27541_authenticate(struct i2c_client *client)
 {
 	return true;
@@ -1181,44 +1212,13 @@ static bool bq27541_authenticate(struct i2c_client *client)
 //Fuchun.Liao@EXP.Driver,2014/01/10 add for check battery type
 #define BATTERY_2700MA		0
 #define BATTERY_3000MA		1
-#define BATTERY_N3_ATL		2
-#define BATTERY_N3_SONY	3
 #define TYPE_INFO_LEN		8
 
-#if defined (CONFIG_MACH_FIND7OP) || defined (CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024)
-#if (defined(CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024))
-static int bq27541_batt_type_detect(struct i2c_client *client)
-{
-	char blockA_cmd_buf[1] = {0x01};
-	char rc = 0;
-	char recv_buf[TYPE_INFO_LEN] = {0x0};
-	int i = 0;
-	
-	rc = i2c_smbus_write_i2c_block_data(client,DATAFLASHBLOCK,1,&blockA_cmd_buf[0]);
-	if ( rc < 0 ) {
-		pr_info("%s i2c write error\n",__func__);
-		return 0;
-	}
-	msleep(30);	//it is needed
-	i2c_smbus_read_i2c_block_data(client, AUTHENDATA, TYPE_INFO_LEN, &recv_buf[0]);
-	if ((recv_buf[0] == 0x01) && (recv_buf[1] == 0x09) && (recv_buf[2] == 0x08) && (recv_buf[3] == 0x06))
-		rc = BATTERY_N3_ATL;
-	else if ((recv_buf[0] == 0x19) && (recv_buf[1] == 0x89) && (recv_buf[2] == 0x04) && (recv_buf[3] == 0x02))
-		rc = BATTERY_N3_SONY;
-	else {
-		for(i = 0; i < TYPE_INFO_LEN; i++)
-			pr_info("%s error,recv_buf[%d]:0x%x\n",__func__,i,recv_buf[i]);
-		rc =  BATTERY_N3_SONY;
-	}
-	pr_info("%s battery_type:%d\n",__func__,rc);
-	return rc;
-}
-#else
+#if defined (CONFIG_MACH_FIND7OP) || defined (CONFIG_OPPO_MSM_14021)
 static int bq27541_batt_type_detect(struct i2c_client *client)
 {
 	return BATTERY_3000MA;
 }
-#endif //CONFIG_OPPO_MSM_14021
 #else //defined (CONFIG_MACH_FIND7OP) || defined (CONFIG_OPPO_MSM_14021)
 /* jingchun.wang@Onlinerd.Driver, 2014/03/10  Modify for 14001 */
 static int bq27541_batt_type_detect(struct i2c_client *client)
@@ -1326,7 +1326,7 @@ static void fastcg_work_func(struct work_struct *work)
 		gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
 		gpio_direction_input(1);
 #endif /*CONFIG_VENDOR_EDIT*/
-		retval = request_irq(bq27541_di->irq, irq_rx_handler, IRQF_TRIGGER_RISING | IRQF_ONESHOT, "mcu_data", bq27541_di);	//0X01:rising edge,0x02:falling edge
+		retval = request_irq(bq27541_di->irq, irq_rx_handler, IRQF_TRIGGER_RISING, "mcu_data", bq27541_di);	//0X01:rising edge,0x02:falling edge
 		if(retval < 0)
 			pr_err("%s request ap rx irq failed.\n", __func__);
 			
@@ -1335,7 +1335,7 @@ static void fastcg_work_func(struct work_struct *work)
 		
 	if(data == 0x52) {
 		//request fast charging
-		__pm_stay_awake(&bq27541_di->fastchg_wakeup_source);
+		wake_lock(&bq27541_di->fastchg_wake_lock);
 		pic_need_to_up_fw = 0;
 		fw_ver_info = 0;
 		bq27541_di->alow_reading = false;
@@ -1378,7 +1378,7 @@ static void fastcg_work_func(struct work_struct *work)
 		volt = bq27541_get_battery_mvolts();
 		temp = bq27541_get_battery_temperature();
 		remain_cap = bq27541_get_batt_remaining_capacity();
-		soc = bq27541_battery_soc(bq27541_di, 0);
+		soc = bq27541_battery_soc(bq27541_di, false);
 		current_now = bq27541_get_average_current();
 		pr_err("%s volt:%d,temp:%d,remain_cap:%d,soc:%d,current:%d\n",__func__,volt,temp,
 			remain_cap,soc,current_now);	
@@ -1407,7 +1407,7 @@ static void fastcg_work_func(struct work_struct *work)
 		del_timer(&bq27541_di->watchdog);
 		ret_info = 0x2;
 	} else if(data == 0x53){
-		if (bq27541_di->battery_type == BATTERY_3000MA || bq27541_di->battery_type == BATTERY_N3_SONY) {	//13097 ATL battery
+		if (bq27541_di->battery_type == BATTERY_3000MA){	//13097 ATL battery
 			//if temp:10~20 decigec,vddmax = 4250mv
 			//switch off fast chg
 			pr_info("%s fastchg low temp full,switch off fastchg,set GPIO96 0\n", __func__);
@@ -1497,14 +1497,7 @@ static void fastcg_work_func(struct work_struct *work)
 		} else if(i == 1){
 			gpio_set_value(1, ret_info & 0x1);
 		} else {
-#if defined (CONFIG_MACH_FIND7OP) || defined (CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024)
-			if (bq27541_di->battery_type == BATTERY_N3_SONY)
-				gpio_set_value(1, 0);///in N3 for 4.25V low_temp_full
-			else
-				gpio_set_value(1, 1);
-#else
-			gpio_set_value(1,bq27541_di->battery_type);///0 -> 4A or 1 -> 4.5A
-#endif
+			gpio_set_value(1,bq27541_di->battery_type);
 		}
 		
 		gpio_set_value(0, 0);
@@ -1532,7 +1525,7 @@ out:
 
 	//lfc add to set fastchg vddmax = 4250mv during 10 ~ 20 decigec for ATL 3000mAH battery
 	if(data == 0x53){
-		if (bq27541_di->battery_type == BATTERY_3000MA || bq27541_di->battery_type == BATTERY_N3_SONY) {	//13097 ATL battery
+		if(bq27541_di->battery_type == BATTERY_3000MA){	//13097 ATL battery
 			usleep_range(180000,180000);
 			bq27541_di->fast_low_temp_full = true;
 			bq27541_di->alow_reading = true;
@@ -1561,7 +1554,7 @@ out:
 			  jiffies + msecs_to_jiffies(10000));
 	}
 	
-	retval = request_irq(bq27541_di->irq, irq_rx_handler, IRQF_TRIGGER_RISING | IRQF_ONESHOT, "mcu_data", bq27541_di);	//0X01:rising edge,0x02:falling edge
+	retval = request_irq(bq27541_di->irq, irq_rx_handler, IRQF_TRIGGER_RISING, "mcu_data", bq27541_di);	//0X01:rising edge,0x02:falling edge
 	if(retval < 0) {
 	pr_err("%s request ap rx irq failed.\n", __func__);
 	}
@@ -1570,15 +1563,15 @@ out:
 	}
 
 	if(data == 0x53){
-		if (bq27541_di->battery_type == BATTERY_3000MA || bq27541_di->battery_type == BATTERY_N3_SONY) {
+		if(bq27541_di->battery_type == BATTERY_3000MA){
 			power_supply_changed(bq27541_di->batt_psy);
-			__pm_relax(&bq27541_di->fastchg_wakeup_source);
+			wake_unlock(&bq27541_di->fastchg_wake_lock);
 		}
 	}
 		
 	if((data == 0x54) || (data == 0x5a) || (data == 0x59) || (data == 0x5c)){
 		power_supply_changed(bq27541_di->batt_psy);
-		__pm_relax(&bq27541_di->fastchg_wakeup_source);
+		wake_unlock(&bq27541_di->fastchg_wake_lock);
 	}
 }
 
@@ -1604,7 +1597,7 @@ void di_watchdog(unsigned long data)
 	if (ret) {
 		pr_info("%s switch usb error %d\n", __func__, ret);
 	}
-	__pm_relax(&bq27541_di->fastchg_wakeup_source);
+	wake_unlock(&bq27541_di->fastchg_wake_lock);
 }
 #endif
 /* OPPO 2013-12-12 liaofuchun add for fastchg */
@@ -1620,82 +1613,12 @@ static void fastcg_request_irq(struct work_struct *work)
 	
 	gpio_direction_input(1);
 	di->irq = gpio_to_irq(1);
-	retval = request_irq(di->irq, irq_rx_handler, IRQF_TRIGGER_RISING | IRQF_ONESHOT, "mcu_data", di);	//0X01:rising edge,0x02:falling edge
+	retval = request_irq(di->irq, irq_rx_handler, IRQF_TRIGGER_RISING, "mcu_data", di);	//0X01:rising edge,0x02:falling edge
 	if(retval < 0) {
 		pr_err("%s request ap rx irq failed.\n", __func__);
 	}
 }
 #endif
-
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
-static bool bq27541_authenticate(struct i2c_client *client);
-static int bq27541_batt_type_detect(struct i2c_client *client);
-#endif /*CONFIG_VENDOR_EDIT*/
-static void bq27541_hw_config(struct work_struct *work)
-{
-	int ret = 0, flags = 0, type = 0, fw_ver = 0;
-	struct bq27541_device_info *di;
-
-	di  = container_of(work, struct bq27541_device_info, hw_config.work);
-	ret = bq27541_chip_config(di);
-	if (ret) {
-		dev_err(di->dev, "Failed to config Bq27541\n");
-#ifdef CONFIG_VENDOR_EDIT
-/* jingchun.wang@Onlinerd.Driver, 2014/02/12  Add for retry when config fail */
-		di->retry_count--;
-		if(di->retry_count > 0) {
-			schedule_delayed_work(&di->hw_config, HZ);
-		}
-#endif /*CONFIG_VENDOR_EDIT*/
-		return;
-	}
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */	
-	qpnp_battery_gauge_register(&bq27541_batt_gauge);
-#else
-	msm_battery_gauge_register(&bq27541_batt_gauge);
-#endif /*CONFIG_VENDOR_EDIT*/
-	bq27541_cntl_cmd(di, BQ27541_SUBCMD_CTNL_STATUS);
-	udelay(66);
-	bq27541_read(BQ27541_REG_CNTL, &flags, 0, di);
-	bq27541_cntl_cmd(di, BQ27541_SUBCMD_DEVCIE_TYPE);
-	udelay(66);
-	bq27541_read(BQ27541_REG_CNTL, &type, 0, di);
-	bq27541_cntl_cmd(di, BQ27541_SUBCMD_FW_VER);
-	udelay(66);
-	bq27541_read(BQ27541_REG_CNTL, &fw_ver, 0, di);
-
-#ifdef CONFIG_VENDOR_EDIT
-/*OPPO 2013-09-18 liaofuchun add begin for check authenticate data*/
-	di->is_authenticated = bq27541_authenticate(di->client);
-	di->battery_type = bq27541_batt_type_detect(di->client);
-#endif //CONFIG_VENDOR_EDIT
-
-	// Allow updates and fastchg processes after init - 3.10 specific
-	di->alow_reading = true; 
-
-	dev_info(di->dev, "DEVICE_TYPE is 0x%02X, FIRMWARE_VERSION is 0x%02X\n",
-			type, fw_ver);
-	dev_info(di->dev, "Complete bq27541 configuration 0x%02X\n", flags);
-
-	/* OPPO 2013-12-22 wangjc add for fastchg*/
-	#ifdef CONFIG_PIC1503_FASTCG
-	init_timer(&di->watchdog);
-	di->watchdog.data = (unsigned long)di;
-	di->watchdog.function = di_watchdog;
-	wakeup_source_init(&di->fastchg_wakeup_source, "fastcg_wakeup_source");
-	INIT_WORK(&di->fastcg_work,fastcg_work_func);
-	gpio_request(1, "mcu_clk");
-	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
-
-	INIT_DELAYED_WORK(&di->fastcg_request_irq_work,fastcg_request_irq);
-	schedule_delayed_work(&di->fastcg_request_irq_work,
-			      round_jiffies_relative(msecs_to_jiffies
-						(FASTCG_REQUESET_IRQ_INTERVAL)));
-	#endif
-	/* OPPO 2013-12-22 wangjc add end*/
-}
 
 #ifdef CONFIG_VENDOR_EDIT
 /* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
@@ -1705,14 +1628,14 @@ static void update_soc(struct work_struct *work)
 	struct bq27541_device_info *di = container_of(dwork,
 				struct bq27541_device_info, update_soc_work);
 
-	bq27541_battery_soc(di, 0);
+	bq27541_battery_soc(di, false);
 		
 	/*update time 6s*/
 	schedule_delayed_work(&di->update_soc_work,
 			      round_jiffies_relative(msecs_to_jiffies
 						     (BATT_SOC_INTERVAL)));
 }
-#define MAX_RETRY_COUNT	10 // increased to 10 for 3.10
+#define MAX_RETRY_COUNT	5
 #endif /*CONFIG_VENDOR_EDIT*/
 static int bq27541_battery_probe(struct i2c_client *client,
 				 const struct i2c_device_id *id)
@@ -1723,7 +1646,7 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	int num;
 	int retval = 0;
 	
-#if (defined(CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024))
+#ifdef CONFIG_OPPO_MSM_14021
 /* OPPO 2014-06-23 sjc Add begin for 14021 */
 	struct device_node *dev_node = client->dev.of_node;
 	int ret;
@@ -1750,12 +1673,14 @@ static int bq27541_battery_probe(struct i2c_client *client,
 		return -ENODEV;
 
 	/* Get new ID for the new battery device */
+	retval = __idr_pre_get(&battery_id, GFP_KERNEL);
+	if (retval == 0)
+		return -ENOMEM;
 	mutex_lock(&battery_mutex);
-	num = idr_alloc(&battery_id, client, 0, 0, GFP_KERNEL);
+	retval = __idr_get_new_above(&battery_id, client, 0, &num);
 	mutex_unlock(&battery_mutex);
-
-	if (num < 0)
-		return num;
+	if (retval < 0)
+		return retval;
 
 	name = kasprintf(GFP_KERNEL, "%s-%d", id->name, num);
 	if (!name) {
@@ -1790,7 +1715,7 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	di->temp_pre = 0;
 #endif
 /* OPPO 2013-08-19 wangjc Add end */
-	di->alow_reading = false;
+	di->alow_reading = true;
 	di->fast_chg_ing = false;
 	di->fast_low_temp_full = false;
 #ifdef CONFIG_VENDOR_EDIT
@@ -1829,18 +1754,29 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	bq27541_di = di;
 	INIT_WORK(&di->counter, bq27541_coulomb_counter_work);
 	INIT_DELAYED_WORK(&di->hw_config, bq27541_hw_config);
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
 	schedule_delayed_work(&di->hw_config, 0);
-#else
-	schedule_delayed_work(&di->hw_config, BQ27541_INIT_DELAY);
-#endif /*CONFIG_VENDOR_EDIT*/
-	
+
 	INIT_DELAYED_WORK(&di->update_soc_work,
 							update_soc);
 	schedule_delayed_work(&di->update_soc_work,
 			      round_jiffies_relative(msecs_to_jiffies
 						(BATT_SOC_INTERVAL)));
+	/* OPPO 2013-12-22 wangjc add for fastchg*/
+	#ifdef CONFIG_PIC1503_FASTCG
+	init_timer(&di->watchdog);
+	di->watchdog.data = (unsigned long)di;
+	di->watchdog.function = di_watchdog;
+	wake_lock_init(&di->fastchg_wake_lock,		
+		WAKE_LOCK_SUSPEND, "fastcg_wake_lock");
+	INIT_WORK(&di->fastcg_work,fastcg_work_func);
+	gpio_request(1, "mcu_clk");
+	gpio_tlmm_config(GPIO_CFG(1,0,GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),1);
+	INIT_DELAYED_WORK(&di->fastcg_request_irq_work,fastcg_request_irq);
+	schedule_delayed_work(&di->fastcg_request_irq_work,
+			      round_jiffies_relative(msecs_to_jiffies
+						(FASTCG_REQUESET_IRQ_INTERVAL)));
+	#endif
+	/* OPPO 2013-12-22 wangjc add end*/
 	return 0;
 
 batt_failed_4:
@@ -1861,17 +1797,13 @@ static int bq27541_battery_remove(struct i2c_client *client)
 {
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
 	
-#if (defined(CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024))
+#ifdef CONFIG_OPPO_MSM_14021
 /* OPPO 2014-06-23 sjc Add begin for 14021 */	
 	if (gpio_is_valid(mcu_en_gpio))//sjc0623 add
 		gpio_free(mcu_en_gpio);
 #endif
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
+
 	qpnp_battery_gauge_unregister(&bq27541_batt_gauge);
-#else
-	msm_battery_gauge_unregister(&bq27541_batt_gauge);
-#endif /*CONFIG_VENDOR_EDIT*/
 	bq27541_cntl_cmd(di, BQ27541_SUBCMD_DISABLE_DLOG);
 	udelay(66);
 	bq27541_cntl_cmd(di, BQ27541_SUBCMD_DISABLE_IT);
@@ -1887,8 +1819,6 @@ static int bq27541_battery_remove(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
 static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t message)
 {
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
@@ -1902,158 +1832,40 @@ static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t messa
 #define RESUME_TIME  1*60 
 static int bq27541_battery_resume(struct i2c_client *client)
 {
-	int suspend_time;
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
 			
 	atomic_set(&di->suspended, 0);
-	suspend_time =  di->rtc_resume_time - di->rtc_suspend_time;
-
-	/*update pre capacity when sleep time more than 1minutes*/
-	bq27541_battery_soc(bq27541_di, suspend_time); 
+	
+	bq27541_battery_soc(bq27541_di, true); 
 
 	return 0;
 }
 
-#if (defined(CONFIG_OPPO_MSM_14021) || defined(CONFIG_OPPO_MSM_14024))
-/* OPPO 2014-11-18 sjc Add begin for 14021 */
-#define CONTROL_CMD				0x00
-#define CONTROL_STATUS				0x00
-#define SEAL_POLLING_RETRY_LIMIT	100
-#define BQ27541_UNSEAL_KEY			11151986
-#define RESET_SUBCMD				0x0041
 
-static void control_cmd_write(struct bq27541_device_info *di, u16 cmd)
-{
-	int value;
-	
-	//dev_dbg(di->dev, "%s: %04x\n", __FUNCTION__, cmd);
-	bq27541_cntl_cmd(di, 0x0041);
-	msleep(10);
-	bq27541_read(CONTROL_STATUS, &value, 0, di);
-	printk(KERN_ERR "bq27541 CONTROL_STATUS: 0x%x\n", value);
-}
-/*
-static int control_cmd_read(struct bq27541_device_info *di, u16 cmd)
-{
-	int ret = 0;
-	int value = 0;
-	
-	dev_dbg(di->dev, "%s: %04x\n", __FUNCTION__, cmd);
 
-	bq27541_write(CONTROL_CMD, cmd, false, di);
 
-	msleep(10);
-
-	ret = bq27541_read(CONTROL_CMD, &value, false, di);
-	if (ret) {
-		printk(KERN_ERR "control_cmd_read() fail !\n");
-		return ret;
-	}
-
-	return value;
-	
-}
-*/
-static int sealed(struct bq27541_device_info *di)
-{
-	//return control_cmd_read(di, CONTROL_STATUS) & (1 << 13);
-	int value = 0;
-	
-	bq27541_cntl_cmd(di,CONTROL_STATUS);
-	msleep(10);
-	bq27541_read(CONTROL_STATUS, &value, 0, di);
-	pr_err("%s REG_CNTL: 0x%x\n", __func__, value);
-
-	return value & BIT(14);
-}
-
-static int unseal(struct bq27541_device_info *di, u32 key)
-{
-	int i = 0;
-
-	if (!sealed(di))
-		goto out;
-
-	//bq27541_write(CONTROL_CMD, key & 0xFFFF, false, di);
-	bq27541_cntl_cmd(di, 0x1115);
-	msleep(10);
-	//bq27541_write(CONTROL_CMD, (key & 0xFFFF0000) >> 16, false, di);
-	bq27541_cntl_cmd(di, 0x1986);
-	msleep(10);
-	bq27541_cntl_cmd(di, 0xffff);
-	msleep(10);
-	bq27541_cntl_cmd(di, 0xffff);
-	msleep(10);
-
-	while (i < SEAL_POLLING_RETRY_LIMIT) {
-		i++;
-		if (!sealed(di))
-			break;
-		msleep(10);
-	}
-
-out:
-	printk(KERN_ERR "bq27541 %s: i=%d\n", __FUNCTION__, i);
-
-	if ( i == SEAL_POLLING_RETRY_LIMIT) {
-		printk(KERN_ERR "bq27541 %s failed\n", __FUNCTION__);
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-static void bq27541_reset(struct i2c_client *client)
-{
-	struct bq27541_device_info *di = i2c_get_clientdata(client);
-
-	if (bq27541_get_battery_mvolts() <= 3250 * 1000 
-			&& bq27541_get_battery_mvolts() > 2500 * 1000
-			&& bq27541_get_battery_soc() == 0 
-			&& bq27541_get_battery_temperature() > 150) {
-		if (!unseal(di, BQ27541_UNSEAL_KEY)) {
-			printk(KERN_ERR "bq27541 unseal fail !\n");
-			return;
-		}
-		printk(KERN_ERR "bq27541 unseal OK !\n");
-		
-		control_cmd_write(di, RESET_SUBCMD);
-	}
-	return;
-}
-#else
-//static void bq27541_reset(struct i2c_client *client) {}
-#endif //CONFIG_OPPO_MSM_14021
 
 static const struct of_device_id bq27541_match[] = {
 	{ .compatible = "ti,bq27541-battery" },
 	{ },
 };
 
-#endif /*CONFIG_VENDOR_EDIT*/
 static const struct i2c_device_id bq27541_id[] = {
-	{ "bq27541", 1 },
+	{ "bq27541-battery", 1 },
 	{},
 };
 MODULE_DEVICE_TABLE(i2c, BQ27541_id);
 
 static struct i2c_driver bq27541_battery_driver = {
 	.driver		= {
-			.name = "bq27541-battery",
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
+		.name = "bq27541-battery",
 		.owner	= THIS_MODULE,
 		.of_match_table = bq27541_match,
-#endif /*CONFIG_VENDOR_EDIT*/
 	},
 	.probe		= bq27541_battery_probe,
 	.remove		= bq27541_battery_remove,
-#ifdef CONFIG_VENDOR_EDIT
-/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
-//	.shutdown	= bq27541_reset,
 	.suspend	= bq27541_battery_suspend ,
 	.resume		= bq27541_battery_resume,
-#endif /*CONFIG_VENDOR_EDIT*/
 	.id_table	= bq27541_id,
 };
 

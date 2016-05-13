@@ -329,7 +329,6 @@ static int fake_chgvol = 0;
 #ifdef CONFIG_BATTERY_BQ27541
 static struct qpnp_battery_gauge *qpnp_batt_gauge = NULL;
 #endif /*CONFIG_BATTERY_BQ27541*/
-static int called_once_but_you_werent_there = 0;
 
 #ifdef CONFIG_BQ24196_CHARGER
 static struct qpnp_external_charger *qpnp_ext_charger = NULL;
@@ -1518,12 +1517,6 @@ qpnp_chg_charge_en(struct qpnp_chg_chip *chip, int enable)
 #ifdef CONFIG_VENDOR_EDIT
 	if(get_boot_mode() != MSM_BOOT_MODE__NORMAL)
 		return -EINVAL;
-	if(get_prop_authenticate(chip) == 0)
-	{
-		called_once_but_you_werent_there = enable;
-		pr_err("battery wasn't initialized yet, charge will start after init");
-		return -EINVAL;
-	}
 #endif
 /* OPPO 2013-08-19 wangjc Add end */
 
@@ -1946,6 +1939,7 @@ qpnp_chg_set_appropriate_vddmax(struct qpnp_chg_chip *chip)
 }
 #else
 #ifdef CONFIG_BATTERY_BQ27541
+#if 0
 static int
 get_prop_battery_cc(struct qpnp_chg_chip *chip)//sjc20150105
 {
@@ -1967,7 +1961,7 @@ get_prop_battery_fcc(struct qpnp_chg_chip *chip)//sjc20150105
 		return false;
 	}
 }
-
+#endif
 //wangjc add for authentication
 static int
 get_prop_authenticate(struct qpnp_chg_chip *chip)
@@ -3090,7 +3084,7 @@ static int ext_ovp_present;
 module_param(ext_ovp_present, int, 0444);
 
 /* OPPO 2013-09-30 wangjc Add end */
-#define OVP_USB_WALL_THRESHOLD_MA	200
+#define OVP_USB_WALL_THRESHOLD_MA      200
 
 #define OVP_USB_WALL_TRSH_MA   200
 static int
@@ -8123,7 +8117,7 @@ static ssize_t test_temp_store(struct device *dev,
 		
 	return size;
 }
-static DEVICE_ATTR(test_temp, S_IRUGO | S_IWUSR, NULL, test_temp_store);
+static DEVICE_ATTR(test_temp, 0200, NULL, test_temp_store);
 
 static ssize_t test_chg_vol_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size) {
@@ -8139,24 +8133,15 @@ static ssize_t test_chg_vol_store(struct device *dev,
 		
 	return size;
 }
-static DEVICE_ATTR(test_chg_vol, S_IRUGO | S_IWUSR, NULL, test_chg_vol_store);
-
+static DEVICE_ATTR(test_chg_vol, 0200, NULL, test_chg_vol_store);
 void qpnp_battery_gauge_register(struct qpnp_battery_gauge *batt_gauge)
 {
-	struct power_supply *batt_psy = power_supply_get_by_name("battery");
-	struct qpnp_chg_chip *chip = container_of(batt_psy,
-				struct qpnp_chg_chip, batt_psy);
 	if (qpnp_batt_gauge) {
 		qpnp_batt_gauge = batt_gauge;
 		pr_err("qpnp-charger %s multiple battery gauge called\n",
 								__func__);
 	} else {
 		qpnp_batt_gauge = batt_gauge;
-		if(called_once_but_you_werent_there == 1)
-		{
-			called_once_but_you_werent_there = 0;
-			qpnp_chg_charge_en(chip,called_once_but_you_werent_there);
-		}
 	}
 }
 EXPORT_SYMBOL(qpnp_battery_gauge_register);
@@ -8253,6 +8238,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 }
 #endif /*CONFIG_FB*/
 
+#if 0
 /* jingchun.wang@Onlinerd.Driver, 2014/04/24  Add for control charger */
 static ssize_t write_charger(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
@@ -8337,7 +8323,7 @@ static void battery_fcc_init_procfs(void)//sjc20150105
 		pr_err("Failed to register batt_fcc proc interface\n");
 }
 /* yangfangbiao@oneplus.cn, 2015/01/06  Modify  end for  sync with KK charge standard  */
-
+#endif
 #endif
 /* OPPO 2013-06-08 wangjc Add end */
 
@@ -8843,10 +8829,13 @@ qpnp_charger_probe(struct spmi_device *spmi)
 					__func__, rc);
 		device_remove_file(chip->dev, &dev_attr_test_chg_vol);
 	}
+
+#if 0
 /* jingchun.wang@Onlinerd.Driver, 2014/04/24  Add for control charger */
 	charger_init_procfs();
 	battery_cc_init_procfs();//sjc20150105  /* yangfangbiao@oneplus.cn, 2015/01/06  Modify for  sync with KK charge standard  */
 	battery_fcc_init_procfs();//sjc20150105  /* yangfangbiao@oneplus.cn, 2015/01/06  Modify for  sync with KK charge standard  */
+#endif
 #endif
 /* OPPO 2013-06-08 wangjc Add end */
 	pr_info("success chg_dis = %d, bpd = %d, usb = %d, dc = %d b_health = %d batt_present = %d\n",
