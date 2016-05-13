@@ -175,3 +175,4 @@ module_exit(wcnss_pre_alloc_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION(DEVICE "WCNSS Prealloc Driver");
+

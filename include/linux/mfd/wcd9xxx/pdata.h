@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -129,11 +129,6 @@ struct wcd9xxx_micbias_setting {
 	bool bias2_is_headset_only;
 };
 
-enum codec_variant {
-	WCD9XXX,
-	WCD9330,
-};
-
 struct wcd9xxx_ocp_setting {
 	unsigned int	use_pdata:1; /* 0 - use sys default as recommended */
 	unsigned int	num_attempts:4; /* up to 15 attempts */
@@ -142,7 +137,7 @@ struct wcd9xxx_ocp_setting {
 	unsigned int	hph_ocp_limit:3; /* Headphone OCP current limit */
 };
 
-#define WCD9XXX_MAX_REGULATOR	8
+#define WCD9XXX_MAX_REGULATOR	10
 /*
  *      format : TABLA_<POWER_SUPPLY_PIN_NAME>_CUR_MAX
  *
@@ -158,6 +153,8 @@ struct wcd9xxx_ocp_setting {
 #define  WCD9XXX_VDDD_CDC_A_CUR_MAX       5000
 
 #define WCD9XXX_VDD_SPKDRV_NAME "cdc-vdd-spkdrv"
+#define WCD9XXX_VDD_HPMIC_SWITCH "cdc-vdd-hpmic-switch"
+#define WCD9XXX_VDD_MICBIAS_NAME "cdc-vdd-mic-bias"
 
 struct wcd9xxx_regulator {
 	const char *name;
@@ -180,7 +177,7 @@ struct wcd9xxx_pdata {
 	struct wcd9xxx_regulator regulator[WCD9XXX_MAX_REGULATOR];
 	u32 mclk_rate;
 	u32 dmic_sample_rate;
-	enum codec_variant cdc_variant;
 };
 
 #endif
+

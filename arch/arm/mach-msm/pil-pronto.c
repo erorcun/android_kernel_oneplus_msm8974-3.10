@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,9 +30,8 @@
 #include <soc/qcom/ramdump.h>
 
 #include <mach/msm_smsm.h>
-#include <mach/msm_bus_board.h>
-
 #include <soc/qcom/smem.h>
+#include <mach/msm_bus_board.h>
 
 #include "peripheral-loader.h"
 #include "scm-pas.h"
@@ -63,6 +62,9 @@
 
 #define PRONTO_PMU_CCPU_BOOT_REMAP_ADDR			0x2004
 
+#define PRONTO_PMU_SPARE				0x1088
+#define PRONTO_PMU_SPARE_SSR_BIT			BIT(23)
+
 #define CLK_CTL_WCNSS_RESTART_BIT			BIT(0)
 
 #define AXI_HALTREQ					0x0
@@ -84,6 +86,7 @@ struct pronto_data {
 	struct regulator *vreg;
 	bool restart_inprogress;
 	bool crash;
+	struct delayed_work cancel_vote_work;
 	struct ramdump_device *ramdump_dev;
 	struct work_struct wcnss_wdog_bite_work;
 };
@@ -113,7 +116,6 @@ err:
 static void pil_pronto_remove_proxy_vote(struct pil_desc *pil)
 {
 	struct pronto_data *drv = dev_get_drvdata(pil->dev);
-
 	regulator_disable(drv->vreg);
 	clk_disable_unprepare(drv->cxo);
 }
@@ -329,6 +331,7 @@ static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 	struct pronto_data *drv = subsys_to_drv(dev_id);
 
 	drv->crash = true;
+
 	if (drv->restart_inprogress) {
 		pr_err("Ignoring wcnss bite irq, restart in progress\n");
 		return IRQ_HANDLED;
@@ -340,25 +343,55 @@ static irqreturn_t wcnss_wdog_bite_irq_hdlr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void wcnss_post_bootup(struct work_struct *work)
+{
+	struct platform_device *pdev = wcnss_get_platform_device();
+	struct wcnss_wlan_config *pwlanconfig = wcnss_get_wlan_config();
+
+	wcnss_wlan_power(&pdev->dev, pwlanconfig, WCNSS_WLAN_SWITCH_OFF, NULL);
+}
+
 static int wcnss_shutdown(const struct subsys_desc *subsys, bool force_stop)
 {
 	struct pronto_data *drv = subsys_to_drv(subsys);
 
+	disable_irq_nosync(drv->subsys_desc.wdog_bite_irq);
 	pil_shutdown(&drv->desc);
+	flush_delayed_work(&drv->cancel_vote_work);
+	wcnss_flush_delayed_boot_votes();
+
 	return 0;
 }
 
 static int wcnss_powerup(const struct subsys_desc *subsys)
 {
 	struct pronto_data *drv = subsys_to_drv(subsys);
-	int ret;
+	struct platform_device *pdev = wcnss_get_platform_device();
+	struct wcnss_wlan_config *pwlanconfig = wcnss_get_wlan_config();
+	void __iomem *base = drv->base;
+	u32 reg;
+	int ret = -1;
 
-	ret = pil_boot(&drv->desc);
-	if (ret)
-		return ret;
+	if (base) {
+		reg = readl_relaxed(base + PRONTO_PMU_SPARE);
+		reg |= PRONTO_PMU_SPARE_SSR_BIT;
+		writel_relaxed(reg, base + PRONTO_PMU_SPARE);
+	}
 
+	if (pdev && pwlanconfig)
+		ret = wcnss_wlan_power(&pdev->dev, pwlanconfig,
+					WCNSS_WLAN_SWITCH_ON, NULL);
+	if (!ret) {
+		msleep(1000);
+		ret = pil_boot(&drv->desc);
+		if (ret)
+			return ret;
+	}
 	drv->restart_inprogress = false;
-	return ret;
+	enable_irq(drv->subsys_desc.wdog_bite_irq);
+	schedule_delayed_work(&drv->cancel_vote_work, msecs_to_jiffies(5000));
+
+	return 0;
 }
 
 static void crash_shutdown(const struct subsys_desc *subsys)
@@ -464,6 +497,7 @@ static int pil_pronto_probe(struct platform_device *pdev)
 	drv->subsys_desc.err_fatal_handler = wcnss_err_fatal_intr_handler;
 	drv->subsys_desc.wdog_bite_handler = wcnss_wdog_bite_irq_hdlr;
 
+	INIT_DELAYED_WORK(&drv->cancel_vote_work, wcnss_post_bootup);
 	INIT_WORK(&drv->wcnss_wdog_bite_work, wcnss_wdog_bite_work_hdlr);
 
 	drv->subsys = subsys_register(&drv->subsys_desc);
@@ -532,3 +566,4 @@ module_exit(pil_pronto_exit);
 
 MODULE_DESCRIPTION("Support for booting PRONTO (WCNSS) processors");
 MODULE_LICENSE("GPL v2");
+

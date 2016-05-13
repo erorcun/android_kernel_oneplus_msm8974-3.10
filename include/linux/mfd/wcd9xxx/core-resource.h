@@ -139,3 +139,4 @@ int wcd9xxx_core_res_suspend(
 	struct wcd9xxx_core_resource *,
 	pm_message_t);
 #endif
+
