@@ -27,6 +27,11 @@
 #define CDBG(fmt, args...) do { } while (0)
 #endif
 
+#ifdef CONFIG_MACH_OPPO
+static struct msm_sensor_ctrl_t *gs_ctrl_back = NULL;
+static struct msm_sensor_ctrl_t *gs_ctrl_front = NULL;
+#endif
+
 static int32_t msm_sensor_enable_i2c_mux(struct msm_camera_i2c_conf *i2c_conf)
 {
 	struct v4l2_subdev *i2c_mux_sd =
@@ -549,6 +554,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_RESET] = 1;
 		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET]);
 	}
@@ -566,8 +572,15 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_STANDBY] = 1;
 		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
+/* OPPO 2013-12-18 yingpiao.lin modify begin for bug gpio-standby is none */
+#ifdef CONFIG_MACH_OPPO
+	} else {
+		gconf->gpio_num_info->valid[SENSOR_GPIO_STANDBY] = 1;
+#endif
+/* OPPO 2013-12-18 yingpiao.lin Add modify end */
 	}
 
 	rc = of_property_read_u32(of_node, "qcom,gpio-vio", &val);
@@ -579,6 +592,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VIO] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VIO] = 1;
 		CDBG("%s qcom,gpio-vio %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VIO]);
 	} else if (rc != -EINVAL) {
@@ -596,6 +610,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VANA] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VANA] = 1;
 		CDBG("%s qcom,gpio-vana %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VANA]);
 	} else if (rc != -EINVAL) {
@@ -613,6 +628,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VDIG] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VDIG] = 1;
 		CDBG("%s qcom,gpio-vdig %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VDIG]);
 	} else if (rc != -EINVAL) {
@@ -630,6 +646,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VAF] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VAF] = 1;
 		CDBG("%s qcom,gpio-vaf %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VAF]);
 	} else if (rc != -EINVAL) {
@@ -647,6 +664,7 @@ int32_t msm_sensor_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_AF_PWDM] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_AF_PWDM] = 1;
 		CDBG("%s qcom,gpio-af-pwdm %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_AF_PWDM]);
 	} else if (rc != -EINVAL) {
@@ -1022,6 +1040,9 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 					SENSOR_GPIO_MAX);
 				goto power_up_failed;
 			}
+			if (!data->gpio_conf->gpio_num_info->valid
+				[power_setting->seq_val])
+				continue;
 			pr_debug("%s:%d gpio set val %d\n", __func__, __LINE__,
 				data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val]);
@@ -1099,6 +1120,9 @@ power_up_failed:
 				0);
 			break;
 		case SENSOR_GPIO:
+			if (!data->gpio_conf->gpio_num_info->valid
+				[power_setting->seq_val])
+				continue;
 			gpio_set_value_cansleep(
 				data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val], GPIOF_OUT_INIT_LOW);
@@ -1167,6 +1191,9 @@ int32_t msm_sensor_power_down(struct msm_sensor_ctrl_t *s_ctrl)
 					SENSOR_GPIO_MAX);
 				continue;
 			}
+			if (!data->gpio_conf->gpio_num_info->valid
+				[power_setting->seq_val])
+				continue;
 			gpio_set_value_cansleep(
 				data->gpio_conf->gpio_num_info->gpio_num
 				[power_setting->seq_val], GPIOF_OUT_INIT_LOW);
@@ -1790,6 +1817,110 @@ static struct msm_camera_i2c_fn_t msm_sensor_qup_func_tbl = {
 	.i2c_write_conf_tbl = msm_camera_qup_i2c_write_conf_tbl,
 };
 
+#if CONFIG_MACH_OPPO
+//jindian.guan@Camera, 2014/04/14, Add proc for sensor state
+#include <linux/proc_fs.h>
+#define PAGESIZE 512
+static int sensor_proc_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int len = 0;
+	char page[PAGESIZE];
+
+	if (gs_ctrl_back == NULL)
+	{
+		pr_err("gs_ctrl is NULL \n");
+		return 0;
+	}
+	len = sprintf(page, "%d",gs_ctrl_back->sensor_state);
+	len = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return len;
+}
+
+static int sensor_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+	return 0;
+}
+static int sensor_proc_read_front(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int len = 0;
+	char page[PAGESIZE];
+
+	if (gs_ctrl_front == NULL)
+	{
+		pr_err("gs_ctrl is NULL \n");
+		return 0;
+	}
+	len = sprintf(page, "%d",gs_ctrl_front->sensor_state);
+	len = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return len;
+}
+
+static int sensor_proc_write_front(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+	return 0;
+}
+
+static const struct file_operations sensor_fops = {
+	.write = sensor_proc_write,
+	.read =  sensor_proc_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations sensor1_fops = {
+	.write = sensor_proc_write_front,
+	.read =  sensor_proc_read_front,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static int sensor_proc_init(struct msm_sensor_ctrl_t *sensor_ctl)
+{
+	int ret=0;
+	static int temp=0;
+	struct proc_dir_entry *proc_entry=NULL;
+	if(0==temp)
+	 {
+	   proc_entry= proc_create( "qcom_sensor_state", 0666, NULL, &sensor_fops);
+
+	   if(proc_entry == NULL)
+	    {
+		  ret = -ENOMEM;
+	  	  pr_err("[%s]: Error! Couldn't create qcom_sensor_state proc entry\n", __func__);
+	    }
+	   else
+	    {
+	      gs_ctrl_back=sensor_ctl;
+	      temp++;
+		  pr_err("[%s]: create qcom_sensor_state proc success \n", __func__);
+	    }
+	  }
+	else if(1==temp)
+		{
+		proc_entry= proc_create( "qcom_sensor_state_1", 0666, NULL, &sensor1_fops);
+
+	   if(proc_entry == NULL)
+	    {
+		  ret = -ENOMEM;
+	  	  pr_err("[%s]: Error! Couldn't create qcom_sensor_state_1 proc entry\n", __func__);
+	    }
+	   else
+	    {
+	      gs_ctrl_front = sensor_ctl;
+	      temp++;
+		  pr_err("[%s]: create qcom_sensor_state_1 proc success \n", __func__);
+	    }
+	   }
+	else
+	 	{
+	 	 pr_err("[%s]: temp=%d \n", __func__,temp);
+	 	 return 0;
+	 	}
+
+	return ret;
+}
+#endif
+
 int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 				  const void *data)
 {
@@ -1798,6 +1929,8 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 		(struct msm_sensor_ctrl_t *)data;
 	struct msm_camera_cci_client *cci_client = NULL;
 	uint32_t session_id;
+	unsigned long mount_pos;
+
 	s_ctrl->pdev = pdev;
 	s_ctrl->dev = &pdev->dev;
 	CDBG("%s called data %p\n", __func__, data);
@@ -1863,6 +1996,11 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 	s_ctrl->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_SENSOR;
 	s_ctrl->msm_sd.sd.entity.name =
 		s_ctrl->msm_sd.sd.name;
+	mount_pos = s_ctrl->sensordata->sensor_init_params->position;		
+	mount_pos = mount_pos << 8;		
+	mount_pos = mount_pos |		
+	(s_ctrl->sensordata->sensor_init_params->sensor_mount_angle / 90);		
+	s_ctrl->msm_sd.sd.entity.flags = mount_pos;
 
 	rc = camera_init_v4l2(&s_ctrl->pdev->dev, &session_id);
 	CDBG("%s rc %d session_id %d\n", __func__, rc, session_id);
@@ -1873,6 +2011,9 @@ int32_t msm_sensor_platform_probe(struct platform_device *pdev,
 
 	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
 	CDBG("%s:%d\n", __func__, __LINE__);
+#ifdef CONFIG_MACH_OPPO
+	sensor_proc_init(s_ctrl);
+#endif
 	return rc;
 }
 
@@ -1881,6 +2022,8 @@ int32_t msm_sensor_i2c_probe(struct i2c_client *client,
 {
 	int rc = 0;
 	uint32_t session_id;
+	unsigned long mount_pos;
+
 	CDBG("%s %s_i2c_probe called\n", __func__, client->name);
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		pr_err("%s %s i2c_check_functionality failed\n",
@@ -1976,6 +2119,12 @@ int32_t msm_sensor_i2c_probe(struct i2c_client *client,
 	s_ctrl->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_SENSOR;
 	s_ctrl->msm_sd.sd.entity.name =
 		s_ctrl->msm_sd.sd.name;
+
+	mount_pos = s_ctrl->sensordata->sensor_init_params->position;		
+	mount_pos = mount_pos << 8;		
+	mount_pos = mount_pos |		
+	(s_ctrl->sensordata->sensor_init_params->sensor_mount_angle / 90);		
+	s_ctrl->msm_sd.sd.entity.flags = mount_pos;
 
 	rc = camera_init_v4l2(&s_ctrl->sensor_i2c_client->client->dev,
 		&session_id);

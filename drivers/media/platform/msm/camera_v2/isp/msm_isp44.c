@@ -995,7 +995,7 @@ static void msm_vfe44_cfg_axi_ub(struct vfe_device *vfe_dev)
 
 static void msm_vfe44_update_ping_pong_addr(
 	struct vfe_device *vfe_dev,
-	uint8_t wm_idx, uint32_t pingpong_status, dma_addr_t paddr)
+	uint8_t wm_idx, uint32_t pingpong_status, unsigned long paddr)
 {
 	uint32_t paddr32 = (paddr & 0xFFFFFFFF);
 	msm_camera_io_w(paddr32, vfe_dev->vfe_base +
@@ -1058,28 +1058,6 @@ static int msm_vfe44_get_stats_idx(enum msm_isp_stats_type stats_type)
 		pr_err("%s: Invalid stats type\n", __func__);
 		return -EINVAL;
 	}
-}
-
-static int msm_vfe44_stats_check_streams(
-	struct msm_vfe_stats_stream *stream_info)
-{
-	if (stream_info[STATS_IDX_BF].state ==
-		STATS_AVALIABLE &&
-		stream_info[STATS_IDX_BF_SCALE].state !=
-		STATS_AVALIABLE) {
-		pr_err("%s: does not support BF_SCALE while BF is disabled\n",
-			__func__);
-		return -EINVAL;
-	}
-	if (stream_info[STATS_IDX_BF].state != STATS_AVALIABLE &&
-		stream_info[STATS_IDX_BF_SCALE].state != STATS_AVALIABLE &&
-		stream_info[STATS_IDX_BF].composite_flag !=
-		stream_info[STATS_IDX_BF_SCALE].composite_flag) {
-		pr_err("%s: Different composite flag for BF and BF_SCALE\n",
-			__func__);
-		return -EINVAL;
-	}
-	return 0;
 }
 
 static void msm_vfe44_stats_cfg_comp_mask(
@@ -1293,7 +1271,7 @@ static void msm_vfe44_stats_update_cgc_override(struct vfe_device *vfe_dev,
 
 static void msm_vfe44_stats_update_ping_pong_addr(
 	struct vfe_device *vfe_dev, struct msm_vfe_stats_stream *stream_info,
-	uint32_t pingpong_status, dma_addr_t paddr)
+	uint32_t pingpong_status, unsigned long paddr)
 {
 	uint32_t paddr32 = (paddr & 0xFFFFFFFF);
 	int stats_idx = STATS_IDX(stream_info->stream_handle);
@@ -1453,8 +1431,6 @@ struct msm_vfe_hardware_info vfe44_hw_info = {
 			.get_wm_mask = msm_vfe44_get_wm_mask,
 			.get_pingpong_status = msm_vfe44_get_pingpong_status,
 			.halt = msm_vfe44_axi_halt,
-			.update_cgc_override =
-				msm_vfe44_axi_update_cgc_override,
 		},
 		.core_ops = {
 			.reg_update = msm_vfe44_reg_update,
@@ -1471,7 +1447,6 @@ struct msm_vfe_hardware_info vfe44_hw_info = {
 		},
 		.stats_ops = {
 			.get_stats_idx = msm_vfe44_get_stats_idx,
-			.check_streams = msm_vfe44_stats_check_streams,
 			.cfg_comp_mask = msm_vfe44_stats_cfg_comp_mask,
 			.cfg_wm_irq_mask = msm_vfe44_stats_cfg_wm_irq_mask,
 			.clear_wm_irq_mask = msm_vfe44_stats_clear_wm_irq_mask,
@@ -1485,8 +1460,6 @@ struct msm_vfe_hardware_info vfe44_hw_info = {
 			.get_wm_mask = msm_vfe44_stats_get_wm_mask,
 			.get_frame_id = msm_vfe44_stats_get_frame_id,
 			.get_pingpong_status = msm_vfe44_get_pingpong_status,
-			.update_cgc_override =
-				msm_vfe44_stats_update_cgc_override,
 		},
 	},
 	.dmi_reg_offset = 0x918,

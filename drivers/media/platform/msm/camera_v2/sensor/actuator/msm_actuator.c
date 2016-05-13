@@ -98,7 +98,15 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 				i2c_byte1 = write_arr[i].reg_addr;
 				i2c_byte2 = value;
 				if (size != (i+1)) {
+#ifndef VENDOR_EDIT
+//20150630@Neil Chen: some driver IC need write data-H first, then data-L.
 					i2c_byte2 = value & 0xFF;
+#else
+					if (size==2)
+						i2c_byte2 = (value & 0xFF00) >> 8;
+					else
+						i2c_byte2 = value & 0xFF;
+#endif
 					CDBG("byte1:0x%x, byte2:0x%x\n",
 						i2c_byte1, i2c_byte2);
 					i2c_tbl[a_ctrl->i2c_tbl_index].
@@ -110,7 +118,15 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 					a_ctrl->i2c_tbl_index++;
 					i++;
 					i2c_byte1 = write_arr[i].reg_addr;
+#ifndef VENDOR_EDIT
+//20150630@Neil Chen: some driver IC need write data-H first, then data-L.
 					i2c_byte2 = (value & 0xFF00) >> 8;
+#else
+					if (size==2)
+						i2c_byte2 = value & 0xFF;
+					else
+						i2c_byte2 = (value & 0xFF00) >> 8;
+#endif
 				}
 			} else {
 				i2c_byte1 = (value & 0xFF00) >> 8;
@@ -327,12 +343,26 @@ static int32_t msm_actuator_move_focus(
 	reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 	reg_setting.data_type = a_ctrl->i2c_data_type;
 	reg_setting.size = a_ctrl->i2c_tbl_index;
+#ifndef VENDOR_EDIT
+/*modified by Jinshui.Liu@Camera 20150623 start for avoid cci write fail*/
 	rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_table_w_microdelay(
 		&a_ctrl->i2c_client, &reg_setting);
 	if (rc < 0) {
 		pr_err("i2c write error:%d\n", rc);
 		return rc;
 	}
+#else
+	if (reg_setting.size > 0 && reg_setting.size < 8192) {
+		rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_table_w_microdelay(
+			&a_ctrl->i2c_client, &reg_setting);
+		if (rc < 0) {
+			pr_err("i2c write error:%d\n", rc);
+			return rc;
+		}
+	} else {
+		pr_err("error, size %d\n", reg_setting.size);
+	}
+#endif
 	a_ctrl->i2c_tbl_index = 0;
 	CDBG("Exit\n");
 

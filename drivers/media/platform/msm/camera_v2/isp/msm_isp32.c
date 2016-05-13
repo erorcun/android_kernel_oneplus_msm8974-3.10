@@ -33,14 +33,12 @@
 #define VFE32_PING_PONG_BASE(wm, ping_pong) \
 	(VFE32_WM_BASE(wm) + 0x4 * (1 + (~(ping_pong >> wm) & 0x1)))
 
-static uint8_t stats_pingpong_offset_map[] = {
-	7, 8, 9, 10, 11, 12, 13};
-
 #define VFE32_NUM_STATS_TYPE 7
+#define VFE32_STATS_PING_PONG_OFFSET 7
 #define VFE32_STATS_BASE(idx) (0xF4 + 0xC * idx)
 #define VFE32_STATS_PING_PONG_BASE(idx, ping_pong) \
 	(VFE32_STATS_BASE(idx) + 0x4 * \
-	(~(ping_pong >> (stats_pingpong_offset_map[idx])) & 0x1))
+	(~(ping_pong >> (idx + VFE32_STATS_PING_PONG_OFFSET)) & 0x1))
 
 #define VFE32_CLK_IDX 0
 static struct msm_cam_clk_info msm_vfe32_1_clk_info[] = {
@@ -827,8 +825,9 @@ static void msm_vfe32_cfg_axi_ub(struct vfe_device *vfe_dev)
 	}
 }
 
-static void msm_vfe32_update_ping_pong_addr(struct vfe_device *vfe_dev,
-		uint8_t wm_idx, uint32_t pingpong_status, dma_addr_t paddr)
+static void msm_vfe32_update_ping_pong_addr(
+	struct vfe_device *vfe_dev,
+	uint8_t wm_idx, uint32_t pingpong_status, unsigned long paddr)
 {
 	uint32_t paddr32 = (paddr & 0xFFFFFFFF);
 	msm_camera_io_w(paddr32, vfe_dev->vfe_base +
@@ -898,12 +897,6 @@ static int msm_vfe32_get_stats_idx(enum msm_isp_stats_type stats_type)
 		pr_err("%s: Invalid stats type\n", __func__);
 		return -EINVAL;
 	}
-}
-
-static int msm_vfe32_stats_check_streams(
-	struct msm_vfe_stats_stream *stream_info)
-{
-	return 0;
 }
 
 static void msm_vfe32_stats_cfg_comp_mask(struct vfe_device *vfe_dev,
@@ -1005,9 +998,9 @@ static void msm_vfe32_stats_enable_module(struct vfe_device *vfe_dev,
 	msm_camera_io_w(module_cfg, vfe_dev->vfe_base + 0x10);
 }
 
-static void msm_vfe32_stats_update_ping_pong_addr(struct vfe_device *vfe_dev,
-	struct msm_vfe_stats_stream *stream_info, uint32_t pingpong_status,
-	dma_addr_t paddr)
+static void msm_vfe32_stats_update_ping_pong_addr(
+	struct vfe_device *vfe_dev, struct msm_vfe_stats_stream *stream_info,
+	uint32_t pingpong_status, unsigned long paddr)
 {
 	uint32_t paddr32 = (paddr & 0xFFFFFFFF);
 	int stats_idx = STATS_IDX(stream_info->stream_handle);
@@ -1134,7 +1127,7 @@ static struct msm_vfe_stats_hardware_info msm_vfe32_stats_hw_info = {
 		1 << MSM_ISP_STATS_AWB | 1 << MSM_ISP_STATS_IHIST |
 		1 << MSM_ISP_STATS_RS | 1 << MSM_ISP_STATS_CS |
 		1 << MSM_ISP_STATS_SKIN | 1 << MSM_ISP_STATS_BHIST,
-	.stats_ping_pong_offset = stats_pingpong_offset_map,
+	.stats_ping_pong_offset = VFE32_STATS_PING_PONG_OFFSET,
 	.num_stats_type = VFE32_NUM_STATS_TYPE,
 	.num_stats_comp_mask = 0,
 };
@@ -1209,7 +1202,6 @@ struct msm_vfe_hardware_info vfe32_hw_info = {
 		},
 		.stats_ops = {
 			.get_stats_idx = msm_vfe32_get_stats_idx,
-			.check_streams = msm_vfe32_stats_check_streams,
 			.cfg_comp_mask = msm_vfe32_stats_cfg_comp_mask,
 			.cfg_wm_irq_mask = msm_vfe32_stats_cfg_wm_irq_mask,
 			.clear_wm_irq_mask = msm_vfe32_stats_clear_wm_irq_mask,

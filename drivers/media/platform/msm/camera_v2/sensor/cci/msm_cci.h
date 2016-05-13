@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,12 +20,19 @@
 #include <media/msm_cam_sensor.h>
 #include <soc/qcom/camera2.h>
 #include "msm_sd.h"
+/*Added by Jinshui.Liu@Camera 20140221 start for cci error*/
+#ifdef CONFIG_MACH_OPPO
+#include <linux/wakelock.h>
+#endif
+/*Added by Jinshui.Liu@Camera 20140221 end*/
 
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
 
 #define TRUE  1
 #define FALSE 0
+
+#define CCI_NUM_CLK_MAX	16
 
 enum cci_i2c_queue_t {
 	QUEUE_0,
@@ -51,6 +58,7 @@ enum msm_cci_cmd_type {
 	MSM_CCI_SET_SYNC_CID,
 	MSM_CCI_I2C_READ,
 	MSM_CCI_I2C_WRITE,
+	MSM_CCI_I2C_WRITE_SEQ,
 	MSM_CCI_GPIO_WRITE,
 };
 
@@ -128,13 +136,18 @@ struct cci_device {
 	uint8_t ref_count;
 	enum msm_cci_state_t cci_state;
 
-	struct clk *cci_clk[5];
+	struct clk *cci_clk[CCI_NUM_CLK_MAX];
 	struct msm_camera_cci_i2c_queue_info
 		cci_i2c_queue_info[NUM_MASTERS][NUM_QUEUES];
 	struct msm_camera_cci_master_info cci_master_info[NUM_MASTERS];
 	struct msm_cci_clk_params_t cci_clk_params[MASTER_MAX];
 	struct gpio *cci_gpio_tbl;
 	uint8_t cci_gpio_tbl_size;
+/*Added by Jinshui.Liu@Camera 20140221 start for cci error*/
+#ifdef CONFIG_MACH_OPPO
+	struct wake_lock cci_wakelock;
+#endif
+/*Added by Jinshui.Liu@Camera 20140221 end*/
 };
 
 enum msm_cci_i2c_cmd_type {
@@ -176,3 +189,4 @@ struct v4l2_subdev *msm_cci_get_subdev(void);
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct msm_camera_cci_ctrl *)
 
 #endif
+

@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -12,7 +12,6 @@
 #include <linux/io.h>
 #include <linux/atomic.h>
 #include <media/v4l2-subdev.h>
-#include <media/msmb_isp.h>
 #include "msm_isp_util.h"
 #include "msm_isp_stats_util.h"
 
@@ -25,23 +24,23 @@ static int msm_isp_stats_cfg_ping_pong_address(struct vfe_device *vfe_dev,
 	uint32_t pingpong_bit = 0;
 	uint32_t bufq_handle = stream_info->bufq_handle;
 	uint32_t stats_pingpong_offset;
-	uint32_t stats_idx = STATS_IDX(stream_info->stream_handle);
 
-	if (stats_idx >= vfe_dev->hw_info->stats_hw_info->num_stats_type ||
-		stats_idx > MSM_ISP_STATS_MAX) {
-		pr_err("%s Invalid stats index %d", __func__, stats_idx);
+	if (STATS_IDX(stream_info->stream_handle) >=
+			vfe_dev->hw_info->stats_hw_info->num_stats_type) {
+		pr_err("%s Invalid stats index %d", __func__,
+				STATS_IDX(stream_info->stream_handle));
 		return -EINVAL;
 	}
 
-	stats_pingpong_offset =
-		vfe_dev->hw_info->stats_hw_info->stats_ping_pong_offset[
-		stats_idx];
+	stats_pingpong_offset = STATS_IDX(stream_info->stream_handle) +
+		vfe_dev->hw_info->stats_hw_info->stats_ping_pong_offset;
 
 	pingpong_bit = (~(pingpong_status >> stats_pingpong_offset) & 0x1);
 	rc = vfe_dev->buf_mgr->ops->get_buf(vfe_dev->buf_mgr,
 			vfe_dev->pdev->id, bufq_handle, &buf);
 	if (rc < 0) {
-		vfe_dev->error_info.stats_framedrop_count[stats_idx]++;
+		vfe_dev->error_info.stats_framedrop_count[
+			STATS_IDX(stream_info->stream_handle)]++;
 		return rc;
 	}
 
@@ -379,27 +378,6 @@ static int msm_isp_stats_wait_for_cfg_done(struct vfe_device *vfe_dev)
 	return rc;
 }
 
-static int msm_isp_stats_update_cgc_override(struct vfe_device *vfe_dev,
-	struct msm_vfe_stats_stream_cfg_cmd *stream_cfg_cmd)
-{
-	int i;
-	uint32_t stats_mask = 0, idx;
-
-	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
-		idx = STATS_IDX(stream_cfg_cmd->stream_handle[i]);
-
-		if (idx >= vfe_dev->hw_info->stats_hw_info->num_stats_type) {
-			pr_err("%s Invalid stats index %d", __func__, idx);
-			return -EINVAL;
-		}
-		stats_mask |= 1 << idx;
-	}
-
-	vfe_dev->hw_info->vfe_ops.stats_ops.update_cgc_override(
-		vfe_dev, stats_mask, stream_cfg_cmd->enable);
-	return 0;
-}
-
 static int msm_isp_start_stats_stream(struct vfe_device *vfe_dev,
 	struct msm_vfe_stats_stream_cfg_cmd *stream_cfg_cmd)
 {
@@ -407,10 +385,7 @@ static int msm_isp_start_stats_stream(struct vfe_device *vfe_dev,
 	uint32_t stats_mask = 0, comp_stats_mask = 0, idx;
 	struct msm_vfe_stats_stream *stream_info;
 	struct msm_vfe_stats_shared_data *stats_data = &vfe_dev->stats_data;
-	rc = vfe_dev->hw_info->vfe_ops.stats_ops.check_streams(
-		stats_data->stream_info);
-	if (rc < 0)
-		return rc;
+
 	for (i = 0; i < stream_cfg_cmd->num_streams; i++) {
 		idx = STATS_IDX(stream_cfg_cmd->stream_handle[i]);
 
@@ -518,15 +493,10 @@ int msm_isp_cfg_stats_stream(struct vfe_device *vfe_dev, void *arg)
 	if (vfe_dev->stats_data.num_active_stream == 0)
 		vfe_dev->hw_info->vfe_ops.stats_ops.cfg_ub(vfe_dev);
 
-	if (stream_cfg_cmd->enable) {
-		msm_isp_stats_update_cgc_override(vfe_dev, stream_cfg_cmd);
-
+	if (stream_cfg_cmd->enable)
 		rc = msm_isp_start_stats_stream(vfe_dev, stream_cfg_cmd);
-	} else {
+	else
 		rc = msm_isp_stop_stats_stream(vfe_dev, stream_cfg_cmd);
-
-		msm_isp_stats_update_cgc_override(vfe_dev, stream_cfg_cmd);
-	}
 
 	return rc;
 }

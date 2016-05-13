@@ -518,7 +518,7 @@ static int camera_v4l2_vb2_q_init(struct file *filep)
 	q->io_modes = VB2_USERPTR;
 	q->io_flags = 0;
 	q->buf_struct_size = sizeof(struct msm_vb2_buffer);
-	q->timestamp_type = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+//	q->timestamp_type = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
 	return vb2_queue_init(q);
 }
 
@@ -589,7 +589,7 @@ static int camera_v4l2_open(struct file *filep)
 	} else {
 		rc = msm_create_command_ack_q(pvdev->vdev->num,
 			atomic_read(&pvdev->stream_cnt));
-		if (rc < 0)
+		if (rc < 0) {
 			pr_err("%s : creation of command_ack queue failed Line %d rc %d\n",
 					__func__, __LINE__, rc);
 			goto session_fail;

@@ -217,7 +217,7 @@ enum msm_isp_stats_type {
 	MSM_ISP_STATS_BF,    /* Bayer Focus */
 	MSM_ISP_STATS_BE,    /* Bayer Exposure*/
 	MSM_ISP_STATS_BHIST, /* Bayer Hist */
-	MSM_ISP_STATS_BF_SCALE, /* Bayer Focus scale */
+//	MSM_ISP_STATS_BF_SCALE, /* Bayer Focus scale */
 	MSM_ISP_STATS_MAX    /* MAX */
 };
 
@@ -314,7 +314,7 @@ struct msm_isp_buf_request {
 
 struct msm_isp_qbuf_info {
 	uint32_t handle;
-	int32_t buf_idx;
+	int buf_idx;
 	/*Only used for prepare buffer*/
 	struct v4l2_buffer buffer;
 	/*Only used for diverted buffer*/

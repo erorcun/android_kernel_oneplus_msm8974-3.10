@@ -11,13 +11,30 @@
  *
  */
 #include "msm_sensor.h"
-
 #define OV5648_SENSOR_NAME "ov5648"
+
+#include <mach/device_info.h>
+#define DEVICE_VERSION	"ov5648"
+#define DEVICE_MANUFACUTRE	"OmniVision"
+
+ 
 DEFINE_MSM_MUTEX(ov5648_mut);
 
 static struct msm_sensor_ctrl_t ov5648_s_ctrl;
 
-static struct msm_sensor_power_setting ov5648_power_setting[] = {
+static struct msm_sensor_power_setting ov5648_power_setting[] = {	
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 0,
+	},
+	{ 
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_RESET,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 5,
+	},	
 	{
 		.seq_type = SENSOR_VREG,
 		.seq_val = CAM_VIO,
@@ -25,24 +42,12 @@ static struct msm_sensor_power_setting ov5648_power_setting[] = {
 		.delay = 0,
 	},
 	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_VDIG,
-		.config_val = GPIO_OUT_LOW,
-		.delay = 5,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_VDIG,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 5,
-	},
-	{
 		.seq_type = SENSOR_VREG,
-		.seq_val = CAM_VANA,
+		.seq_val = CAM_VDIG,
 		.config_val = 0,
-		.delay = 5,
+		.delay = 0,
 	},
-	{
+    {
 		.seq_type = SENSOR_GPIO,
 		.seq_val = SENSOR_GPIO_STANDBY,
 		.config_val = GPIO_OUT_LOW,
@@ -52,25 +57,13 @@ static struct msm_sensor_power_setting ov5648_power_setting[] = {
 		.seq_type = SENSOR_GPIO,
 		.seq_val = SENSOR_GPIO_STANDBY,
 		.config_val = GPIO_OUT_HIGH,
-		.delay = 10,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_LOW,
 		.delay = 5,
-	},
-	{
-		.seq_type = SENSOR_GPIO,
-		.seq_val = SENSOR_GPIO_RESET,
-		.config_val = GPIO_OUT_HIGH,
-		.delay = 10,
 	},
 	{
 		.seq_type = SENSOR_CLK,
 		.seq_val = SENSOR_CAM_MCLK,
 		.config_val = 24000000,
-		.delay = 10,
+		.delay = 1,
 	},
 	{
 		.seq_type = SENSOR_I2C_MUX,
@@ -126,7 +119,7 @@ static struct msm_sensor_ctrl_t ov5648_s_ctrl = {
 
 static const struct of_device_id ov5648_dt_match[] = {
 	{
-		.compatible = "ovti,ov5648",
+		.compatible = "qcom,ov5648",
 		.data = &ov5648_s_ctrl
 	},
 	{}
@@ -136,7 +129,7 @@ MODULE_DEVICE_TABLE(of, ov5648_dt_match);
 
 static struct platform_driver ov5648_platform_driver = {
 	.driver = {
-		.name = "ovti,ov5648",
+		.name = "qcom,ov5648",
 		.owner = THIS_MODULE,
 		.of_match_table = ov5648_dt_match,
 	},
@@ -146,16 +139,19 @@ static int32_t ov5648_platform_probe(struct platform_device *pdev)
 {
 	int32_t rc = 0;
 	const struct of_device_id *match;
-
 	match = of_match_device(ov5648_dt_match, &pdev->dev);
 	rc = msm_sensor_platform_probe(pdev, match->data);
+    if(!rc)
+    {
+        register_device_proc("f_camera", DEVICE_VERSION, DEVICE_MANUFACUTRE);
+    }
+
 	return rc;
 }
-
+ 
 static int __init ov5648_init_module(void)
 {
 	int32_t rc = 0;
-
 	rc = platform_driver_probe(&ov5648_platform_driver,
 		ov5648_platform_probe);
 	if (!rc)

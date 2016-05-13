@@ -47,14 +47,12 @@
 #define VFE40_PING_PONG_BASE(wm, ping_pong) \
 	(VFE40_WM_BASE(wm) + 0x4 * (1 + (~(ping_pong >> wm) & 0x1)))
 
-static uint8_t stats_pingpong_offset_map[] = {
-	8, 9, 10, 11, 12, 13, 14, 15};
-
 #define VFE40_NUM_STATS_TYPE 8
+#define VFE40_STATS_PING_PONG_OFFSET 8
 #define VFE40_STATS_BASE(idx) (0x168 + 0x18 * idx)
 #define VFE40_STATS_PING_PONG_BASE(idx, ping_pong) \
 	(VFE40_STATS_BASE(idx) + 0x4 * \
-	(~(ping_pong >> (stats_pingpong_offset_map[idx])) & 0x1))
+	(~(ping_pong >> (idx + VFE40_STATS_PING_PONG_OFFSET)) & 0x1))
 
 #define VFE40_VBIF_CLKON                    0x4
 #define VFE40_VBIF_IN_RD_LIM_CONF0          0xB0
@@ -468,62 +466,92 @@ static void msm_vfe40_process_error_status(struct vfe_device *vfe_dev)
 {
 	uint32_t error_status1 = vfe_dev->error_info.error_mask1;
 	if (error_status1 & (1 << 0))
-		pr_err_ratelimited("%s: camif error status: 0x%x\n",
+		pr_err("%s: camif error status: 0x%x\n",
 			__func__, vfe_dev->error_info.camif_status);
 	if (error_status1 & (1 << 1))
-		pr_err_ratelimited("%s: stats bhist overwrite\n", __func__);
+		pr_err("%s: stats bhist overwrite\n", __func__);
 	if (error_status1 & (1 << 2))
-		pr_err_ratelimited("%s: stats cs overwrite\n", __func__);
+		pr_err("%s: stats cs overwrite\n", __func__);
 	if (error_status1 & (1 << 3))
-		pr_err_ratelimited("%s: stats ihist overwrite\n", __func__);
+		pr_err("%s: stats ihist overwrite\n", __func__);
 	if (error_status1 & (1 << 4))
-		pr_err_ratelimited("%s: realign buf y overflow\n", __func__);
+		pr_err("%s: realign buf y overflow\n", __func__);
 	if (error_status1 & (1 << 5))
-		pr_err_ratelimited("%s: realign buf cb overflow\n", __func__);
+		pr_err("%s: realign buf cb overflow\n", __func__);
 	if (error_status1 & (1 << 6))
-		pr_err_ratelimited("%s: realign buf cr overflow\n", __func__);
+		pr_err("%s: realign buf cr overflow\n", __func__);
 	if (error_status1 & (1 << 7)) {
-		pr_err_ratelimited("%s: violation\n", __func__);
+		pr_err("%s: violation\n", __func__);
 		msm_vfe40_process_violation_status(vfe_dev);
 	}
-	if (error_status1 & (1 << 9))
+	if (error_status1 & (1 << 9)) {
+		vfe_dev->stats->imagemaster0_overflow++;
 		pr_err_ratelimited("%s: image master 0 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 10))
+	}
+	if (error_status1 & (1 << 10)) {
+		vfe_dev->stats->imagemaster1_overflow++;
 		pr_err_ratelimited("%s: image master 1 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 11))
+	}
+	if (error_status1 & (1 << 11)) {
+		vfe_dev->stats->imagemaster2_overflow++;
 		pr_err_ratelimited("%s: image master 2 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 12))
+	}
+	if (error_status1 & (1 << 12)) {
+		vfe_dev->stats->imagemaster3_overflow++;
 		pr_err_ratelimited("%s: image master 3 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 13))
+	}
+	if (error_status1 & (1 << 13)) {
+		vfe_dev->stats->imagemaster4_overflow++;
 		pr_err_ratelimited("%s: image master 4 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 14))
+	}
+	if (error_status1 & (1 << 14)) {
+		vfe_dev->stats->imagemaster5_overflow++;
 		pr_err_ratelimited("%s: image master 5 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 15))
+	}
+	if (error_status1 & (1 << 15)) {
+		vfe_dev->stats->imagemaster6_overflow++;
 		pr_err_ratelimited("%s: image master 6 bus overflow\n",
 			__func__);
-	if (error_status1 & (1 << 16))
+	}
+	if (error_status1 & (1 << 16)) {
+		vfe_dev->stats->be_overflow++;
 		pr_err_ratelimited("%s: status be bus overflow\n", __func__);
-	if (error_status1 & (1 << 17))
+	}
+	if (error_status1 & (1 << 17)) {
+		vfe_dev->stats->bg_overflow++;
 		pr_err_ratelimited("%s: status bg bus overflow\n", __func__);
-	if (error_status1 & (1 << 18))
+	}
+	if (error_status1 & (1 << 18)) {
+		vfe_dev->stats->bf_overflow++;
 		pr_err_ratelimited("%s: status bf bus overflow\n", __func__);
-	if (error_status1 & (1 << 19))
+	}
+	if (error_status1 & (1 << 19)) {
+		vfe_dev->stats->awb_overflow++;
 		pr_err_ratelimited("%s: status awb bus overflow\n", __func__);
-	if (error_status1 & (1 << 20))
+	}
+	if (error_status1 & (1 << 20)) {
+		vfe_dev->stats->imagemaster0_overflow++;
 		pr_err_ratelimited("%s: status rs bus overflow\n", __func__);
-	if (error_status1 & (1 << 21))
+	}
+	if (error_status1 & (1 << 21)) {
+		vfe_dev->stats->cs_overflow++;
 		pr_err_ratelimited("%s: status cs bus overflow\n", __func__);
-	if (error_status1 & (1 << 22))
+	}
+	if (error_status1 & (1 << 22)) {
+		vfe_dev->stats->ihist_overflow++;
 		pr_err_ratelimited("%s: status ihist bus overflow\n", __func__);
-	if (error_status1 & (1 << 23))
+	}
+	if (error_status1 & (1 << 23)) {
+		vfe_dev->stats->skinbhist_overflow++;
 		pr_err_ratelimited("%s: status skin bhist bus overflow\n",
 			__func__);
+	}
 }
 
 static void msm_vfe40_read_irq_status(struct vfe_device *vfe_dev,
@@ -1146,10 +1174,9 @@ static void msm_vfe40_cfg_axi_ub(struct vfe_device *vfe_dev)
 
 static void msm_vfe40_update_ping_pong_addr(
 	struct vfe_device *vfe_dev,
-	uint8_t wm_idx, uint32_t pingpong_status, dma_addr_t paddr)
+	uint8_t wm_idx, uint32_t pingpong_status, unsigned long paddr)
 {
-	uint32_t paddr32 = (paddr & 0xFFFFFFFF);
-	msm_camera_io_w(paddr32, vfe_dev->vfe_base +
+	msm_camera_io_w(paddr, vfe_dev->vfe_base +
 		VFE40_PING_PONG_BASE(wm_idx, pingpong_status));
 }
 
@@ -1249,12 +1276,6 @@ static int msm_vfe40_get_stats_idx(enum msm_isp_stats_type stats_type)
 		pr_err("%s: Invalid stats type\n", __func__);
 		return -EINVAL;
 	}
-}
-
-static int msm_vfe40_stats_check_streams(
-	struct msm_vfe_stats_stream *stream_info)
-{
-	return 0;
 }
 
 static void msm_vfe40_stats_cfg_comp_mask(struct vfe_device *vfe_dev,
@@ -1387,11 +1408,10 @@ static void msm_vfe40_stats_enable_module(struct vfe_device *vfe_dev,
 
 static void msm_vfe40_stats_update_ping_pong_addr(
 	struct vfe_device *vfe_dev, struct msm_vfe_stats_stream *stream_info,
-	uint32_t pingpong_status, dma_addr_t paddr)
+	uint32_t pingpong_status, unsigned long paddr)
 {
-	uint32_t paddr32 = (paddr & 0xFFFFFFFF);
 	int stats_idx = STATS_IDX(stream_info->stream_handle);
-	msm_camera_io_w(paddr32, vfe_dev->vfe_base +
+	msm_camera_io_w(paddr, vfe_dev->vfe_base +
 		VFE40_STATS_PING_PONG_BASE(stats_idx, pingpong_status));
 }
 
@@ -1490,7 +1510,7 @@ static struct msm_vfe_stats_hardware_info msm_vfe40_stats_hw_info = {
 		1 << MSM_ISP_STATS_BG | 1 << MSM_ISP_STATS_BHIST |
 		1 << MSM_ISP_STATS_AWB | 1 << MSM_ISP_STATS_IHIST |
 		1 << MSM_ISP_STATS_RS | 1 << MSM_ISP_STATS_CS,
-	.stats_ping_pong_offset = stats_pingpong_offset_map,
+	.stats_ping_pong_offset = VFE40_STATS_PING_PONG_OFFSET,
 	.num_stats_type = VFE40_NUM_STATS_TYPE,
 	.num_stats_comp_mask = 2,
 };
@@ -1566,7 +1586,6 @@ struct msm_vfe_hardware_info vfe40_hw_info = {
 		},
 		.stats_ops = {
 			.get_stats_idx = msm_vfe40_get_stats_idx,
-			.check_streams = msm_vfe40_stats_check_streams,
 			.cfg_comp_mask = msm_vfe40_stats_cfg_comp_mask,
 			.cfg_wm_irq_mask = msm_vfe40_stats_cfg_wm_irq_mask,
 			.clear_wm_irq_mask = msm_vfe40_stats_clear_wm_irq_mask,

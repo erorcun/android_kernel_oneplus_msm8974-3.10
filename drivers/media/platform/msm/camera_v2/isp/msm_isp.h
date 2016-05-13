@@ -139,14 +139,12 @@ struct msm_vfe_axi_ops {
 	void (*cfg_ub) (struct vfe_device *vfe_dev);
 
 	void (*update_ping_pong_addr) (struct vfe_device *vfe_dev,
-		uint8_t wm_idx, uint32_t pingpong_status, dma_addr_t paddr);
+		uint8_t wm_idx, uint32_t pingpong_status, unsigned long paddr);
 
 	uint32_t (*get_wm_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_comp_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_pingpong_status) (struct vfe_device *vfe_dev);
 	long (*halt) (struct vfe_device *vfe_dev, uint32_t blocking);
-	void (*update_cgc_override) (struct vfe_device *vfe_dev,
-		uint8_t wm_idx, uint8_t cgc_override);
 };
 
 struct msm_vfe_core_ops {
@@ -175,7 +173,6 @@ struct msm_vfe_core_ops {
 };
 struct msm_vfe_stats_ops {
 	int (*get_stats_idx) (enum msm_isp_stats_type stats_type);
-	int (*check_streams) (struct msm_vfe_stats_stream *stream_info);
 	void (*cfg_framedrop) (struct vfe_device *vfe_dev,
 		struct msm_vfe_stats_stream *stream_info);
 	void (*clear_framedrop) (struct vfe_device *vfe_dev,
@@ -199,15 +196,13 @@ struct msm_vfe_stats_ops {
 
 	void (*update_ping_pong_addr) (struct vfe_device *vfe_dev,
 		struct msm_vfe_stats_stream *stream_info,
-		uint32_t pingpong_status, dma_addr_t paddr);
+		uint32_t pingpong_status, unsigned long paddr);
 
 	uint32_t (*get_frame_id) (struct vfe_device *vfe_dev);
 	uint32_t (*get_wm_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_comp_mask) (uint32_t irq_status0, uint32_t irq_status1);
 	uint32_t (*get_pingpong_status) (struct vfe_device *vfe_dev);
 
-	void (*update_cgc_override) (struct vfe_device *vfe_dev,
-		uint32_t stats_mask, uint8_t enable);
 };
 
 struct msm_vfe_ops {
@@ -360,7 +355,7 @@ struct msm_vfe_axi_shared_data {
 
 struct msm_vfe_stats_hardware_info {
 	uint32_t stats_capability_mask;
-	uint8_t *stats_ping_pong_offset;
+	uint32_t stats_ping_pong_offset;
 	uint8_t num_stats_type;
 	uint8_t num_stats_comp_mask;
 };
