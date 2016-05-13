@@ -297,7 +297,7 @@ struct v4l2_plane32 {
 	union {
 		__u32		mem_offset;
 		compat_long_t	userptr;
-		__s32		fd;
+//		__s32		fd;
 	} m;
 	__u32			data_offset;
 	__u32			reserved[11];
@@ -319,7 +319,7 @@ struct v4l2_buffer32 {
 		__u32           offset;
 		compat_long_t   userptr;
 		compat_caddr_t  planes;
-		__s32		fd;
+//		__s32		fd;
 	} m;
 	__u32			length;
 	__u32			reserved2;

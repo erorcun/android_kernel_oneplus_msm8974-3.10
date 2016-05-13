@@ -139,7 +139,6 @@ enum v4l2_buf_type {
 #endif
 	V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE = 9,
 	V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE  = 10,
-	/* Deprecated, do not use */
 	V4L2_BUF_TYPE_PRIVATE              = 0x80,
 };
 
@@ -154,6 +153,9 @@ enum v4l2_buf_type {
 	 || (type) == V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY	\
 	 || (type) == V4L2_BUF_TYPE_VBI_OUTPUT			\
 	 || (type) == V4L2_BUF_TYPE_SLICED_VBI_OUTPUT)
+
+#define V4L2_TYPE_IS_PRIVATE(type)				\
+	((type) == V4L2_BUF_TYPE_PRIVATE)
 
 enum v4l2_tuner_type {
 	V4L2_TUNER_RADIO	     = 1,
@@ -621,7 +623,7 @@ struct v4l2_plane {
 	union {
 		__u32		mem_offset;
 		unsigned long	userptr;
-		__s32		fd;
+//		__s32		fd;
 	} m;
 	__u32			data_offset;
 	__u32			reserved[11];
@@ -674,10 +676,10 @@ struct v4l2_buffer {
 		__u32           offset;
 		unsigned long   userptr;
 		struct v4l2_plane *planes;
-		__s32		fd;
+//		__s32		fd;
 	} m;
 	__u32			length;
-	__u32			reserved2;
+	__u32			input;
 	__u32			reserved;
 };
 
@@ -691,6 +693,7 @@ struct v4l2_buffer {
 /* Buffer is ready, but the data contained within is corrupted. */
 #define V4L2_BUF_FLAG_ERROR	0x0040
 #define V4L2_BUF_FLAG_TIMECODE	0x0100	/* timecode field is valid */
+#define V4L2_BUF_FLAG_INPUT     0x0200  /* input field is valid */
 #define V4L2_BUF_FLAG_PREPARED	0x0400	/* Buffer is prepared for queuing */
 /* Cache handling flags */
 #define V4L2_BUF_FLAG_NO_CACHE_INVALIDATE	0x0800
@@ -701,21 +704,24 @@ struct v4l2_buffer {
 #define V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC	0x2000
 #define V4L2_BUF_FLAG_TIMESTAMP_COPY		0x4000
 /* Vendor extensions */
-#define V4L2_QCOM_BUF_FLAG_CODECCONFIG		0x10000
-#define V4L2_QCOM_BUF_FLAG_EOSEQ		0x20000
-#define V4L2_QCOM_BUF_TIMESTAMP_INVALID		0x40000
-#define V4L2_QCOM_BUF_FLAG_IDRFRAME		0x80000	/*Image is a IDR-frame*/
-#define V4L2_QCOM_BUF_FLAG_DECODEONLY		0x100000
-#define V4L2_QCOM_BUF_DATA_CORRUPT		0x200000
-#define V4L2_QCOM_BUF_DROP_FRAME		0x400000
-#define V4L2_QCOM_BUF_INPUT_UNSUPPORTED		0x800000
-#define V4L2_QCOM_BUF_FLAG_EOS			0x1000000
+#define V4L2_QCOM_BUF_FLAG_CODECCONFIG  0x4000
+#define V4L2_QCOM_BUF_FLAG_EOSEQ  0x8000
+#define V4L2_QCOM_BUF_TIMESTAMP_INVALID 0x10000
+#define V4L2_QCOM_BUF_FLAG_IDRFRAME	0x20000	/* Image is a IDR-frame */
+#define V4L2_QCOM_BUF_FLAG_DECODEONLY 0x40000
+#define V4L2_QCOM_BUF_DATA_CORRUPT 0x80000
+#define V4L2_QCOM_BUF_DROP_FRAME 0x100000
+#define V4L2_QCOM_BUF_INPUT_UNSUPPORTED 0x200000
+#define V4L2_QCOM_BUF_FLAG_EOS          0x2000
+#define V4L2_BUF_FLAG_EOS	0x2000
+#define V4L2_QCOM_BUF_FLAG_READONLY     0x400000
+#define V4L2_MSM_BUF_FLAG_MBAFF			0x800000
+
 #define V4L2_QCOM_BUF_TS_DISCONTINUITY		0x2000000
 #define V4L2_QCOM_BUF_TS_ERROR			0x4000000
-#define V4L2_QCOM_BUF_FLAG_READONLY		0x8000000
 #define V4L2_MSM_VIDC_BUF_START_CODE_NOT_FOUND	0x10000000
 #define V4L2_MSM_BUF_FLAG_YUV_601_709_CLAMP	0x20000000
-#define V4L2_MSM_BUF_FLAG_MBAFF			0x40000000
+
 
 /**
  * struct v4l2_exportbuffer - export of video buffer as DMABUF file descriptor
@@ -998,6 +1004,49 @@ struct v4l2_standard {
 };
 
 /*
+ *	V I D E O	T I M I N G S	D V	P R E S E T
+ */
+struct v4l2_dv_preset {
+	__u32	preset;
+	__u32	reserved[4];
+};
+
+/*
+ *	D V	P R E S E T S	E N U M E R A T I O N
+ */
+struct v4l2_dv_enum_preset {
+	__u32	index;
+	__u32	preset;
+	__u8	name[32]; /* Name of the preset timing */
+	__u32	width;
+	__u32	height;
+	__u32	reserved[4];
+};
+
+/*
+ * 	D V	P R E S E T	V A L U E S
+ */
+#define		V4L2_DV_INVALID		0
+#define		V4L2_DV_480P59_94	1 /* BT.1362 */
+#define		V4L2_DV_576P50		2 /* BT.1362 */
+#define		V4L2_DV_720P24		3 /* SMPTE 296M */
+#define		V4L2_DV_720P25		4 /* SMPTE 296M */
+#define		V4L2_DV_720P30		5 /* SMPTE 296M */
+#define		V4L2_DV_720P50		6 /* SMPTE 296M */
+#define		V4L2_DV_720P59_94	7 /* SMPTE 274M */
+#define		V4L2_DV_720P60		8 /* SMPTE 274M/296M */
+#define		V4L2_DV_1080I29_97	9 /* BT.1120/ SMPTE 274M */
+#define		V4L2_DV_1080I30		10 /* BT.1120/ SMPTE 274M */
+#define		V4L2_DV_1080I25		11 /* BT.1120 */
+#define		V4L2_DV_1080I50		12 /* SMPTE 296M */
+#define		V4L2_DV_1080I60		13 /* SMPTE 296M */
+#define		V4L2_DV_1080P24		14 /* SMPTE 296M */
+#define		V4L2_DV_1080P25		15 /* SMPTE 296M */
+#define		V4L2_DV_1080P30		16 /* SMPTE 296M */
+#define		V4L2_DV_1080P50		17 /* BT.1120 */
+#define		V4L2_DV_1080P60		18 /* BT.1120 */
+
+/*
  *	D V 	B T	T I M I N G S
  */
 
@@ -1210,6 +1259,7 @@ struct v4l2_input {
 #define V4L2_IN_ST_VTR         0x04000000  /* VTR time constant */
 
 /* capabilities flags */
+#define V4L2_IN_CAP_PRESETS		0x00000001 /* Supports S_DV_PRESET */
 #define V4L2_IN_CAP_DV_TIMINGS		0x00000002 /* Supports S_DV_TIMINGS */
 #define V4L2_IN_CAP_CUSTOM_TIMINGS	V4L2_IN_CAP_DV_TIMINGS /* For compatibility */
 #define V4L2_IN_CAP_STD			0x00000004 /* Supports S_STD */
@@ -1233,6 +1283,7 @@ struct v4l2_output {
 #define V4L2_OUTPUT_TYPE_ANALOGVGAOVERLAY	3
 
 /* capabilities flags */
+#define V4L2_OUT_CAP_PRESETS		0x00000001 /* Supports S_DV_PRESET */
 #define V4L2_OUT_CAP_DV_TIMINGS		0x00000002 /* Supports S_DV_TIMINGS */
 #define V4L2_OUT_CAP_CUSTOM_TIMINGS	V4L2_OUT_CAP_DV_TIMINGS /* For compatibility */
 #define V4L2_OUT_CAP_STD		0x00000004 /* Supports S_STD */
@@ -1983,7 +2034,10 @@ struct v4l2_create_buffers {
 #define VIDIOC_DBG_G_CHIP_IDENT _IOWR('V', 81, struct v4l2_dbg_chip_ident)
 
 #define VIDIOC_S_HW_FREQ_SEEK	 _IOW('V', 82, struct v4l2_hw_freq_seek)
-
+#define	VIDIOC_ENUM_DV_PRESETS	_IOWR('V', 83, struct v4l2_dv_enum_preset)
+#define	VIDIOC_S_DV_PRESET	_IOWR('V', 84, struct v4l2_dv_preset)
+#define	VIDIOC_G_DV_PRESET	_IOWR('V', 85, struct v4l2_dv_preset)
+#define	VIDIOC_QUERY_DV_PRESET	_IOR('V',  86, struct v4l2_dv_preset)
 #define	VIDIOC_S_DV_TIMINGS	_IOWR('V', 87, struct v4l2_dv_timings)
 #define	VIDIOC_G_DV_TIMINGS	_IOWR('V', 88, struct v4l2_dv_timings)
 #define	VIDIOC_DQEVENT		 _IOR('V', 89, struct v4l2_event)

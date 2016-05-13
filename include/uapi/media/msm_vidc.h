@@ -81,9 +81,6 @@ struct msm_vidc_stream_userdata_payload {
 	unsigned int type;
 	unsigned int data[1];
 };
-struct msm_vidc_frame_qp_payoad {
-	unsigned int frame_qp;
-};
 struct msm_vidc_frame_qp_payload {
 	unsigned int frame_qp;
 };
@@ -112,6 +109,23 @@ struct msm_vidc_s3d_frame_packing_payload {
 	unsigned int fpa_extension_flag;
 };
 
+struct msm_vidc_vui_display_info_payload {
+	unsigned int video_signal_present_flag;
+	unsigned int video_format;
+	unsigned int bit_depth_y;
+	unsigned int bit_depth_c;
+	unsigned int video_full_range_flag;
+	unsigned int color_description_present_flag;
+	unsigned int color_primaries;
+	unsigned int transfer_characteristics;
+	unsigned int matrix_coefficients;
+	unsigned int chroma_location_info_present_flag;
+	unsigned int chroma_format_idc;
+	unsigned int separate_color_plane_flag;
+	unsigned int chroma_sample_loc_type_top_field;
+	unsigned int chroma_sample_loc_type_bottom_field;
+};
+
 enum msm_vidc_extradata_type {
 	MSM_VIDC_EXTRADATA_NONE = 0x00000000,
 	MSM_VIDC_EXTRADATA_MB_QUANTIZATION = 0x00000001,
@@ -136,6 +150,7 @@ enum msm_vidc_extradata_type {
 	MSM_VIDC_EXTRADATA_METADATA_LTR = 0x7F100004,
 	MSM_VIDC_EXTRADATA_METADATA_FILLER = 0x7FE00002,
 	MSM_VIDC_EXTRADATA_METADATA_MBI = 0x7F100005,
+	MSM_VIDC_EXTRADATA_VUI_DISPLAY_INFO = 0x7F100006,
 };
 enum msm_vidc_interlace_type {
 	MSM_VIDC_INTERLACE_FRAME_PROGRESSIVE = 0x01,
@@ -144,6 +159,15 @@ enum msm_vidc_interlace_type {
 	MSM_VIDC_INTERLACE_FRAME_TOPFIELDFIRST = 0x08,
 	MSM_VIDC_INTERLACE_FRAME_BOTTOMFIELDFIRST = 0x10,
 };
+
+/* enum msm_vidc_framepack_type */
+#define MSM_VIDC_FRAMEPACK_CHECKERBOARD 0x00
+#define MSM_VIDC_FRAMEPACK_COLUMN_INTERLEAVE 0x01
+#define MSM_VIDC_FRAMEPACK_ROW_INTERLEAVE 0x02
+#define MSM_VIDC_FRAMEPACK_SIDE_BY_SIDE 0x03
+#define MSM_VIDC_FRAMEPACK_TOP_BOTTOM 0x04
+#define MSM_VIDC_FRAMEPACK_TEMPORAL_INTERLEAVE 0x05
+
 enum msm_vidc_recovery_sei {
 	MSM_VIDC_FRAME_RECONSTRUCTION_INCORRECT = 0x0,
 	MSM_VIDC_FRAME_RECONSTRUCTION_CORRECT = 0x01,

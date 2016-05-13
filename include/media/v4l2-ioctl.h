@@ -40,6 +40,8 @@ struct v4l2_ioctl_ops {
 					      struct v4l2_fmtdesc *f);
 	int (*vidioc_enum_fmt_vid_out_mplane)(struct file *file, void *fh,
 					      struct v4l2_fmtdesc *f);
+	int (*vidioc_enum_fmt_type_private)(struct file *file, void *fh,
+					      struct v4l2_fmtdesc *f);
 
 	/* VIDIOC_G_FMT handlers */
 	int (*vidioc_g_fmt_vid_cap)    (struct file *file, void *fh,
@@ -85,6 +87,8 @@ struct v4l2_ioctl_ops {
 					   struct v4l2_format *f);
 	int (*vidioc_s_fmt_vid_out_mplane)(struct file *file, void *fh,
 					   struct v4l2_format *f);
+	int (*vidioc_s_fmt_type_private)(struct file *file, void *fh,
+					struct v4l2_format *f);
 
 	/* VIDIOC_TRY_FMT handlers */
 	int (*vidioc_try_fmt_vid_cap)    (struct file *file, void *fh,
@@ -107,6 +111,8 @@ struct v4l2_ioctl_ops {
 					     struct v4l2_format *f);
 	int (*vidioc_try_fmt_vid_out_mplane)(struct file *file, void *fh,
 					     struct v4l2_format *f);
+	int (*vidioc_try_fmt_type_private)(struct file *file, void *fh,
+					struct v4l2_format *f);
 
 	/* Buffer handlers */
 	int (*vidioc_reqbufs) (struct file *file, void *fh, struct v4l2_requestbuffers *b);
@@ -258,6 +264,15 @@ struct v4l2_ioctl_ops {
 					   struct v4l2_frmivalenum *fival);
 
 	/* DV Timings IOCTLs */
+	int (*vidioc_enum_dv_presets) (struct file *file, void *fh,
+				       struct v4l2_dv_enum_preset *preset);
+
+	int (*vidioc_s_dv_preset) (struct file *file, void *fh,
+				   struct v4l2_dv_preset *preset);
+	int (*vidioc_g_dv_preset) (struct file *file, void *fh,
+				   struct v4l2_dv_preset *preset);
+	int (*vidioc_query_dv_preset) (struct file *file, void *fh,
+					struct v4l2_dv_preset *qpreset);
 	int (*vidioc_s_dv_timings) (struct file *file, void *fh,
 				    struct v4l2_dv_timings *timings);
 	int (*vidioc_g_dv_timings) (struct file *file, void *fh,

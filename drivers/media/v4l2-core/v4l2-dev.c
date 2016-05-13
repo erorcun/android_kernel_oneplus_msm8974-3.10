@@ -608,6 +608,7 @@ static void determine_valid_ioctls(struct video_device *vdev)
 		/* video specific ioctls */
 		if ((is_rx && (ops->vidioc_enum_fmt_vid_cap ||
 			       ops->vidioc_enum_fmt_vid_cap_mplane ||
+				ops->vidioc_enum_fmt_type_private ||
 			       ops->vidioc_enum_fmt_vid_overlay)) ||
 		    (is_tx && (ops->vidioc_enum_fmt_vid_out ||
 			       ops->vidioc_enum_fmt_vid_out_mplane)))
@@ -648,16 +649,19 @@ static void determine_valid_ioctls(struct video_device *vdev)
 	} else if (is_vbi) {
 		/* vbi specific ioctls */
 		if ((is_rx && (ops->vidioc_g_fmt_vbi_cap ||
+				ops->vidioc_g_fmt_type_private ||
 			       ops->vidioc_g_fmt_sliced_vbi_cap)) ||
 		    (is_tx && (ops->vidioc_g_fmt_vbi_out ||
 			       ops->vidioc_g_fmt_sliced_vbi_out)))
 			set_bit(_IOC_NR(VIDIOC_G_FMT), valid_ioctls);
 		if ((is_rx && (ops->vidioc_s_fmt_vbi_cap ||
+				ops->vidioc_s_fmt_type_private ||
 			       ops->vidioc_s_fmt_sliced_vbi_cap)) ||
 		    (is_tx && (ops->vidioc_s_fmt_vbi_out ||
 			       ops->vidioc_s_fmt_sliced_vbi_out)))
 			set_bit(_IOC_NR(VIDIOC_S_FMT), valid_ioctls);
 		if ((is_rx && (ops->vidioc_try_fmt_vbi_cap ||
+				ops->vidioc_try_fmt_type_private ||
 			       ops->vidioc_try_fmt_sliced_vbi_cap)) ||
 		    (is_tx && (ops->vidioc_try_fmt_vbi_out ||
 			       ops->vidioc_try_fmt_sliced_vbi_out)))
@@ -686,6 +690,7 @@ static void determine_valid_ioctls(struct video_device *vdev)
 			SET_VALID_IOCTL(ops, VIDIOC_ENUMAUDIO, vidioc_enumaudio);
 			SET_VALID_IOCTL(ops, VIDIOC_G_AUDIO, vidioc_g_audio);
 			SET_VALID_IOCTL(ops, VIDIOC_S_AUDIO, vidioc_s_audio);
+			SET_VALID_IOCTL(ops, VIDIOC_QUERY_DV_PRESET, vidioc_query_dv_preset);
 			SET_VALID_IOCTL(ops, VIDIOC_QUERY_DV_TIMINGS, vidioc_query_dv_timings);
 		}
 		if (is_tx) {
@@ -708,6 +713,9 @@ static void determine_valid_ioctls(struct video_device *vdev)
 					(ops->vidioc_g_std || vdev->current_norm)))
 			set_bit(_IOC_NR(VIDIOC_G_PARM), valid_ioctls);
 		SET_VALID_IOCTL(ops, VIDIOC_S_PARM, vidioc_s_parm);
+		SET_VALID_IOCTL(ops, VIDIOC_ENUM_DV_PRESETS, vidioc_enum_dv_presets);
+		SET_VALID_IOCTL(ops, VIDIOC_S_DV_PRESET, vidioc_s_dv_preset);
+		SET_VALID_IOCTL(ops, VIDIOC_G_DV_PRESET, vidioc_g_dv_preset);
 		SET_VALID_IOCTL(ops, VIDIOC_S_DV_TIMINGS, vidioc_s_dv_timings);
 		SET_VALID_IOCTL(ops, VIDIOC_G_DV_TIMINGS, vidioc_g_dv_timings);
 		SET_VALID_IOCTL(ops, VIDIOC_ENUM_DV_TIMINGS, vidioc_enum_dv_timings);

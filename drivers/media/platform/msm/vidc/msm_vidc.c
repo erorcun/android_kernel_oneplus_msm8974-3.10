@@ -717,11 +717,23 @@ int output_buffer_cache_invalidate(struct msm_vidc_inst *inst,
 	return 0;
 }
 
+static bool valid_v4l2_buffer(struct v4l2_buffer *b,
+		struct msm_vidc_inst *inst) {
+	enum vidc_ports port =
+		!V4L2_TYPE_IS_MULTIPLANAR(b->type) ? MAX_PORT_NUM :
+		b->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE ? CAPTURE_PORT :
+		b->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE ? OUTPUT_PORT :
+								MAX_PORT_NUM;
+
+	return port != MAX_PORT_NUM &&
+		inst->fmts[port]->num_planes == b->length;
+}
+
 int msm_vidc_prepare_buf(void *instance, struct v4l2_buffer *b)
 {
 	struct msm_vidc_inst *inst = instance;
 
-	if (!inst || !b)
+	if (!inst || !b || !valid_v4l2_buffer(b, inst))
 		return -EINVAL;
 
 	if (is_dynamic_output_buffer_mode(b, inst)) {
@@ -817,7 +829,7 @@ int msm_vidc_release_buffers(void *instance, int buffer_type)
 	}
 
 free_and_unmap:
-	mutex_lock(&inst->sync_lock);
+//	mutex_lock(&inst->sync_lock);
 	mutex_lock(&inst->lock);
 	list_for_each_safe(ptr, next, &inst->registered_bufs) {
 		bi = list_entry(ptr, struct buffer_info, list);
@@ -838,7 +850,7 @@ free_and_unmap:
 		}
 	}
 	mutex_unlock(&inst->lock);
-	mutex_unlock(&inst->sync_lock);
+//	mutex_unlock(&inst->sync_lock);
 	return rc;
 }
 EXPORT_SYMBOL(msm_vidc_release_buffers);
@@ -877,14 +889,8 @@ int msm_vidc_qbuf(void *instance, struct v4l2_buffer *b)
 	int rc = 0;
 	int i;
 
-	if (!inst || !b)
+	if (!inst || !b || !valid_v4l2_buffer(b, inst))
 		return -EINVAL;
-
-	if (b->length > VIDEO_MAX_PLANES) {
-		dprintk(VIDC_ERR, "num planes exceeds max: %d\n",
-			b->length);
-		return -EINVAL;
-	}
 
 	if (is_dynamic_output_buffer_mode(b, inst)) {
 		if (b->m.planes[0].reserved[0])
@@ -960,14 +966,8 @@ int msm_vidc_dqbuf(void *instance, struct v4l2_buffer *b)
 	struct buffer_info *buffer_info = NULL;
 	int i = 0, rc = 0;
 
-	if (!inst || !b)
+	if (!inst || !b || !valid_v4l2_buffer(b, inst))
 		return -EINVAL;
-
-	if (b->length > VIDEO_MAX_PLANES) {
-		dprintk(VIDC_ERR, "num planes exceed maximum: %d\n",
-			b->length);
-		return -EINVAL;
-	}
 
 	if (inst->session_type == MSM_VIDC_DECODER)
 		rc = msm_vdec_dqbuf(instance, b);
@@ -1168,7 +1168,7 @@ static inline int vb2_bufq_init(struct msm_vidc_inst *inst,
 	q->type = type;
 	q->io_modes = VB2_MMAP | VB2_USERPTR;
 	q->io_flags = 0;
-	q->timestamp_type = V4L2_BUF_FLAG_TIMESTAMP_COPY;
+//	q->timestamp_type = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 
 	if (sess == MSM_VIDC_DECODER)
 		q->ops = msm_vdec_get_vb2q_ops();
@@ -1263,7 +1263,7 @@ void *msm_vidc_open(int core_id, int session_type)
 	mutex_init(&inst->bufq[OUTPUT_PORT].lock);
 	mutex_init(&inst->lock);
 	inst->session_type = session_type;
-	INIT_LIST_HEAD(&inst->pendingq);
+	INIT_MSM_VIDC_LIST(&inst->pendingq);
 	INIT_LIST_HEAD(&inst->internalbufs);
 	INIT_LIST_HEAD(&inst->persistbufs);
 	INIT_LIST_HEAD(&inst->registered_bufs);
@@ -1347,18 +1347,16 @@ EXPORT_SYMBOL(msm_vidc_open);
 
 static void cleanup_instance(struct msm_vidc_inst *inst)
 {
-	struct list_head *ptr, *next;
-	struct vb2_buf_entry *entry;
+	struct vb2_buf_entry *entry, *dummy;
 	if (inst) {
-		mutex_lock(&inst->lock);
-		if (!list_empty(&inst->pendingq)) {
-			list_for_each_safe(ptr, next, &inst->pendingq) {
-				entry = list_entry(ptr, struct vb2_buf_entry,
-						list);
-				list_del(&entry->list);
-				kfree(entry);
-			}
+		mutex_lock(&inst->pendingq.lock);
+		list_for_each_entry_safe(entry, dummy, &inst->pendingq.list,
+				list) {
+			list_del(&entry->list);
+			kfree(entry);
 		}
+		mutex_unlock(&inst->pendingq.lock);
+		mutex_lock(&inst->lock);
 		if (!list_empty(&inst->internalbufs)) {
 			mutex_unlock(&inst->lock);
 			if (msm_comm_release_scratch_buffers(inst))
@@ -1421,7 +1419,6 @@ int msm_vidc_close(void *instance)
 	}
 
 	core = inst->core;
-	msm_comm_session_clean(inst);
 
 	mutex_lock(&core->lock);
 	list_for_each_safe(ptr, next, &core->instances) {
@@ -1448,6 +1445,8 @@ int msm_vidc_close(void *instance)
 	if (rc)
 		dprintk(VIDC_ERR,
 			"Failed to move video instance to uninit state\n");
+
+	msm_comm_session_clean(inst);
 
 	msm_smem_delete_client(inst->mem_client);
 	pr_info(VIDC_DBG_TAG "Closed video instance: %p\n", VIDC_INFO, inst);

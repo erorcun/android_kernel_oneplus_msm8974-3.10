@@ -427,7 +427,7 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"Advanced Coding Efficency",
 		NULL,
 	};
-	static const char * const mpeg_mpeg2_level[] = {
+/*	static const char * const mpeg_mpeg2_level[] = {
 		"1",
 		"2",
 		"4",
@@ -443,7 +443,7 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"High",
 		NULL,
 	};
-
+*/
 	static const char * const flash_led_mode[] = {
 		"Off",
 		"Flash",
@@ -573,11 +573,11 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return dv_rgb_range;
 	case V4L2_CID_MPEG_VIDC_VIDEO_INTRA_REFRESH_MODE:
 		return mpeg_video_intra_refresh_mode;
-	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
+/*	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
 		return mpeg_mpeg2_level;
 	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_PROFILE:
 		return mpeg2_profile;
-	default:
+*/	default:
 		return NULL;
 	}
 }
@@ -721,11 +721,11 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MPEG_VIDEO_MPEG4_MAX_QP:			return "MPEG4 Maximum QP Value";
 	case V4L2_CID_MPEG_VIDEO_MPEG4_LEVEL:			return "MPEG4 Level";
 	case V4L2_CID_MPEG_VIDEO_MPEG4_PROFILE:			return "MPEG4 Profile";
-	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
+/*	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
 		return "MPEG2 Level";
 	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_PROFILE:
 		return "MPEG2 Profile";
-	case V4L2_CID_MPEG_VIDEO_MPEG4_QPEL:			return "Quarter Pixel Search Enable";
+*/	case V4L2_CID_MPEG_VIDEO_MPEG4_QPEL:			return "Quarter Pixel Search Enable";
 	case V4L2_CID_QCOM_VIDEO_SYNC_FRAME_SEQ_HDR:
 		return "CodecConfig with sync frame";
 	case V4L2_CID_MPEG_VIDEO_MULTI_SLICE_MAX_BYTES:		return "Maximum Bytes in a Slice";
@@ -748,9 +748,9 @@ const char *v4l2_ctrl_get_name(u32 id)
 		return "VP8 Profile Level";
 	case V4L2_CID_MPEG_VIDC_VIDEO_DEINTERLACE:
 		return "Deinterlace for encoder";
-	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG4_TIME_RESOLUTION:
+/*	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG4_TIME_RESOLUTION:
 		return "Vop time increment resolution";
-
+*/
 	/* CAMERA controls */
 	/* Keep the order of the 'case's the same as in videodev2.h! */
 	case V4L2_CID_CAMERA_CLASS:		return "Camera Controls";
@@ -956,9 +956,9 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_MPEG_VIDEO_H264_FMO_MAP_TYPE:
 	case V4L2_CID_MPEG_VIDEO_MPEG4_LEVEL:
 	case V4L2_CID_MPEG_VIDEO_MPEG4_PROFILE:
-	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
+/*	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_LEVEL:
 	case V4L2_CID_MPEG_VIDC_VIDEO_MPEG2_PROFILE:
-	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
+*/	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
 	case V4L2_CID_ISO_SENSITIVITY_AUTO:
 	case V4L2_CID_EXPOSURE_METERING:
 	case V4L2_CID_SCENE_MODE:
@@ -1409,7 +1409,6 @@ static int validate_new(const struct v4l2_ctrl *ctrl,
 		    ctrl->qmenu[c->value][0] == '\0')
 			return -EINVAL;
 		return 0;
-
 	case V4L2_CTRL_TYPE_BITMASK:
 		c->value &= ctrl->maximum;
 		return 0;
@@ -2244,9 +2243,9 @@ int v4l2_querymenu(struct v4l2_ctrl_handler *hdl, struct v4l2_querymenu *qm)
 		if (ctrl->qmenu[i] == NULL || ctrl->qmenu[i][0] == '\0')
 			return -EINVAL;
 		strlcpy(qm->name, ctrl->qmenu[i], sizeof(qm->name));
-	} else {
+/*	} else {
 		qm->value = ctrl->qmenu_int[i];
-	}
+*/	}
 	return 0;
 }
 EXPORT_SYMBOL(v4l2_querymenu);

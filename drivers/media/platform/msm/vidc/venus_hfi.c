@@ -136,6 +136,11 @@ static void venus_hfi_sim_modify_cmd_packet(u8 *packet)
 
 	sys_init = (struct hfi_cmd_sys_session_init_packet *)packet;
 	sess = (struct hal_session *) sys_init->session_id;
+	if (!sess) {
+		dprintk(VIDC_DBG, "%s :Invalid session id : %x\n",
+				__func__, sys_init->session_id);
+		return;
+	}
 	switch (sys_init->packet_type) {
 	case HFI_CMD_SESSION_EMPTY_BUFFER:
 		if (sess->is_decoder) {
@@ -709,19 +714,13 @@ static void venus_hfi_unvote_buses(void *dev, enum mem_type mtype)
 	}
 }
 
-#define BUS_LOAD(__w, __h, __fps) (\
-	/* Something's fishy if the width & height aren't macroblock aligned */\
-	BUILD_BUG_ON_ZERO(!IS_ALIGNED(__h, 16) || !IS_ALIGNED(__w, 16)) ?: \
-	(__h >> 4) * (__w >> 4) * __fps)
-
 static const u32 venus_hfi_bus_table[] = {
-	BUS_LOAD(640, 480, 30),
-	BUS_LOAD(1280, 736, 30),
-	BUS_LOAD(1920, 1088, 30),
-	BUS_LOAD(1920, 1088, 60),
-	BUS_LOAD(3840, 2176, 24),
-	BUS_LOAD(4096, 2176, 24),
-	BUS_LOAD(3840, 2176, 30),
+	36000,
+	110400,
+	244800,
+	489000,
+	783360,
+	979200,
 };
 
 static int venus_hfi_get_bus_vector(struct venus_hfi_device *device, int load,
@@ -1080,8 +1079,6 @@ static int __unset_free_ocmem(struct venus_hfi_device *device)
 				__func__, device);
 		return -EINVAL;
 	}
-	if (!device->res->ocmem_size)
-		return rc;
 
 	if (!device->res->ocmem_size)
 		return rc;
@@ -1991,7 +1988,6 @@ static int venus_hfi_core_init(void *device)
 	VENUS_SET_STATE(dev, VENUS_STATE_INIT);
 
 	dev->intr_status = 0;
-	INIT_LIST_HEAD(&dev->sess_head);
 	venus_hfi_set_registers(dev);
 
 	if (!dev->hal_client) {
@@ -2510,19 +2506,19 @@ static int venus_hfi_session_abort(void *session)
 static int venus_hfi_session_clean(void *session)
 {
 	struct hal_session *sess_close;
+	struct venus_hfi_device *device;
 	if (!session) {
 		dprintk(VIDC_ERR, "Invalid Params %s", __func__);
 		return -EINVAL;
 	}
 	sess_close = session;
+	device = sess_close->device;
 	dprintk(VIDC_DBG, "deleted the session: 0x%p",
 			sess_close);
-	mutex_lock(&((struct venus_hfi_device *)
-			sess_close->device)->session_lock);
+	mutex_lock(&device->session_lock);
 	list_del(&sess_close->list);
-	mutex_unlock(&((struct venus_hfi_device *)
-			sess_close->device)->session_lock);
 	kfree(sess_close);
+	mutex_unlock(&device->session_lock);
 	return 0;
 }
 
@@ -3775,7 +3771,8 @@ static void venus_hfi_unload_fw(void *dev)
 		return;
 	}
 	if (device->resources.fw.cookie) {
-		flush_workqueue(device->vidc_workq);
+		if (device->state != VENUS_STATE_DEINIT)
+			flush_workqueue(device->vidc_workq);
 		flush_workqueue(device->venus_pm_workq);
 		subsystem_put(device->resources.fw.cookie);
 		venus_hfi_interface_queues_release(dev);
@@ -3936,6 +3933,7 @@ static void *venus_hfi_add_device(u32 device_id,
 	mutex_init(&hdevice->session_lock);
 	mutex_init(&hdevice->clk_pwr_lock);
 
+	INIT_LIST_HEAD(&hdevice->sess_head);
 	if (hal_ctxt.dev_count == 0)
 		INIT_LIST_HEAD(&hal_ctxt.dev_head);
 

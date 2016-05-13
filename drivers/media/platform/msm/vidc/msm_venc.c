@@ -893,14 +893,6 @@ static struct msm_vidc_format venc_formats[] = {
 		.type = CAPTURE_PORT,
 	},
 	{
-		.name = "HEVC",
-		.description = "HEVC compressed format",
-		.fourcc = V4L2_PIX_FMT_HEVC,
-		.num_planes = 1,
-		.get_frame_size = get_frame_size_compressed,
-		.type = CAPTURE_PORT,
-	},
-	{
 		.name = "YCrCb Semiplanar 4:2:0",
 		.description = "Y/CrCb 4:2:0",
 		.fourcc = V4L2_PIX_FMT_NV21,
@@ -1112,21 +1104,20 @@ static inline int start_streaming(struct msm_vidc_inst *inst)
 			"Failed to move inst: %p to start done state\n", inst);
 		goto fail_start;
 	}
-	mutex_lock(&inst->sync_lock);
-	if (!list_empty(&inst->pendingq)) {
-		list_for_each_safe(ptr, next, &inst->pendingq) {
-			temp = list_entry(ptr, struct vb2_buf_entry, list);
-			rc = msm_comm_qbuf(temp->vb);
-			if (rc) {
-				dprintk(VIDC_ERR,
+
+	mutex_lock(&inst->pendingq.lock);
+	list_for_each_safe(ptr, next, &inst->pendingq.list) {
+		temp = list_entry(ptr, struct vb2_buf_entry, list);
+		rc = msm_comm_qbuf(temp->vb);
+		if (rc) {
+			dprintk(VIDC_ERR,
 					"Failed to qbuf to hardware\n");
-				break;
-			}
-			list_del(&temp->list);
-			kfree(temp);
+			break;
 		}
+		list_del(&temp->list);
+		kfree(temp);
 	}
-	mutex_unlock(&inst->sync_lock);
+	mutex_unlock(&inst->pendingq.lock);
 	return rc;
 fail_start:
 	return rc;
@@ -1478,15 +1469,6 @@ static int try_set_ctrl(struct msm_vidc_inst *inst, struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_MPEG_VIDC_VIDEO_IDR_PERIOD:
-		if (inst->fmts[CAPTURE_PORT]->fourcc != V4L2_PIX_FMT_H264 &&
-			inst->fmts[CAPTURE_PORT]->fourcc !=
-				V4L2_PIX_FMT_H264_NO_SC) {
-			dprintk(VIDC_ERR, "Control 0x%x only valid for H264\n",
-					ctrl->id);
-			rc = -ENOTSUPP;
-			break;
-		}
-
 		property_id =
 			HAL_CONFIG_VENC_IDR_PERIOD;
 		idr_period.idr_period = ctrl->val;
@@ -2591,7 +2573,7 @@ int msm_venc_s_parm(struct msm_vidc_inst *inst, struct v4l2_streamparm *a)
 
 	if ((fps % 15 == 14) || (fps % 24 == 23))
 		fps = fps + 1;
-	else if ((fps % 24 == 1) || (fps % 15 == 1))
+	else if ((fps > 1) && ((fps % 24 == 1) || (fps % 15 == 1)))
 		fps = fps - 1;
 
 	if (inst->prop.fps != fps) {
@@ -3135,12 +3117,12 @@ int msm_venc_ctrl_init(struct msm_vidc_inst *inst)
 
 		ret_val = inst->ctrl_handler.error;
 		if (ret_val) {
- 			dprintk(VIDC_ERR,
+			dprintk(VIDC_ERR,
 					"Error adding ctrl (%s) to ctrl handle, %d\n",
 					msm_venc_ctrls[idx].name,
 					inst->ctrl_handler.error);
 			return ret_val;
- 		}
+		}
 
 		inst->ctrls[idx] = ctrl;
 	}

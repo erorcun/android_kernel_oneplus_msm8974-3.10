@@ -30,6 +30,17 @@ enum smem_prop {
 	SMEM_CACHED = ION_FLAG_CACHED,
 	SMEM_SECURE = ION_FLAG_SECURE,
 };
+enum core_id {
+	MSM_VIDC_CORE_VENUS = 0,
+	MSM_VIDC_CORE_Q6,
+	MSM_VIDC_CORES_MAX,
+};
+
+enum session_type {
+	MSM_VIDC_ENCODER = 0,
+	MSM_VIDC_DECODER,
+	MSM_VIDC_MAX_DEVICES,
+};
 
 /* NOTE: if you change this enum you MUST update the
  * "buffer-type-tz-usage-table" for any affected target
@@ -66,16 +77,6 @@ enum smem_cache_ops {
 	SMEM_CACHE_CLEAN_INVALIDATE,
 };
 
-enum core_id {
-	MSM_VIDC_CORE_VENUS = 0,
-	MSM_VIDC_CORE_Q6,
-	MSM_VIDC_CORES_MAX,
-};
-enum session_type {
-	MSM_VIDC_ENCODER = 0,
-	MSM_VIDC_DECODER,
-	MSM_VIDC_MAX_DEVICES,
-};
 void *msm_vidc_open(int core_id, int session_type);
 int msm_vidc_close(void *instance);
 int msm_vidc_suspend(int core_id);
@@ -120,3 +121,5 @@ int msm_vidc_smem_get_domain_partition(void *instance,
 		int *domain_num, int *partition_num);
 void *msm_vidc_smem_get_client(void *instance);
 #endif
+
+

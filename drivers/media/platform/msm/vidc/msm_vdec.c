@@ -241,7 +241,7 @@ static struct msm_vidc_ctrl msm_vdec_ctrls[] = {
 	},
 	{
 		.id = V4L2_CID_MPEG_VIDC_SET_PERF_LEVEL,
-		.name = "Decoder Performance Level",
+		.name = "Encoder Performance Level",
 		.type = V4L2_CTRL_TYPE_MENU,
 		.minimum = V4L2_CID_MPEG_VIDC_PERF_LEVEL_NOMINAL,
 		.maximum = V4L2_CID_MPEG_VIDC_PERF_LEVEL_TURBO,
@@ -933,7 +933,7 @@ int msm_vdec_s_parm(struct msm_vidc_inst *inst, struct v4l2_streamparm *a)
 
 	if ((fps % 15 == 14) || (fps % 24 == 23))
 		fps = fps + 1;
-	else if ((fps % 24 == 1) || (fps % 15 == 1))
+	else if ((fps > 1) && ((fps % 24 == 1) || (fps % 15 == 1)))
 		fps = fps - 1;
 
 	if (inst->prop.fps != fps) {
@@ -1310,21 +1310,20 @@ static inline int start_streaming(struct msm_vidc_inst *inst)
 			goto fail_start;
 		}
 	}
-	mutex_lock(&inst->sync_lock);
-	if (!list_empty(&inst->pendingq)) {
-		list_for_each_safe(ptr, next, &inst->pendingq) {
-			temp = list_entry(ptr, struct vb2_buf_entry, list);
-			rc = msm_comm_qbuf(temp->vb);
-			if (rc) {
-				dprintk(VIDC_ERR,
-					"Failed to qbuf to hardware\n");
-				break;
-			}
-			list_del(&temp->list);
-			kfree(temp);
+
+	mutex_lock(&inst->pendingq.lock);
+	list_for_each_safe(ptr, next, &inst->pendingq.list) {
+		temp = list_entry(ptr, struct vb2_buf_entry, list);
+		rc = msm_comm_qbuf(temp->vb);
+		if (rc) {
+			dprintk(VIDC_ERR,
+				"Failed to qbuf to hardware\n");
+			break;
 		}
+		list_del(&temp->list);
+		kfree(temp);
 	}
-	mutex_unlock(&inst->sync_lock);
+	mutex_unlock(&inst->pendingq.lock);
 	return rc;
 fail_start:
 	return rc;
@@ -1941,14 +1940,18 @@ int msm_vdec_ctrl_init(struct msm_vidc_inst *inst)
 					msm_vdec_ctrls[idx].default_value);
 			}
 		}
-	
+
+		ret_val = inst->ctrl_handler.error;
+		if (ret_val) {
+			dprintk(VIDC_ERR,
+					"Error adding ctrl (%s) to ctrl handle, %d\n",
+					msm_vdec_ctrls[idx].name,
+					inst->ctrl_handler.error);
+			return ret_val;
+		}
+
 		inst->ctrls[idx] = ctrl;
 	}
-	ret_val = inst->ctrl_handler.error;
-	if (ret_val) 
-		dprintk(VIDC_ERR,
-				"Error adding ctrl to ctrl handle, %d\n",
-				inst->ctrl_handler.error);
 
 	/* Construct a super cluster of all controls */
 	inst->cluster = get_super_cluster(inst, &cluster_size);
@@ -1976,3 +1979,4 @@ int msm_vdec_ctrl_deinit(struct msm_vidc_inst *inst)
 
 	return 0;
 }
+

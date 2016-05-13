@@ -40,10 +40,9 @@ module_param(debug, int, 0644);
 #define call_qop(q, op, args...)					\
 	(((q)->ops->op) ? ((q)->ops->op(args)) : 0)
 
-#define V4L2_BUFFER_MASK_FLAGS	(V4L2_BUF_FLAG_MAPPED | V4L2_BUF_FLAG_QUEUED | \
+#define V4L2_BUFFER_STATE_FLAGS	(V4L2_BUF_FLAG_MAPPED | V4L2_BUF_FLAG_QUEUED | \
 				 V4L2_BUF_FLAG_DONE | V4L2_BUF_FLAG_ERROR | \
-				 V4L2_BUF_FLAG_PREPARED | \
-				 V4L2_BUF_FLAG_TIMESTAMP_MASK)
+				 V4L2_BUF_FLAG_PREPARED )
 
 /**
  * __vb2_buf_mem_alloc() - allocate video memory for the given buffer
@@ -113,7 +112,7 @@ static void __vb2_buf_userptr_put(struct vb2_buffer *vb)
 		vb->planes[plane].mem_priv = NULL;
 	}
 }
-
+#if 0
 /**
  * __vb2_plane_dmabuf_put() - release memory associated with
  * a DMABUF shared plane
@@ -143,7 +142,7 @@ static void __vb2_buf_dmabuf_put(struct vb2_buffer *vb)
 	for (plane = 0; plane < vb->num_planes; ++plane)
 		__vb2_plane_dmabuf_put(q, &vb->planes[plane]);
 }
-
+#endif
 /**
  * __setup_offsets() - setup unique offsets ("cookies") for every plane in
  * every buffer on the queue
@@ -266,9 +265,9 @@ static void __vb2_free_mem(struct vb2_queue *q, unsigned int buffers)
 		/* Free MMAP buffers or release USERPTR buffers */
 		if (q->memory == V4L2_MEMORY_MMAP)
 			__vb2_buf_mem_free(vb);
-		else if (q->memory == V4L2_MEMORY_DMABUF)
+/*		else if (q->memory == V4L2_MEMORY_DMABUF)
 			__vb2_buf_dmabuf_put(vb);
-		else
+*/		else
 			__vb2_buf_userptr_put(vb);
 	}
 }
@@ -376,9 +375,9 @@ static void __fill_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b)
 {
 	struct vb2_queue *q = vb->vb2_queue;
 
-	/* Copy back data such as timestamp, flags, etc. */
+	/* Copy back data such as timestamp, flags, input, etc. */
 	memcpy(b, &vb->v4l2_buf, offsetof(struct v4l2_buffer, m));
-	b->reserved2 = vb->v4l2_buf.reserved2;
+	b->input = vb->v4l2_buf.input;
 	b->reserved = vb->v4l2_buf.reserved;
 
 	if (V4L2_TYPE_IS_MULTIPLANAR(q->type)) {
@@ -400,15 +399,15 @@ static void __fill_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b)
 			b->m.offset = vb->v4l2_planes[0].m.mem_offset;
 		else if (q->memory == V4L2_MEMORY_USERPTR)
 			b->m.userptr = vb->v4l2_planes[0].m.userptr;
-		else if (q->memory == V4L2_MEMORY_DMABUF)
+/*		else if (q->memory == V4L2_MEMORY_DMABUF)
 			b->m.fd = vb->v4l2_planes[0].m.fd;
-	}
+*/	}
 
 	/*
 	 * Clear any buffer state related flags.
 	 */
-	b->flags &= ~V4L2_BUFFER_MASK_FLAGS;
-	b->flags |= q->timestamp_type;
+	b->flags &= ~V4L2_BUFFER_STATE_FLAGS;
+//	b->flags |= q->timestamp_type;
 
 	switch (vb->state) {
 	case VB2_BUF_STATE_QUEUED:
@@ -911,7 +910,7 @@ static void __fill_vb2_buffer(struct vb2_buffer *vb, const struct v4l2_buffer *b
 					b->m.planes[plane].length;
 			}
 		}
-		if (b->memory == V4L2_MEMORY_DMABUF) {
+/*		if (b->memory == V4L2_MEMORY_DMABUF) {
 			for (plane = 0; plane < vb->num_planes; ++plane) {
 				v4l2_planes[plane].m.fd =
 					b->m.planes[plane].m.fd;
@@ -921,7 +920,7 @@ static void __fill_vb2_buffer(struct vb2_buffer *vb, const struct v4l2_buffer *b
 					b->m.planes[plane].data_offset;
 			}
 		}
-	} else {
+*/	} else {
 		/*
 		 * Single-planar buffers do not use planes array,
 		 * so fill in relevant v4l2_buffer struct fields instead.
@@ -938,17 +937,18 @@ static void __fill_vb2_buffer(struct vb2_buffer *vb, const struct v4l2_buffer *b
 			v4l2_planes[0].length = b->length;
 		}
 
-		if (b->memory == V4L2_MEMORY_DMABUF) {
+/*		if (b->memory == V4L2_MEMORY_DMABUF) {
 			v4l2_planes[0].m.fd = b->m.fd;
 			v4l2_planes[0].length = b->length;
 			v4l2_planes[0].data_offset = 0;
 		}
-
+*/
 	}
 
 	vb->v4l2_buf.field = b->field;
 	vb->v4l2_buf.timestamp = b->timestamp;
-	vb->v4l2_buf.flags = b->flags & ~V4L2_BUFFER_MASK_FLAGS;
+	vb->v4l2_buf.input = b->input;
+	vb->v4l2_buf.flags = b->flags & ~V4L2_BUFFER_STATE_FLAGS;
 }
 
 /**
@@ -1043,6 +1043,7 @@ static int __qbuf_mmap(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 	return 0;
 }
 
+#if 0
 /**
  * __qbuf_dmabuf() - handle qbuf of a DMABUF buffer
  */
@@ -1143,7 +1144,7 @@ err:
 
 	return ret;
 }
-
+#endif
 /**
  * __enqueue_in_driver() - enqueue a vb2_buffer in driver for processing
  */
@@ -1174,10 +1175,10 @@ static int __buf_prepare(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 	case V4L2_MEMORY_USERPTR:
 		ret = __qbuf_userptr(vb, b);
 		break;
-	case V4L2_MEMORY_DMABUF:
+/*	case V4L2_MEMORY_DMABUF:
 		ret = __qbuf_dmabuf(vb, b);
 		break;
-	default:
+*/	default:
 		WARN(1, "Invalid queue type\n");
 		ret = -EINVAL;
 	}
@@ -1506,8 +1507,8 @@ EXPORT_SYMBOL_GPL(vb2_wait_for_all_buffers);
  */
 static void __vb2_dqbuf(struct vb2_buffer *vb)
 {
-	struct vb2_queue *q = vb->vb2_queue;
-	unsigned int i;
+//	struct vb2_queue *q = vb->vb2_queue;
+//	unsigned int i;
 
 	/* nothing to do if the buffer is already dequeued */
 	if (vb->state == VB2_BUF_STATE_DEQUEUED)
@@ -1516,14 +1517,14 @@ static void __vb2_dqbuf(struct vb2_buffer *vb)
 	vb->state = VB2_BUF_STATE_DEQUEUED;
 
 	/* unmap DMABUF buffer */
-	if (q->memory == V4L2_MEMORY_DMABUF)
+/*	if (q->memory == V4L2_MEMORY_DMABUF)
 		for (i = 0; i < vb->num_planes; ++i) {
 			if (!vb->planes[i].dbuf_mapped)
 				continue;
 			call_memop(q, unmap_dmabuf, vb->planes[i].mem_priv);
 			vb->planes[i].dbuf_mapped = 0;
 		}
-}
+*/}
 
 /**
  * vb2_dqbuf() - Dequeue a buffer to the userspace
@@ -2063,12 +2064,12 @@ int vb2_queue_init(struct vb2_queue *q)
 	    WARN_ON(!q->type)		  ||
 	    WARN_ON(!q->io_modes)	  ||
 	    WARN_ON(!q->ops->queue_setup) ||
-	    WARN_ON(!q->ops->buf_queue)   ||
-	    WARN_ON(q->timestamp_type & ~V4L2_BUF_FLAG_TIMESTAMP_MASK))
+	    WARN_ON(!q->ops->buf_queue)/*   ||
+	    WARN_ON(q->timestamp_type & ~V4L2_BUF_FLAG_TIMESTAMP_MASK)*/)
 		return -EINVAL;
 
 	/* Warn that the driver should choose an appropriate timestamp type */
-	WARN_ON(q->timestamp_type == V4L2_BUF_FLAG_TIMESTAMP_UNKNOWN);
+//	WARN_ON(q->timestamp_type == V4L2_BUF_FLAG_TIMESTAMP_UNKNOWN);
 
 	INIT_LIST_HEAD(&q->queued_list);
 	INIT_LIST_HEAD(&q->done_list);

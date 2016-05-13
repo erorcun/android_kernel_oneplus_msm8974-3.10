@@ -150,6 +150,7 @@ const char *v4l2_type_names[] = {
 	[V4L2_BUF_TYPE_VIDEO_OUTPUT_OVERLAY] = "vid-out-overlay",
 	[V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE] = "vid-cap-mplane",
 	[V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE] = "vid-out-mplane",
+	[V4L2_BUF_TYPE_PRIVATE]      = "private",
 };
 EXPORT_SYMBOL(v4l2_type_names);
 
@@ -316,6 +317,8 @@ static void v4l_print_format(const void *arg, bool write_only)
 				sliced->service_lines[0][i],
 				sliced->service_lines[1][i]);
 		break;
+	case V4L2_BUF_TYPE_PRIVATE:
+		break;
 	}
 }
 
@@ -349,9 +352,9 @@ static void v4l_print_modulator(const void *arg, bool write_only)
 		pr_cont("index=%u, txsubchans=0x%x\n", p->index, p->txsubchans);
 	else
 		pr_cont("index=%u, name=%.*s, capability=0x%x, "
-			"rangelow=%u, rangehigh=%u, txsubchans=0x%x\n",
+			"txsubchans=0x%x\n",
 			p->index, (int)sizeof(p->name), p->name, p->capability,
-			p->rangelow, p->rangehigh, p->txsubchans);
+			p->txsubchans);
 }
 
 static void v4l_print_tuner(const void *arg, bool write_only)
@@ -362,11 +365,10 @@ static void v4l_print_tuner(const void *arg, bool write_only)
 		pr_cont("index=%u, audmode=%u\n", p->index, p->audmode);
 	else
 		pr_cont("index=%u, name=%.*s, type=%u, capability=0x%x, "
-			"rangelow=%u, rangehigh=%u, signal=%u, afc=%d, "
+			"signal=%u, afc=%d, "
 			"rxsubchans=0x%x, audmode=%u\n",
 			p->index, (int)sizeof(p->name), p->name, p->type,
-			p->capability, p->rangelow,
-			p->rangehigh, p->signal, p->afc,
+			p->capability, p->signal, p->afc,
 			p->rxsubchans, p->audmode);
 }
 
@@ -400,9 +402,8 @@ static void v4l_print_hw_freq_seek(const void *arg, bool write_only)
 	const struct v4l2_hw_freq_seek *p = arg;
 
 	pr_cont("tuner=%u, type=%u, seek_upward=%u, wrap_around=%u, spacing=%u, "
-		"rangelow=%u, rangehigh=%u\n",
-		p->tuner, p->type, p->seek_upward, p->wrap_around, p->spacing,
-		p->rangelow, p->rangehigh);
+		"\n",
+		p->tuner, p->type, p->seek_upward, p->wrap_around, p->spacing);
 }
 
 static void v4l_print_requestbuffers(const void *arg, bool write_only)
@@ -660,6 +661,22 @@ static void v4l_print_dbg_register(const void *arg, bool write_only)
 			p->reg, p->val);
 }
 
+static void v4l_print_dv_enum_presets(const void *arg, bool write_only)
+{
+	const struct v4l2_dv_enum_preset *p = arg;
+
+	pr_cont("index=%u, preset=%u, name=%.*s, width=%u, height=%u\n",
+			p->index, p->preset,
+			(int)sizeof(p->name), p->name, p->width, p->height);
+}
+
+static void v4l_print_dv_preset(const void *arg, bool write_only)
+{
+	const struct v4l2_dv_preset *p = arg;
+
+	pr_cont("preset=%u\n", p->preset);
+}
+
 static void v4l_print_dv_timings(const void *arg, bool write_only)
 {
 	const struct v4l2_dv_timings *p = arg;
@@ -840,10 +857,9 @@ static void v4l_print_freq_band(const void *arg, bool write_only)
 	const struct v4l2_frequency_band *p = arg;
 
 	pr_cont("tuner=%u, type=%u, index=%u, capability=0x%x, "
-		"rangelow=%u, rangehigh=%u, modulation=0x%x\n",
+		"modulation=0x%x\n",
 			p->tuner, p->type, p->index,
-			p->capability, p->rangelow,
-			p->rangehigh, p->modulation);
+			p->capability, p->modulation);
 }
 
 static void v4l_print_u32(const void *arg, bool write_only)
@@ -1007,13 +1023,17 @@ static int v4l_enuminput(const struct v4l2_ioctl_ops *ops,
 	struct v4l2_input *p = arg;
 
 	/*
-	 * We set the flags for CAP_DV_TIMINGS &
+	 * We set the flags for CAP_PRESETS, CAP_DV_TIMINGS &
 	 * CAP_STD here based on ioctl handler provided by the
 	 * driver. If the driver doesn't support these
 	 * for a specific input, it must override these flags.
 	 */
 	if (is_valid_ioctl(vfd, VIDIOC_S_STD))
 		p->capabilities |= V4L2_IN_CAP_STD;
+	if (is_valid_ioctl(vfd, VIDIOC_S_DV_PRESET))
+		p->capabilities |= V4L2_IN_CAP_PRESETS;
+	if (is_valid_ioctl(vfd, VIDIOC_S_DV_TIMINGS))
+		p->capabilities |= V4L2_IN_CAP_DV_TIMINGS;
 
 	return ops->vidioc_enum_input(file, fh, p);
 }
@@ -1025,13 +1045,17 @@ static int v4l_enumoutput(const struct v4l2_ioctl_ops *ops,
 	struct v4l2_output *p = arg;
 
 	/*
-	 * We set the flags for CAP_DV_TIMINGS &
+	 * We set the flags for CAP_PRESETS, CAP_DV_TIMINGS &
 	 * CAP_STD here based on ioctl handler provided by the
 	 * driver. If the driver doesn't support these
 	 * for a specific output, it must override these flags.
 	 */
 	if (is_valid_ioctl(vfd, VIDIOC_S_STD))
 		p->capabilities |= V4L2_OUT_CAP_STD;
+	if (is_valid_ioctl(vfd, VIDIOC_S_DV_PRESET))
+		p->capabilities |= V4L2_OUT_CAP_PRESETS;
+	if (is_valid_ioctl(vfd, VIDIOC_S_DV_TIMINGS))
+		p->capabilities |= V4L2_OUT_CAP_DV_TIMINGS;
 
 	return ops->vidioc_enum_output(file, fh, p);
 }
@@ -1065,6 +1089,12 @@ static int v4l_enum_fmt(const struct v4l2_ioctl_ops *ops,
 		if (unlikely(!is_tx || !ops->vidioc_enum_fmt_vid_out_mplane))
 			break;
 		return ops->vidioc_enum_fmt_vid_out_mplane(file, fh, arg);
+	case V4L2_BUF_TYPE_PRIVATE:
+		if (unlikely(!ops->vidioc_enum_fmt_type_private))
+			break;
+		return ops->vidioc_enum_fmt_type_private(file, fh, arg);
+	default:
+		break;
 	}
 	return -EINVAL;
 }
@@ -1119,6 +1149,12 @@ static int v4l_g_fmt(const struct v4l2_ioctl_ops *ops,
 		if (unlikely(!is_tx || is_vid || !ops->vidioc_g_fmt_sliced_vbi_out))
 			break;
 		return ops->vidioc_g_fmt_sliced_vbi_out(file, fh, arg);
+	case V4L2_BUF_TYPE_PRIVATE:
+		if (unlikely(!ops->vidioc_g_fmt_type_private))
+			break;
+		return ops->vidioc_g_fmt_type_private(file, fh, arg);
+	default:
+		break;
 	}
 	return -EINVAL;
 }
@@ -1183,6 +1219,12 @@ static int v4l_s_fmt(const struct v4l2_ioctl_ops *ops,
 			break;
 		CLEAR_AFTER_FIELD(p, fmt.sliced);
 		return ops->vidioc_s_fmt_sliced_vbi_out(file, fh, arg);
+	case V4L2_BUF_TYPE_PRIVATE:
+		if (unlikely(!ops->vidioc_s_fmt_type_private))
+			break;
+		return ops->vidioc_s_fmt_type_private(file, fh, arg);
+	default:
+		break;
 	}
 	return -EINVAL;
 }
@@ -1247,6 +1289,12 @@ static int v4l_try_fmt(const struct v4l2_ioctl_ops *ops,
 			break;
 		CLEAR_AFTER_FIELD(p, fmt.sliced);
 		return ops->vidioc_try_fmt_sliced_vbi_out(file, fh, arg);
+	case V4L2_BUF_TYPE_PRIVATE:
+		if (unlikely(!ops->vidioc_try_fmt_type_private))
+			break;
+		return ops->vidioc_try_fmt_type_private(file, fh, arg);
+	default:
+		break;
 	}
 	return -EINVAL;
 }
@@ -1446,7 +1494,8 @@ static int v4l_reqbufs(const struct v4l2_ioctl_ops *ops,
 	if (ret)
 		return ret;
 
-	CLEAR_AFTER_FIELD(p, memory);
+	if (p->type < V4L2_BUF_TYPE_PRIVATE)
+		CLEAR_AFTER_FIELD(p, memory);
 
 	return ops->vidioc_reqbufs(file, fh, p);
 }
@@ -1961,7 +2010,6 @@ static int v4l_enum_freq_bands(const struct v4l2_ioctl_ops *ops,
 		if (err)
 			return err;
 		p->capability = t.capability | V4L2_TUNER_CAP_FREQ_BANDS;
-		p->rangelow = t.rangelow;
 		p->rangehigh = t.rangehigh;
 		p->modulation = (type == V4L2_TUNER_RADIO) ?
 			V4L2_BAND_MODULATION_FM : V4L2_BAND_MODULATION_VSB;
@@ -1980,7 +2028,6 @@ static int v4l_enum_freq_bands(const struct v4l2_ioctl_ops *ops,
 		if (err)
 			return err;
 		p->capability = m.capability | V4L2_TUNER_CAP_FREQ_BANDS;
-		p->rangelow = m.rangelow;
 		p->rangehigh = m.rangehigh;
 		p->modulation = (type == V4L2_TUNER_RADIO) ?
 			V4L2_BAND_MODULATION_FM : V4L2_BAND_MODULATION_VSB;
@@ -2104,6 +2151,10 @@ static struct v4l2_ioctl_info v4l2_ioctls[] = {
 	IOCTL_INFO_FNC(VIDIOC_DBG_G_REGISTER, v4l_dbg_g_register, v4l_print_dbg_register, 0),
 	IOCTL_INFO_FNC(VIDIOC_DBG_G_CHIP_IDENT, v4l_dbg_g_chip_ident, v4l_print_dbg_chip_ident, 0),
 	IOCTL_INFO_FNC(VIDIOC_S_HW_FREQ_SEEK, v4l_s_hw_freq_seek, v4l_print_hw_freq_seek, INFO_FL_PRIO),
+	IOCTL_INFO_STD(VIDIOC_ENUM_DV_PRESETS, vidioc_enum_dv_presets, v4l_print_dv_enum_presets, 0),
+	IOCTL_INFO_STD(VIDIOC_S_DV_PRESET, vidioc_s_dv_preset, v4l_print_dv_preset, INFO_FL_PRIO),
+	IOCTL_INFO_STD(VIDIOC_G_DV_PRESET, vidioc_g_dv_preset, v4l_print_dv_preset, 0),
+	IOCTL_INFO_STD(VIDIOC_QUERY_DV_PRESET, vidioc_query_dv_preset, v4l_print_dv_preset, 0),
 	IOCTL_INFO_STD(VIDIOC_S_DV_TIMINGS, vidioc_s_dv_timings, v4l_print_dv_timings, INFO_FL_PRIO),
 	IOCTL_INFO_STD(VIDIOC_G_DV_TIMINGS, vidioc_g_dv_timings, v4l_print_dv_timings, 0),
 	IOCTL_INFO_FNC(VIDIOC_DQEVENT, v4l_dqevent, v4l_print_event, 0),

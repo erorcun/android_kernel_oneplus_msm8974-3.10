@@ -233,6 +233,7 @@ static int msm_v4l2_enum_framesizes(struct file *file, void *fh,
 	struct msm_vidc_inst *vidc_inst = get_vidc_inst(file, fh);
 	return msm_vidc_enum_framesizes((void *)vidc_inst, fsize);
 }
+
 static const struct v4l2_ioctl_ops msm_v4l2_ioctl_ops = {
 	.vidioc_querycap = msm_v4l2_querycap,
 	.vidioc_enum_fmt_vid_cap_mplane = msm_v4l2_enum_fmt,
@@ -353,7 +354,7 @@ static ssize_t msm_vidc_link_name_show(struct device *dev,
 		return 0;
 }
 
-static DEVICE_ATTR(link_name, 0644, msm_vidc_link_name_show, NULL);
+static DEVICE_ATTR(link_name, 0444, msm_vidc_link_name_show, NULL);
 
 static ssize_t store_pwr_collapse_delay(struct device *dev,
 		struct device_attribute *attr,
