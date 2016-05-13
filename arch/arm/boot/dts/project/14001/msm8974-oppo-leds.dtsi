@@ -13,14 +13,32 @@
 #include "../../qcom/msm8974-leds.dtsi"
 
 &pm8941_lsid1 {
+	qcom,leds@d800 {
+		status = "disabled";
+		qcom,wled_0 {
+			label = "wled";
+			linux,name = "wled:backlight";
+			linux,default-trigger = "bkl-trigger";
+			qcom,cs-out-en;
+			qcom,op-fdbck = <1>;
+			qcom,default-state = "on";
+			qcom,max-current = <25>;
+			qcom,ctrl-delay-us = <0>;
+			qcom,boost-curr-lim = <5>;
+			qcom,cp-sel = <0>;
+			qcom,switch-freq = <11>;
+			qcom,ovp-val = <2>;
+			qcom,num-strings = <3>;
+			qcom,num-physical-strings = <3>;
+			qcom,id = <0>;
+		};
+	};
+
 	qcom,leds@d000 {
 		status = "disabled";
 	};
 
 	qcom,leds@d300 {
-		flash-boost-supply = <&pm8941_chg_boost>; /* 3.10 */
-		torch-boost-supply = <&pm8941_boost>; /* 3.10 */
-
 		qcom,flash_0 {
 			qcom,current = <560>;
 		};
@@ -32,10 +50,6 @@
 		qcom,flash_torch {
 			qcom,current = <53>;
 		};
-	};
-
-	qcom,leds@d800 {
-		status = "disabled";
 	};
 
 	qcom,leds@d900 {

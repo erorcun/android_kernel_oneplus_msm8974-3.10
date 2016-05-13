@@ -20,11 +20,15 @@
 	qcom,init-voltage = <2700000>;
 };
 
+/*
+// CM and Oppo has chosen different approaches for that - I prefer CM one, look to the board-8974-oppo.c
+// Below one is Oppo way
+
 &pm8941_l18 {
 	regulator-min-microvolt = <1800000>;
 	regulator-max-microvolt = <1800000>;
 	qcom,init-voltage = <1800000>;
-};
+};*/
 
 &pm8941_l23 {
 	regulator-min-microvolt = <2800000>;

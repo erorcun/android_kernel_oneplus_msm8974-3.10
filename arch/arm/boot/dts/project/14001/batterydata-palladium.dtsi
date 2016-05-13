@@ -15,10 +15,11 @@ qcom,palladium-batterydata {
 	qcom,default-rbatt-mohm = <210>;
 	qcom,rbatt-capacitive-mohm = <50>;
 	qcom,flat-ocv-threshold-uv = <3800000>;
-	qcom,max-voltage-uv = <4320000>;  /* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
+	qcom,max-voltage-uv = <4350000>;
 	qcom,v-cutoff-uv = <3400000>;
 	qcom,chg-term-ua = <150000>;
 	qcom,batt-id-kohm = <75>;
+	qcom,battery-type = "palladium_1500mah";
 
 	qcom,fcc-temp-lut {
 		qcom,lut-col-legend = <(-20) 0 25 40 60>;

@@ -10,31 +10,73 @@
  * GNU General Public License for more details.
  */
 
-&mtp_batterydata {
-	qcom,mtp-3000mah {
-		qcom,max-voltage-uv = <4350000>;
-	};
+/ {
+	mtp_batterydata: qcom,battery-data {
+		qcom,rpull-up-kohm = <100>;
+		qcom,vref-batt-therm = <1800000>;
 
-	qcom,palladium-batterydata {
-		qcom,max-voltage-uv = <4350000>;
+		#include "batterydata-palladium.dtsi"
+		#include "batterydata-mtp-3000mah.dtsi"
 	};
 };
 
-&soc {
-	i2c@f9923000 {
-		bq27541-battery@55 {
-			status = "okay";
-			compatible = "ti,bq27541-battery";
-			reg = <0x55>;
-		};
+&pm8941_bms {
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <10>;
+	status = "ok";
+	qcom,battery-data = <&mtp_batterydata>;
+};
+
+&pm8941_chg {
+	status = "ok";
+	qcom,battery-data = <&mtp_batterydata>;
+
+	qcom,chgr@1000 {
+		status = "ok";
 	};
 
-	i2c@f9928000 {
-		bq24196_charger@6b {
-			status = "okay";
-			compatible = "ti,bq24196_charger";
-			reg = <0x6b>;
-		};
+	qcom,buck@1100 {
+		status = "ok";
+	};
+
+	qcom,bat-if@1200 {
+		status = "ok";
+	};
+
+	qcom,usb-chgpth@1300 {
+		status = "ok";
+	};
+
+	qcom,dc-chgpth@1400 {
+		status = "ok";
+	};
+
+	qcom,boost@1500 {
+		status = "ok";
+	};
+
+	qcom,chg-misc@1600 {
+		status = "ok";
+	};
+};
+
+&i2c_1 {
+	status = "ok";
+	bq27541-battery@55 {
+		status = "okay";
+		compatible = "ti,bq27541-battery";
+		reg = <0x55>;
+	};
+};
+
+&i2c_6 {
+	bq24196_charger@6b {
+		status = "okay";
+		compatible = "ti,bq24196_charger";
+		reg = <0x6b>;
 	};
 };
 
@@ -75,3 +117,14 @@
 	};
 };
 
+&pm8941_chg_boost {
+	status = "ok";
+};
+
+&spi_0 {
+	status = "disabled";
+};
+
+&spi_7 {
+	status = "disabled";
+};

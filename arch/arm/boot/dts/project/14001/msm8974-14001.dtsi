@@ -15,10 +15,17 @@
 #include "dsi-panel-sharp-1080p-cmd.dtsi"
 #include "dsi-panel-truly-1080p-cmd.dtsi"
 #include "dsi-panel-truly-1080p-video.dtsi"
+#include "msm8974-14001-camera.dtsi"
+#include "msm8974-oppo-nfc.dtsi"
+#include "msm8974-oppo-pm.dtsi"
+#include "msm8974-oppo-regulator.dtsi"
+#include "msm8974-14001-sound.dtsi"
+#include "msm8974-oppo-leds.dtsi"
 
 / {
 	aliases {
 		serial0 = &blsp1_uart1;
+//		spi9 = &spi_9;
 	};
 
 	memory {
@@ -48,26 +55,34 @@
 		batfet-supply = <&pm8941_chg_batif>;
 	};
 
-	mdss_dsi0: qcom,mdss_dsi@fd922800 {
-/*		qcom,ctrl-supply-entries {
-			/delete-property/ qcom,ctrl-supply-entry@1;
-		};
-*/		qcom,panel-supply-entries {
-			/delete-property/ qcom,panel-supply-entry@0;
-		};
-	};
-
-	mdss_dsi1: qcom,mdss_dsi@fd922e00 {
-/*		qcom,ctrl-supply-entries {
-			/delete-property/ qcom,ctrl-supply-entry@1;
-		};
-*/		qcom,panel-supply-entries {
-			/delete-property/ qcom,panel-supply-entry@0;
-		};
-	};
-
 	qcom,hdmi_tx@fd922100 {
 		status = "disabled";
+	};
+
+	i2c@f9924000 {
+		synaptics-rmi-ts@20 {
+			compatible = "synaptics,rmi-ts";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x8>;
+			synaptics,irq-gpio = <&msmgpio 61 0x00>;
+			synaptics,wakeup-gpio = <&msmgpio 57 0x00>;
+			synaptics,reset-gpio = <&msmgpio 60 0x00>;
+			synaptics,id-gpio = <&msmgpio 62 0x00>;
+			synaptics,id3-gpio = <&msmgpio 46 0x00>;
+		};
+		ti_lm3630_bl@36 {
+			compatible = "ti,lm3630";
+			reg = <0x36>;
+			ti,bank-a-ctrl = <0x05>;
+			ti,init-brt-ed1 = <80>;
+			ti,init-brt-led2 = <80>;
+			ti,max-brt-led1 = <255>;
+			ti,max-brt-led2 = <255>;
+			ti,pwm-active = <0>;
+			ti,pwm-ctrl = <0>;
+			ti,pwm-period = <255>;
+		};
 	};
 
 	gpio_keys {
@@ -104,6 +119,16 @@
 			debounce-interval = <150>;
 		};
 	};
+
+	sound {
+		qcom,model = "msm8974-taiko-mtp-snd-card";
+		qcom,cdc-micbias2-headset-only;
+	};
+};
+
+// card detect gpio is 69 in bacon - 3.10
+&sdhc2_cd {
+	qcom,pins = <&gp 69>;
 };
 
 &sdhc_1 {
@@ -149,8 +174,8 @@
 	qcom,vdd-io-current-level = <6 22000>;
 
 	pinctrl-names = "active", "sleep";
-	pinctrl-0 = <&sdc1_clk_on &sdc1_cmd_on &sdc1_data_on>;
-	pinctrl-1 = <&sdc1_clk_off &sdc1_cmd_off &sdc1_data_off>;
+	pinctrl-0 = <&sdc2_clk_on &sdc2_cmd_on &sdc2_data_on>;
+	pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off>;
 
 	status = "ok";
 };
@@ -160,7 +185,7 @@
  * without any problems, continue to use those.
  */
 &sdhc_1 {
-	pinctrl-0 = <&sdc1_clk_on_16 &sdc2_cmd_on &sdc2_data_on>;
+	pinctrl-0 = <&sdc1_clk_on_16 &sdc1_cmd_on &sdc1_data_on>;
 };
 
 &sdhc_2 {
@@ -173,59 +198,6 @@
 
 &usb3 {
 	qcom,otg-capability;
-};
-
-/ {
-	mtp_batterydata: qcom,battery-data {
-		qcom,rpull-up-kohm = <100>;
-		qcom,vref-batt-therm = <1800000>;
-
-		#include "batterydata-palladium.dtsi"
-		#include "batterydata-mtp-3000mah.dtsi"
-	};
-};
-
-&pm8941_bms {
-	qcom,enable-fcc-learning;
-	qcom,min-fcc-learning-soc = <20>;
-	qcom,min-fcc-ocv-pc = <30>;
-	qcom,min-fcc-learning-samples = <5>;
-	qcom,fcc-resolution = <10>;
-	status = "ok";
-	qcom,battery-data = <&mtp_batterydata>;
-};
-
-&pm8941_chg {
-	status = "ok";
-	qcom,battery-data = <&mtp_batterydata>;
-
-	qcom,chgr@1000 {
-		status = "ok";
-	};
-
-	qcom,buck@1100 {
-		status = "ok";
-	};
-
-	qcom,bat-if@1200 {
-		status = "ok";
-	};
-
-	qcom,usb-chgpth@1300 {
-		status = "ok";
-	};
-
-	qcom,dc-chgpth@1400 {
-		status = "ok";
-	};
-
-	qcom,boost@1500 {
-		status = "ok";
-	};
-
-	qcom,chg-misc@1600 {
-		status = "ok";
-	};
 };
 
 &pm8941_gpios {
@@ -506,21 +478,18 @@
 	};
 };
 
-#include "msm8974-14001-camera.dtsi"
-#include "msm8974-oppo-input.dtsi"
-#include "msm8974-oppo-misc.dtsi"
-#include "msm8974-oppo-pm.dtsi"
-#include "msm8974-oppo-nfc.dtsi"
-#include "msm8974-oppo-regulator.dtsi"
-#include "msm8974-14001-sound.dtsi"
-#include "msm8974-oppo-leds.dtsi"
-
-&i2c_1 {
-	status = "ok";
+&pm8941_lsid1 {
+	qcom,vibrator@c000 {
+		qcom,vib-timeout-ms = <15000>;
+		qcom,vib-vtg-level-mV = <3100>;
+		qcom,vib-vtg-min-mV = <1900>;
+		status = "okay";
+	};
 };
 
-&spi_0 {
-	status = "disabled";
+&usb_otg {
+	qcom,hsusb-otg-phy-init-seq = <0x44 0x80 0x3F 0x81 0x4D 0x82 0x13 0x83 0xffffffff>;
+	qcom,hsusb-otg-otg-control = <2>;
 };
 
 &pm8941_boost {

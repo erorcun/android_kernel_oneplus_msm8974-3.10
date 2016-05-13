@@ -12,8 +12,6 @@
 
 &soc {
 	sound {
-		qcom,model = "msm8974-taiko-mtp-snd-card";
-		qcom,cdc-micbias2-headset-only;
 		qcom,audio-routing =
 			"AIF4 VI", "MCLK",
 			"RX_BIAS", "MCLK",
@@ -53,8 +51,6 @@
 		qcom,yda145_boost-gpio = <&msmgpio 67 0>;
 		enable_spk-gpio = <&msmgpio 73 0>;
 		qcom,mbhc-audio-jack-type = "4-pole-jack";
-/*		asoc-codec = <&stub_codec>, <&hdmi_audio>;
-		asoc-codec-names = "msm-stub-codec.1", "msm-hdmi-audio-codec-rx"; */
 	};
 };
 
@@ -72,5 +68,6 @@
 		qcom,cdc-micbias2-ext-cap;
 		qcom,cdc-micbias3-ext-cap;
 		qcom,cdc-micbias4-ext-cap;
+		qcom,cdc-micbias-cfilt3-mv = <1800>;
 	};
 };
