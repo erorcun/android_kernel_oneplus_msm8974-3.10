@@ -297,6 +297,7 @@ void subsys_interface_unregister(struct subsys_interface *sif);
 
 int subsys_system_register(struct bus_type *subsys,
 			   const struct attribute_group **groups);
+int soc_sysdev_register(struct bus_type *subsys);
 int subsys_virtual_register(struct bus_type *subsys,
 			    const struct attribute_group **groups);
 

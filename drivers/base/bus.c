@@ -1248,6 +1248,47 @@ err_dev:
 	return err;
 }
 
+int soc_sysdev_register(struct bus_type *subsys)
+{
+	struct device *dev;
+	int err;
+
+	err = bus_register(subsys);
+	if (err < 0)
+		return err;
+
+	dev = kzalloc(sizeof(struct device), GFP_KERNEL);
+	if (!dev) {
+		err = -ENOMEM;
+		goto err_dev;
+	}
+
+	err = dev_set_name(dev, "%s", subsys->dev_name);
+	if (err < 0)
+		goto err_name;
+
+	dev->kobj.parent = &system_kset->kobj;
+	dev->groups = NULL;
+	dev->release = system_root_device_release;
+
+	err = device_register(dev);
+	if (err < 0)
+		goto err_dev_reg;
+
+	subsys->dev_root = dev;
+	return 0;
+
+err_dev_reg:
+	put_device(dev);
+	dev = NULL;
+err_name:
+	kfree(dev);
+err_dev:
+	bus_unregister(subsys);
+	return err;
+}
+EXPORT_SYMBOL_GPL(soc_sysdev_register);
+
 /**
  * subsys_system_register - register a subsystem at /sys/devices/system/
  * @subsys: system subsystem

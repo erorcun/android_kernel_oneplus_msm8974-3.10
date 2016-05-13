@@ -24,10 +24,15 @@
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/types.h>
+#include <linux/device.h>
 
 #include <soc/qcom/socinfo.h>
 #include <soc/qcom/smem.h>
 #include <soc/qcom/boot_stats.h>
+
+#ifdef CONFIG_MACH_OPPO
+#include <linux/pcb_version.h>
+#endif
 
 #define BUILD_ID_LENGTH 32
 #define SMEM_IMAGE_VERSION_BLOCKS_COUNT 32
@@ -565,6 +570,162 @@ enum msm_cpu socinfo_get_msm_cpu(void)
 EXPORT_SYMBOL_GPL(socinfo_get_msm_cpu);
 
 static ssize_t
+socinfo_show_id(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", socinfo_get_id());
+}
+
+static ssize_t
+socinfo_show_version(struct device *dev,
+		     struct device_attribute *attr,
+		     char *buf)
+{
+	uint32_t version;
+
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	version = socinfo_get_version();
+	return snprintf(buf, PAGE_SIZE, "%u.%u\n",
+			SOCINFO_VERSION_MAJOR(version),
+			SOCINFO_VERSION_MINOR(version));
+}
+
+#ifdef CONFIG_MACH_OPPO
+static ssize_t
+socinfo_show_hw_pcb_version(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	char *hw_version = "NULL";
+
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	switch (get_pcb_version()) {
+		case HW_VERSION__10:
+			hw_version = "10";
+			break;
+		case HW_VERSION__11:
+			hw_version = "11";
+			break;
+		case HW_VERSION__12:
+			hw_version = "12";
+			break;
+		case HW_VERSION__13:
+			hw_version = "13";
+			break;
+		case HW_VERSION__20:
+			hw_version = "20";
+			break;
+		case HW_VERSION__21:
+			hw_version = "21";
+			break;
+		case HW_VERSION__22:
+			hw_version = "22";
+			break;
+		case HW_VERSION__23:
+			hw_version = "23";
+			break;
+		default:
+			hw_version = "UNKNOWN";
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
+			hw_version);
+}
+
+static ssize_t
+socinfo_show_hw_rf_version(struct device *dev,
+			struct device_attribute *attr,
+			char *buf)
+{
+	char *rf_version = "NULL";
+
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	switch (get_rf_version()) {
+		case RF_VERSION__11:
+			rf_version = "11";
+			break;
+		case RF_VERSION__12:
+			rf_version = "12";
+			break;
+		case RF_VERSION__13:
+			rf_version = "13";
+			break;
+		case RF_VERSION__21:
+			rf_version = "21";
+			break;
+		case RF_VERSION__22:
+			rf_version = "22";
+			break;
+		case RF_VERSION__23:
+			rf_version = "23";
+			break;
+		case RF_VERSION__31:
+			rf_version = "31";
+			break;
+		case RF_VERSION__32:
+			rf_version = "32";
+			break;
+		case RF_VERSION__33:
+			rf_version = "33";
+			break;
+		case RF_VERSION__44:
+			rf_version = "44";
+			break;
+		case RF_VERSION__66:
+			rf_version = "66";
+			break;
+		case RF_VERSION__67:
+			rf_version = "67";
+			break;
+		case RF_VERSION__76:
+			rf_version = "76";
+			break;
+		case RF_VERSION__77:
+			rf_version = "77";
+			break;
+		case RF_VERSION__87:
+			rf_version = "87";
+			break;
+		case RF_VERSION__88:
+			rf_version = "88";
+			break;
+		case RF_VERSION__89:
+			rf_version = "89";
+			break;
+		case RF_VERSION__98:
+			rf_version = "98";
+			break;
+		case RF_VERSION__99:
+			rf_version = "99";
+			break;
+		default:
+			rf_version = "UNKNOWN";
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%-.32s\n",
+			rf_version);
+}
+#endif
+
+static ssize_t
 msm_get_vendor(struct device *dev,
 		struct device_attribute *attr,
 		char *buf)
@@ -899,6 +1060,30 @@ static struct device_attribute select_image =
 	__ATTR(select_image, S_IRUGO | S_IWUSR,
 			msm_get_image_number, msm_select_image);
 
+static struct device_attribute hw_pcb_version =
+	__ATTR(hw_pcb_version, S_IRUGO, socinfo_show_hw_pcb_version, NULL);
+
+static struct device_attribute hw_rf_version =
+	__ATTR(hw_rf_version, S_IRUGO, socinfo_show_hw_rf_version, NULL);
+
+static struct device_attribute sysdev_id =
+	__ATTR(id, S_IRUGO, socinfo_show_id, NULL);
+
+static struct device_attribute sysdev_version =
+	__ATTR(version, S_IRUGO, socinfo_show_version, NULL);
+
+
+static struct bus_type soc_bus_type = {
+	.name = "soc_compat",
+	.dev_name = "soc",
+};
+
+
+static struct device soc_subsys = {
+	.id = 0,
+	.bus = &soc_bus_type, 
+};
+
 static void * __init setup_dummy_socinfo(void)
 {
 	if (early_machine_is_mpq8092()) {
@@ -980,6 +1165,57 @@ static void __init populate_soc_sysfs_files(struct device *msm_soc_device)
 	return;
 }
 
+static void __init populate_soc_sysdev_files(struct device *msm_soc_device)
+{
+	uint32_t legacy_format = 10; //socinfo_get_format();
+
+	switch (legacy_format) {
+	case 10:
+		 device_create_file(msm_soc_device,
+					&hw_rf_version);
+	case 9:
+		 device_create_file(msm_soc_device,
+					&hw_pcb_version);
+	case 8:
+	case 7:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_pmic_model);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_pmic_die_revision);
+	case 6:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_platform_subtype);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_platform_subtype_id);
+	case 5:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_accessory_chip);
+	case 4:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_platform_version);
+	case 3:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_hw_platform);
+	case 2:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_raw_id);
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_raw_version);
+	case 1:
+		device_create_file(msm_soc_device,
+					&msm_soc_attr_build_id);
+		device_create_file(msm_soc_device, &sysdev_id);
+		device_create_file(msm_soc_device, &sysdev_version);
+		break;
+	default:
+		pr_err("%s:Unknown socinfo format:%u\n", __func__,
+				legacy_format);
+		break;
+	}
+
+	return;
+}
+
 static void  __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
 {
 	uint32_t soc_version = socinfo_get_version();
@@ -993,8 +1229,9 @@ static void  __init soc_info_populate(struct soc_device_attribute *soc_dev_attr)
 
 }
 
-static int __init socinfo_init_sysfs(void)
+static int __init socinfo_init_sysdev(void)
 {
+	int err;
 	struct device *msm_soc_device;
 	struct soc_device *soc_dev;
 	struct soc_device_attribute *soc_dev_attr;
@@ -1013,17 +1250,41 @@ static int __init socinfo_init_sysfs(void)
 	soc_info_populate(soc_dev_attr);
 	soc_dev = soc_device_register(soc_dev_attr);
 	if (IS_ERR_OR_NULL(soc_dev)) {
-		kfree(soc_dev_attr);
+		err = -EIO;
 		 pr_err("%s: Soc device register failed\n", __func__);
-		 return -EIO;
+		 goto socinfo_init_err;
 	}
 
 	msm_soc_device = soc_device_to_device(soc_dev);
 	populate_soc_sysfs_files(msm_soc_device);
+
+	// Below codes are needed for 3.10 port. That function under this text is added by me to bus.c
+	// and only difference from subsys_system_register is this one uses "dev_name" for device name.
+	// Original function was using "name" for both bus and device. But ours should be different.
+	err = soc_sysdev_register(&soc_bus_type); 
+	if (err) {
+		pr_err("%s: bus_type_register fail (%d)\n",
+		       __func__, err);
+		goto socinfo_init_err;
+	}
+
+	err = device_register(&soc_subsys);
+	if (err) {
+		pr_err("%s: sysdev_register fail (%d)\n",
+		       __func__, err);
+		goto socinfo_init_err;
+	}
+
+	populate_soc_sysdev_files(&soc_subsys);
+
 	return 0;
+
+socinfo_init_err:
+	 kfree(soc_dev_attr);
+         return err;
 }
 
-late_initcall(socinfo_init_sysfs);
+arch_initcall(socinfo_init_sysdev);
 
 static void socinfo_print(void)
 {
