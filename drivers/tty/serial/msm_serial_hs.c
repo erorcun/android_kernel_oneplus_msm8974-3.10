@@ -61,6 +61,7 @@
 #include <linux/ipc_logging.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
+#include <linux/pinctrl/consumer.h>
 
 #include <linux/msm-sps.h>
 #include <linux/platform_data/msm_serial_hs.h>
@@ -259,8 +260,8 @@ struct msm_hs_port {
 };
 
 static struct of_device_id msm_hs_match_table[] = {
-	{ .compatible = "qcom,msm-hsuart-v14",
-	},
+	{ .compatible = "qcom,msm-hsuart-v14"},
+	{}
 };
 
 
@@ -2514,7 +2515,7 @@ static void msm_hs_get_pinctrl_configs(struct uart_port *uport)
 		msm_uport->use_pinctrl = true;
 
 		set_state = pinctrl_lookup_state(msm_uport->pinctrl,
-						"hsuart_active");
+						PINCTRL_STATE_DEFAULT);
 		if (IS_ERR_OR_NULL(set_state)) {
 			dev_err(uport->dev,
 				"pinctrl lookup failed for hsuart_active");
@@ -2526,7 +2527,7 @@ static void msm_hs_get_pinctrl_configs(struct uart_port *uport)
 		msm_uport->gpio_state_active = set_state;
 
 		set_state = pinctrl_lookup_state(msm_uport->pinctrl,
-						"hsuart_sleep");
+						PINCTRL_STATE_SLEEP);
 		if (IS_ERR_OR_NULL(set_state)) {
 			dev_err(uport->dev,
 				"pinctrl lookup failed for hsuart_sleep");
