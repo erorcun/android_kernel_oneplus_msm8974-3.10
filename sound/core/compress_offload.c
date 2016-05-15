@@ -894,7 +894,7 @@ static long snd_compr_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 }
 
 static const struct file_operations snd_compr_file_ops = {
-		owner =          THIS_MODULE,
+		.owner =          THIS_MODULE,
 		.open =           snd_compr_open,
 		.release =        snd_compr_free,
 		.write =          snd_compr_write,
