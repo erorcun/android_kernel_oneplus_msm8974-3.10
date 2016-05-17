@@ -1202,11 +1202,6 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 			pr_err("%s : Set Volume failed : %d\n",
 				__func__, rc);
 
-		rc = msm_compr_init_pp_params(cstream, ac);
-		if (rc)
-			pr_err("%s : init PP params failed : %d\n",
-				__func__, rc);
-
 		/* issue RUN command for the stream */
 		q6asm_run_nowait(prtd->audio_client, 0, 0, 0);
 		break;
