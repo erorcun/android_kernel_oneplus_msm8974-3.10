@@ -1052,10 +1052,6 @@ static int msm_compr_ioctl_shared(struct snd_pcm_substream *substream,
 			}
 			pr_debug("SND_AUDIOCODEC_AC3\n");
 			compr->codec = FORMAT_AC3;
-			if (copy_from_user(params_value, (void *)ddp->params,
-					params_length))
-				pr_err("%s: copy ddp params value, size=%d\n",
-					__func__, params_length);
 			pr_debug("params_length: %d\n", ddp->params_length);
 			for (i = 0; i < params_length/sizeof(int); i++)
 				pr_debug("params_value[%d]: %x\n", i,
@@ -1095,10 +1091,6 @@ static int msm_compr_ioctl_shared(struct snd_pcm_substream *substream,
 			}
 			pr_debug("SND_AUDIOCODEC_EAC3\n");
 			compr->codec = FORMAT_EAC3;
-			if (copy_from_user(params_value, (void *)ddp->params,
-					params_length))
-				pr_err("%s: copy ddp params value, size=%d\n",
-					__func__, params_length);
 			pr_debug("params_length: %d\n", ddp->params_length);
 			for (i = 0; i < ddp->params_length; i++)
 				pr_debug("params_value[%d]: %x\n", i,
