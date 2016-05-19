@@ -19,7 +19,6 @@
 #include "msm8974-oppo-nfc.dtsi"
 #include "msm8974-oppo-pm.dtsi"
 #include "msm8974-oppo-regulator.dtsi"
-#include "msm8974-14001-sound.dtsi"
 #include "msm8974-oppo-leds.dtsi"
 
 / {
@@ -496,3 +495,5 @@
 	regulator-min-microvolt = <4500000>;
 	regulator-max-microvolt = <4500000>;
 };
+
+#include "msm8974-14001-sound.dtsi"
