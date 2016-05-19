@@ -219,6 +219,7 @@ static struct clk *codec_clk;
 static int clk_users;
 static atomic_t prim_auxpcm_rsc_ref;
 static atomic_t sec_auxpcm_rsc_ref;
+static bool codec_reg_done;
 
 #ifdef CONFIG_MACH_OPPO
 static int msm8974_oppo_ext_spk;
@@ -1795,6 +1796,8 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	taiko_event_register(msm8974_taiko_event_cb, rtd->codec);
+
+	codec_reg_done = true;
 	return 0;
 out:
 	clk_put(codec_clk);
@@ -3182,6 +3185,25 @@ static int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,hdmi-audio-rx")) {
+		dev_info(&pdev->dev, "%s(): hdmi audio support present\n",
+				__func__);
+
+		memcpy(msm8974_dai_links, msm8974_common_dai_links,
+			sizeof(msm8974_common_dai_links));
+
+		memcpy(msm8974_dai_links + ARRAY_SIZE(msm8974_common_dai_links),
+			msm8974_hdmi_dai_link, sizeof(msm8974_hdmi_dai_link));
+
+		card->dai_link	= msm8974_dai_links;
+		card->num_links	= ARRAY_SIZE(msm8974_dai_links);
+	} else {
+		dev_info(&pdev->dev, "%s(): No hdmi audio support\n", __func__);
+
+		card->dai_link	= msm8974_common_dai_links;
+		card->num_links	= ARRAY_SIZE(msm8974_common_dai_links);
+	}
+
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, pdata);
@@ -3253,24 +3275,7 @@ static int msm8974_asoc_machine_probe(struct platform_device *pdev)
 			dev_dbg(&pdev->dev, "Unknown value, hence setting to default");
 		}
 	}
-	if (of_property_read_bool(pdev->dev.of_node, "qcom,hdmi-audio-rx")) {
-		dev_info(&pdev->dev, "%s(): hdmi audio support present\n",
-				__func__);
 
-		memcpy(msm8974_dai_links, msm8974_common_dai_links,
-			sizeof(msm8974_common_dai_links));
-
-		memcpy(msm8974_dai_links + ARRAY_SIZE(msm8974_common_dai_links),
-			msm8974_hdmi_dai_link, sizeof(msm8974_hdmi_dai_link));
-
-		card->dai_link	= msm8974_dai_links;
-		card->num_links	= ARRAY_SIZE(msm8974_dai_links);
-	} else {
-		dev_info(&pdev->dev, "%s(): No hdmi audio support\n", __func__);
-
-		card->dai_link	= msm8974_common_dai_links;
-		card->num_links	= ARRAY_SIZE(msm8974_common_dai_links);
-	}
 	mutex_init(&cdc_mclk_mutex);
 	atomic_set(&prim_auxpcm_rsc_ref, 0);
 	atomic_set(&sec_auxpcm_rsc_ref, 0);
@@ -3285,9 +3290,11 @@ static int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	} */
 
 	ret = snd_soc_register_card(card);
-	if (ret == -EPROBE_DEFER)
+	if (ret == -EPROBE_DEFER) {
+		if (codec_reg_done)
+			ret = -EINVAL;
 		goto err;
-	else if (ret) {
+	} else if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
 			ret);
 		goto err;
