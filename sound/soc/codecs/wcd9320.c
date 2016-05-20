@@ -5678,7 +5678,9 @@ static int taiko_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 						dai->grph);
 		if (!dai->bus_down_in_recovery)
 			ret = taiko_codec_enable_slim_chmask(dai, false);
-
+		else
+			pr_debug("%s: bus in recovery skip enable slim_chmask",
+					__func__);
 		if (ret < 0) {
 			ret = wcd9xxx_disconnect_port(core,
 						      &dai->wcd9xxx_ch_list,
@@ -5686,7 +5688,6 @@ static int taiko_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 			pr_debug("%s: Disconnect RX port, ret = %d\n",
 				 __func__, ret);
 		}
-		dai->bus_down_in_recovery = false;
 		break;
 	}
 	return ret;
@@ -5763,7 +5764,6 @@ static int taiko_codec_enable_slimvi_feedback(struct snd_soc_dapm_widget *w,
 		snd_soc_update_bits(codec, TAIKO_A_SPKR_PROT_EN,
 				0x88, 0x00);
 
-		dai->bus_down_in_recovery = false;
 		break;
 	}
 out_vi:
@@ -5817,7 +5817,6 @@ static int taiko_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 				 __func__, ret);
 		}
 
-		dai->bus_down_in_recovery = false;
 		break;
 	}
 	return ret;
@@ -7210,11 +7209,14 @@ static void taiko_init_slim_slave_cfg(struct snd_soc_codec *codec)
 
 static int taiko_device_down(struct wcd9xxx *wcd9xxx)
 {
+	int codec;
 	struct snd_soc_codec *codec;
 
 	codec = (struct snd_soc_codec *)(wcd9xxx->ssr_priv);
 	snd_soc_card_change_online_state(codec->card, 0);
 
+	for (count = 0; count < NUM_CODEC_DAIS; count++)
+		taiko->dai[count].bus_down_in_recovery = true;
 	return 0;
 }
 
@@ -7438,7 +7440,6 @@ static int taiko_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	struct snd_soc_codec *codec;
 	struct taiko_priv *taiko;
 	int rco_clk_rate;
-	int count;
 
 	codec = (struct snd_soc_codec *)(wcd9xxx->ssr_priv);
 	taiko = snd_soc_codec_get_drvdata(codec);
@@ -7510,9 +7511,6 @@ static int taiko_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	ret = taiko_setup_irqs(taiko);
 	if (ret)
 		pr_err("%s: Failed to setup irq: %d\n", __func__, ret);
-
-	for (count = 0; count < NUM_CODEC_DAIS; count++)
-		taiko->dai[count].bus_down_in_recovery = true;
 
 	mutex_unlock(&codec->mutex);
 	return ret;
