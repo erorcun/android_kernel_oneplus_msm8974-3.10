@@ -122,6 +122,8 @@
 	sound {
 		qcom,model = "msm8974-taiko-mtp-snd-card";
 		qcom,cdc-micbias2-headset-only;
+		asoc-codec = <&stub_codec>, <&hdmi_audio>; /* 3.10 */
+		asoc-codec-names = "msm-stub-codec.1", "msm-hdmi-audio-codec-rx"; /* 3.10 */
 	};
 };
 

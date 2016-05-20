@@ -762,25 +762,25 @@ static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 			ret = -EINVAL;
 			goto exit;
 		}
-
 		clk_users++;
 		if (clk_users != 1)
 			goto exit;
 
-		if (codec_clk) {
-			clk_prepare_enable(codec_clk);
-			taiko_mclk_enable(codec, 1, dapm);
-		} else {
-			pr_err("%s: Error setting Taiko MCLK\n", __func__);
+		ret = clk_prepare_enable(codec_clk);
+		if (ret) {
+			pr_err("%s: clk_prepare failed, err:%d\n",
+				__func__, ret);
 			clk_users--;
 			goto exit;
 		}
+		taiko_mclk_enable(codec, 1, dapm);
 	} else {
 		if (clk_users > 0) {
 			clk_users--;
 			if (clk_users == 0) {
 				taiko_mclk_enable(codec, 0, dapm);
-				clk_disable_unprepare(codec_clk);
+				if (codec_clk)
+					clk_disable_unprepare(codec_clk);
 			}
 		} else {
 			pr_err("%s: Error releasing Taiko MCLK\n", __func__);
@@ -1734,7 +1734,12 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 
 	snd_soc_dapm_sync(dapm);
 
-	codec_clk = clk_get(cpu_dai->dev, "osr_clk");
+	codec_clk = clk_get(&spdev->dev, "osr_clk");
+	if (IS_ERR(codec_clk)) {
+		pr_err("%s: error clk_get %lu\n",
+			__func__, PTR_ERR(codec_clk));
+		return -EINVAL;
+	}
 
 	snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
 				    tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
@@ -3024,7 +3029,6 @@ err:
 	return ret;
 }
 
-#if 0
 static int msm8974_populate_dai_link_component_of_node(
 					struct snd_soc_card *card)
 {
@@ -3110,7 +3114,6 @@ static int msm8974_populate_dai_link_component_of_node(
 err:
 	return ret;
 }
-#endif
 
 static int msm8974_prepare_codec_mclk(struct snd_soc_card *card)
 {
@@ -3278,11 +3281,11 @@ static int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	ext_spk_amp_regulator = NULL;
 	msm8974_liquid_dock_dev = NULL;
 
-/*	ret = msm8974_populate_dai_link_component_of_node(card);
+	ret = msm8974_populate_dai_link_component_of_node(card);
 	if (ret) {
 		ret = -EPROBE_DEFER;
 		goto err;
-	} */
+	}
 
 	ret = snd_soc_register_card(card);
 	if (ret == -EPROBE_DEFER)
