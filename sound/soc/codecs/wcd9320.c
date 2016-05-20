@@ -7209,11 +7209,13 @@ static void taiko_init_slim_slave_cfg(struct snd_soc_codec *codec)
 
 static int taiko_device_down(struct wcd9xxx *wcd9xxx)
 {
-	int codec;
+	int count;
 	struct snd_soc_codec *codec;
+	struct taiko_priv *taiko;
 
 	codec = (struct snd_soc_codec *)(wcd9xxx->ssr_priv);
 	snd_soc_card_change_online_state(codec->card, 0);
+	taiko = snd_soc_codec_get_drvdata(codec);
 
 	for (count = 0; count < NUM_CODEC_DAIS; count++)
 		taiko->dai[count].bus_down_in_recovery = true;
