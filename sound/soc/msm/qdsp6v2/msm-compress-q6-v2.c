@@ -1441,7 +1441,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 
 		/* Wait indefinitely for  DRAIN. Flush can also signal this*/
 		rc = wait_event_interruptible(prtd->eos_wait,
-						(prtd->cmd_ack || prtd->cmd_interrupt));
+						(prtd->eos_ack || prtd->cmd_interrupt));
 
 		if (rc < 0)
 			pr_err("%s: EOS wait failed\n", __func__);
