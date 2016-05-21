@@ -1258,7 +1258,7 @@ static int32_t q6asm_srvc_callback(struct apr_client_data *data, void *priv)
 				buf_node = list_entry(ptr,
 						struct asm_buffer_node,
 						list);
-				if (buf_node->buf_addr_lsw ==
+				if (buf_node->buf_phys_addr ==
 				common_client.port[i].buf->phys) {
 					list_del(&buf_node->list);
 					kfree(buf_node);

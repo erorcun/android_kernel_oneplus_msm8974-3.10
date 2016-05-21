@@ -32,7 +32,7 @@
 #include <linux/msm_audio_ion.h>
 
 #include <linux/of_device.h>
-+#include <sound/tlv.h>
+#include <sound/tlv.h>
 #include <sound/pcm_params.h>
 
 #include "msm-pcm-q6-v2.h"
