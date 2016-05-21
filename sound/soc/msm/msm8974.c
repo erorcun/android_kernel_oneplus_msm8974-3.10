@@ -859,7 +859,7 @@ static const char *const proxy_rx_ch_text[] = {"One", "Two", "Three", "Four",
 
 static char const *hdmi_rx_sample_rate_text[] = {"KHZ_48", "KHZ_96",
 					"KHZ_192"};
-static const char *const btsco_rate_text[] = {"8000", "16000"};
+static const char *const btsco_rate_text[] = {"BTSCO_RATE_8KHZ", "BTSCO_RATE_16KHZ"};
 static const struct soc_enum msm_btsco_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };
@@ -1001,10 +1001,10 @@ static int msm_btsco_rate_put(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	switch (ucontrol->value.integer.value[0]) {
-	case 8000:
+	case 0:
 		msm_btsco_rate = BTSCO_RATE_8KHZ;
 		break;
-	case 16000:
+	case 1:
 		msm_btsco_rate = BTSCO_RATE_16KHZ;
 		break;
 	default:
@@ -3170,6 +3170,7 @@ static int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	const char *auxpcm_pri_gpio_set = NULL;
 	const char *prop_name_ult_lo_gpio = "qcom,ext-ult-lo-amp-gpio";
 	const char *mbhc_audio_jack_type = NULL;
+	size_t n = strlen("4-pole-jack");
 	struct resource	*pri_muxsel;
 	struct resource	*sec_muxsel;
 
@@ -3238,15 +3239,15 @@ static int msm8974_asoc_machine_probe(struct platform_device *pdev)
 		mbhc_cfg.enable_anc_mic_detect = false;
 		dev_dbg(&pdev->dev, "Jack type properties set to default");
 	} else {
-		if (!strcmp(mbhc_audio_jack_type, "4-pole-jack")) {
+		if (!strncmp(mbhc_audio_jack_type, "4-pole-jack", n)) {
 			mbhc_cfg.hw_jack_type = FOUR_POLE_JACK;
 			mbhc_cfg.enable_anc_mic_detect = false;
 			dev_dbg(&pdev->dev, "This hardware has 4 pole jack");
-		} else if (!strcmp(mbhc_audio_jack_type, "5-pole-jack")) {
+		} else if (!strncmp(mbhc_audio_jack_type, "5-pole-jack", n)) {
 			mbhc_cfg.hw_jack_type = FIVE_POLE_JACK;
 			mbhc_cfg.enable_anc_mic_detect = true;
 			dev_dbg(&pdev->dev, "This hardware has 5 pole jack");
-		} else if (!strcmp(mbhc_audio_jack_type, "6-pole-jack")) {
+		} else if (!strncmp(mbhc_audio_jack_type, "6-pole-jack", n)) {
 			mbhc_cfg.hw_jack_type = SIX_POLE_JACK;
 			mbhc_cfg.enable_anc_mic_detect = true;
 			dev_dbg(&pdev->dev, "This hardware has 6 pole jack");
