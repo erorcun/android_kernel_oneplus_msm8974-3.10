@@ -1731,6 +1731,48 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_enable_pin(dapm, "Lineout_2 amp");
 	snd_soc_dapm_enable_pin(dapm, "Lineout_4 amp");
 
+	snd_soc_dapm_ignore_suspend(dapm, "Lineout_1 amp");
+	snd_soc_dapm_ignore_suspend(dapm, "Lineout_3 amp");
+	snd_soc_dapm_ignore_suspend(dapm, "Lineout_2 amp");
+	snd_soc_dapm_ignore_suspend(dapm, "Lineout_4 amp");
+	snd_soc_dapm_ignore_suspend(dapm, "SPK_ultrasound amp");
+	snd_soc_dapm_ignore_suspend(dapm, "Handset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Main Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Second Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "ANC Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic1");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic2");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic3");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic4");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic5");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic6");
+
+	snd_soc_dapm_ignore_suspend(dapm, "MADINPUT");
+	snd_soc_dapm_ignore_suspend(dapm, "AIF4 MAD");
+	snd_soc_dapm_ignore_suspend(dapm, "EAR");
+	snd_soc_dapm_ignore_suspend(dapm, "HEADPHONE");
+	snd_soc_dapm_ignore_suspend(dapm, "LINEOUT1");
+	snd_soc_dapm_ignore_suspend(dapm, "LINEOUT2");
+	snd_soc_dapm_ignore_suspend(dapm, "LINEOUT3");
+	snd_soc_dapm_ignore_suspend(dapm, "LINEOUT4");
+	snd_soc_dapm_ignore_suspend(dapm, "SPK_OUT");
+	snd_soc_dapm_ignore_suspend(dapm, "ANC HEADPHONE");
+	snd_soc_dapm_ignore_suspend(dapm, "ANC EAR");
+	snd_soc_dapm_ignore_suspend(dapm, "AMIC1");
+	snd_soc_dapm_ignore_suspend(dapm, "AMIC2");
+	snd_soc_dapm_ignore_suspend(dapm, "AMIC3");
+	snd_soc_dapm_ignore_suspend(dapm, "AMIC4");
+	snd_soc_dapm_ignore_suspend(dapm, "AMIC5");
+	snd_soc_dapm_ignore_suspend(dapm, "AMIC6");
+	snd_soc_dapm_ignore_suspend(dapm, "DMIC1");
+	snd_soc_dapm_ignore_suspend(dapm, "DMIC2");
+	snd_soc_dapm_ignore_suspend(dapm, "DMIC3");
+	snd_soc_dapm_ignore_suspend(dapm, "DMIC4");
+	snd_soc_dapm_ignore_suspend(dapm, "DMIC5");
+	snd_soc_dapm_ignore_suspend(dapm, "DMIC6");
+	snd_soc_dapm_ignore_suspend(dapm, "AIF4 VI");
+	snd_soc_dapm_ignore_suspend(dapm, "VIINPUT");
 
 	snd_soc_dapm_sync(dapm);
 
@@ -2911,6 +2953,7 @@ static struct snd_soc_dai_link msm8974_common_dai_links[] = {
 		.be_id = MSM_BACKEND_DAI_SLIMBUS_5_TX,
 		.be_hw_params_fixup = msm_slim_5_tx_be_hw_params_fixup,
 		.ops = &msm8974_be_ops,
+		.ignore_suspend = 1,
 	},
 	/* Incall Music BACK END DAI Link */
 	{
