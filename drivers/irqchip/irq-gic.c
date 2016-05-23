@@ -291,9 +291,9 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	}
 	raw_spin_unlock(&irq_controller_lock);
 
-	for (i = find_first_bit((unsigned long *)pending, gic->gic_irqs);
+	for (i = find_first_bit(pending, gic->gic_irqs);
 	     i < gic->gic_irqs;
-	     i = find_next_bit((unsigned long *)pending, gic->gic_irqs, i+1)) {
+	     i = find_next_bit(pending, gic->gic_irqs, i+1)) {
 		log_base_wakeup_reason(i + gic->irq_offset);
 	}
 }
