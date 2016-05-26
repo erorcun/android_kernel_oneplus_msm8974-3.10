@@ -583,8 +583,8 @@ static int msm_compr_capture_prepare(struct snd_pcm_substream *substream)
 			/* dtx mode - disable */
 			AMR_WB_DTX_MODE);
 		if (ret < 0)
-			pr_err("%s: CMD Format block" \
-				"failed: %d\n", __func__, ret);
+			pr_err("%s: CMD Format block failed: %d\n",
+				__func__, ret);
 		break;
 	default:
 		pr_debug("No config for codec %d\n", codec->id);
@@ -602,8 +602,7 @@ static int msm_compr_capture_prepare(struct snd_pcm_substream *substream)
 					- COMPRE_CAPTURE_HEADER_SIZE;
 			read_param.paddr = buf[i].phys
 					+ COMPRE_CAPTURE_HEADER_SIZE;
-			pr_debug("Push buffer [%d] to DSP, "\
-					"paddr: %pa, vaddr: %p\n",
+			pr_debug("Push buffer [%d] to DSP, paddr: %pa, vaddr: %p\n",
 					i, &read_param.paddr,
 					buf[i].data);
 			q6asm_async_read(prtd->audio_client, &read_param);
@@ -1052,12 +1051,8 @@ static int msm_compr_ioctl_shared(struct snd_pcm_substream *substream,
 			}
 			pr_debug("SND_AUDIOCODEC_AC3\n");
 			compr->codec = FORMAT_AC3;
-			if (copy_from_user(params_value, (void *)ddp->params,
-					params_length))
-				pr_err("%s: copy ddp params value, size=%d\n",
-					__func__, params_length);
 			pr_debug("params_length: %d\n", ddp->params_length);
-			for (i = 0; i < params_length; i++)
+			for (i = 0; i < params_length/sizeof(int); i++)
 				pr_debug("params_value[%d]: %x\n", i,
 					params_value_data[i]);
 			for (i = 0; i < ddp->params_length/2; i++) {
@@ -1095,10 +1090,6 @@ static int msm_compr_ioctl_shared(struct snd_pcm_substream *substream,
 			}
 			pr_debug("SND_AUDIOCODEC_EAC3\n");
 			compr->codec = FORMAT_EAC3;
-			if (copy_from_user(params_value, (void *)ddp->params,
-					params_length))
-				pr_err("%s: copy ddp params value, size=%d\n",
-					__func__, params_length);
 			pr_debug("params_length: %d\n", ddp->params_length);
 			for (i = 0; i < ddp->params_length; i++)
 				pr_debug("params_value[%d]: %x\n", i,
@@ -1404,8 +1395,6 @@ static struct snd_soc_platform_driver msm_soc_platform = {
 
 static int msm_compr_probe(struct platform_device *pdev)
 {
-	if (pdev->dev.of_node)
-		dev_set_name(&pdev->dev, "%s", "msm-compr-dsp");
 
 	dev_info(&pdev->dev, "%s: dev name %s\n",
 			 __func__, dev_name(&pdev->dev));

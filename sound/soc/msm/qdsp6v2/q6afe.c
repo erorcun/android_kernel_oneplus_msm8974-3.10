@@ -2315,7 +2315,7 @@ int q6afe_audio_client_buf_alloc_contiguous(unsigned int dir,
 	ac->port[dir].buf = buf;
 
 	rc = msm_audio_ion_alloc("afe_client", &buf[0].client,
-				&buf[0].handle, bufsz*bufcnt,
+				&buf[0].handle, PAGE_ALIGN(bufsz*bufcnt),
 				&buf[0].phys, &len,
 				&buf[0].data);
 	if (rc) {
@@ -2365,7 +2365,7 @@ int afe_memory_map(phys_addr_t dma_addr_p, u32 dma_buf_sz,
 
 	mutex_lock(&this_afe.afe_cmd_lock);
 	ac->mem_map_handle = 0;
-	ret = afe_cmd_memory_map(dma_addr_p, dma_buf_sz);
+	ret = afe_cmd_memory_map(dma_addr_p, PAGE_ALIGN(dma_buf_sz));
 	if (ret < 0) {
 		pr_err("%s: afe_cmd_memory_map failed %d\n",
 			__func__, ret);
@@ -2604,6 +2604,11 @@ int afe_cmd_memory_unmap(u32 mem_map_handle)
 
 	pr_debug("%s: handle 0x%x\n", __func__, mem_map_handle);
 
+	if (!mem_map_handle) {
+		pr_err("%s: mem map handle (null)\n", __func__);
+		return -EINVAL;
+	}
+
 	if (this_afe.apr == NULL) {
 		this_afe.apr = apr_register("ADSP", "AFE", afe_callback,
 					0xFFFFFFFF, &this_afe);
@@ -2646,6 +2651,11 @@ int afe_cmd_memory_unmap_nowait(u32 mem_map_handle)
 	struct afe_service_cmd_shared_mem_unmap_regions mregion;
 
 	pr_debug("%s: handle 0x%x\n", __func__, mem_map_handle);
+
+	if (!mem_map_handle) {
+		pr_err("%s: mem map handle (null)\n", __func__);
+		return -EINVAL;
+	}
 
 	if (this_afe.apr == NULL) {
 		this_afe.apr = apr_register("ADSP", "AFE", afe_callback,
@@ -2960,7 +2970,7 @@ static ssize_t afe_debug_write(struct file *filp,
 				goto afe_error;
 			}
 
-			if (param[1] < 0 || param[1] > 100) {
+			if (param[1] > 100) {
 				pr_err("%s: Error, volume shoud be 0 to 100 percentage param = %lu\n",
 					__func__, param[1]);
 				rc = -EINVAL;
@@ -3449,6 +3459,9 @@ int afe_set_lpass_clock(u16 port_id, struct afe_clk_cfg *cfg)
 		pr_err("%s: wait_event timeout\n", __func__);
 		ret = -EINVAL;
 		goto fail_cmd;
+	} else {
+		/* set ret to 0 as no timeout happened */
+		ret = 0;
 	}
 	if (atomic_read(&this_afe.status) != 0) {
 		pr_err("%s: config cmd failed\n", __func__);

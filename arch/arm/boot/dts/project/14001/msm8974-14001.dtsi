@@ -19,7 +19,6 @@
 #include "msm8974-oppo-nfc.dtsi"
 #include "msm8974-oppo-pm.dtsi"
 #include "msm8974-oppo-regulator.dtsi"
-#include "msm8974-14001-sound.dtsi"
 #include "msm8974-oppo-leds.dtsi"
 
 / {
@@ -123,6 +122,8 @@
 	sound {
 		qcom,model = "msm8974-taiko-mtp-snd-card";
 		qcom,cdc-micbias2-headset-only;
+		asoc-codec = <&stub_codec>, <&hdmi_audio>; /* 3.10 */
+		asoc-codec-names = "msm-stub-codec.1", "msm-hdmi-audio-codec-rx"; /* 3.10 */
 	};
 };
 
@@ -496,3 +497,5 @@
 	regulator-min-microvolt = <4500000>;
 	regulator-max-microvolt = <4500000>;
 };
+
+#include "msm8974-14001-sound.dtsi"

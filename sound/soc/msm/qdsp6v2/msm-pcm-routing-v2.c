@@ -405,7 +405,7 @@ void msm_pcm_routing_reg_psthr_stream(int fedai_id, int dspst_id,
 	mutex_unlock(&routing_lock);
 }
 
-void msm_pcm_routing_reg_phy_compr_stream(int fedai_id, bool perf_mode,
+void msm_pcm_routing_reg_phy_compr_stream(int fedai_id, int perf_mode,
 					  int dspst_id, int stream_type,
 					  uint32_t compr_passthr_mode)
 {
@@ -578,7 +578,7 @@ void msm_pcm_routing_reg_phy_stream(int fedai_id, int perf_mode,
 	mutex_unlock(&routing_lock);
 }
 
-void msm_pcm_routing_reg_phy_stream_v2(int fedai_id, bool perf_mode,
+void msm_pcm_routing_reg_phy_stream_v2(int fedai_id, int perf_mode,
 				       int dspst_id, int stream_type,
 				       struct msm_pcm_routing_evt event_info)
 {
@@ -1366,7 +1366,7 @@ static int msm_routing_ext_ec_put(struct snd_kcontrol *kcontrol,
 		msm_route_ext_ec_ref = AFE_PORT_INVALID;
 		break;
 	}
-	if (voc_set_ext_ec_ref(msm_route_ext_ec_ref, state)) {
+	if (!voc_set_ext_ec_ref(msm_route_ext_ec_ref, state)) {
 		mutex_unlock(&routing_lock);
 		snd_soc_dapm_mux_update_power(widget, kcontrol, mux, e);
 	} else {
@@ -3792,6 +3792,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"INTERNAL_BT_SCO_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
 	{"INTERNAL_BT_SCO_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
 	{"INTERNAL_BT_SCO_RX Audio Mixer", "MultiMedia9", "MM_DL9"},
+	{"INTERNAL_BT_SCO_RX Audio Mixer", "MultiMedia6", "MM_UL6"},
 	{"INTERNAL_BT_SCO_RX Audio Mixer", "MultiMedia10", "MM_DL10"},
 	{"INT_BT_SCO_RX", NULL, "INTERNAL_BT_SCO_RX Audio Mixer"},
 
@@ -3997,6 +3998,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"VOC_EXT_EC MUX", "TERT_MI2S_TX" , "TERT_MI2S_TX"},
 	{"VOC_EXT_EC MUX", "QUAT_MI2S_TX" , "QUAT_MI2S_TX"},
 	{"CS-VOICE_UL1", NULL, "VOC_EXT_EC MUX"},
+	{"VOIP_UL", NULL, "VOC_EXT_EC MUX"},
+	{"VoLTE_UL", NULL, "VOC_EXT_EC MUX"},
+	{"VOICE2_UL", NULL, "VOC_EXT_EC MUX"},
+
 	{"AUDIO_REF_EC_UL1 MUX", "PRI_MI2S_TX" , "PRI_MI2S_TX"},
 	{"AUDIO_REF_EC_UL1 MUX", "SEC_MI2S_TX" , "SEC_MI2S_TX"},
 	{"AUDIO_REF_EC_UL1 MUX", "TERT_MI2S_TX" , "TERT_MI2S_TX"},
@@ -4741,8 +4746,6 @@ static struct snd_soc_platform_driver msm_soc_routing_platform = {
 
 static int msm_routing_pcm_probe(struct platform_device *pdev)
 {
-	if (pdev->dev.of_node)
-		dev_set_name(&pdev->dev, "%s", "msm-pcm-routing");
 
 	dev_dbg(&pdev->dev, "dev name %s\n", dev_name(&pdev->dev));
 	return snd_soc_register_platform(&pdev->dev,

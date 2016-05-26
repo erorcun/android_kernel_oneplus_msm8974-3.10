@@ -30,6 +30,7 @@
 #include <soc/qcom/pm.h>
 #include <soc/qcom/rpm-notifier.h>
 #include <soc/qcom/event_timer.h>
+#include <trace/events/power.h>
 
 #define SCLK_HZ (32768)
 
@@ -119,6 +120,7 @@ module_param_named(
 static int msm_pm_sleep_time_override;
 module_param_named(sleep_time_override,
 	msm_pm_sleep_time_override, int, S_IRUGO | S_IWUSR | S_IWGRP);
+static uint64_t suspend_wake_time;
 
 static struct cpumask num_powered_cores;
 static struct hrtimer lpm_hrtimer;
@@ -326,11 +328,13 @@ static uint64_t lpm_get_system_sleep(bool from_idle, struct cpumask *mask)
 	if (tick_get_broadcast_device())
 		ed = tick_get_broadcast_device()->evtdev;
 
+	if (!suspend_wake_time)
+		suspend_wake_time =  msm_pm_sleep_time_override;
 	if (!from_idle) {
 		if (mask)
 			cpumask_copy(mask, cpumask_of(smp_processor_id()));
-		if (msm_pm_sleep_time_override)
-			us = USEC_PER_SEC * msm_pm_sleep_time_override;
+		if (suspend_wake_time)
+			us = USEC_PER_SEC * suspend_wake_time;
 		return us;
 	}
 
@@ -478,6 +482,21 @@ s32 msm_cpuidle_get_deep_idle_latency(void)
 		return level->pwr.latency_us;
 }
 
+void lpm_suspend_wake_time(uint64_t wakeup_time)
+{
+	if (wakeup_time <= 0) {
+		suspend_wake_time = msm_pm_sleep_time_override;
+		return;
+	}
+
+	if (msm_pm_sleep_time_override &&
+			(msm_pm_sleep_time_override < wakeup_time))
+			suspend_wake_time = msm_pm_sleep_time_override;
+	else
+			suspend_wake_time = wakeup_time;
+}
+EXPORT_SYMBOL(lpm_suspend_wake_time);
+
 static int lpm_cpu_callback(struct notifier_block *cpu_nb,
 	unsigned long action, void *hcpu)
 {
@@ -554,6 +573,11 @@ static int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 			if (!dev->cpu && msm_rpm_waiting_for_ack())
 				break;
 
+		if ((MSM_PM_SLEEP_MODE_POWER_COLLAPSE == mode)
+			&& (num_online_cpus() > 1)
+			&& !sys_state.allow_synched_levels)
+			continue;
+
 		lvl_latency_us = pwr_params->latency_us;
 
 		lvl_overhead_us = pwr_params->time_overhead_us;
@@ -587,7 +611,7 @@ static int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 		if (best_level_pwr >= pwr) {
 			best_level = i;
 			best_level_pwr = pwr;
-			if (next_event_us < sleep_us &&
+			if (next_event_us && next_event_us < sleep_us &&
 				(mode != MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT))
 				modified_time_us
 					= next_event_us - lvl_latency_us;
@@ -770,14 +794,23 @@ static int lpm_cpuidle_enter(struct cpuidle_device *dev,
 		return -EPERM;
 	}
 
+	trace_cpu_idle_rcuidle(idx, dev->cpu);
+
+	if (need_resched()) {
+		dev->last_residency = 0;
+		goto exit;
+	}
+
 	lpm_enter_low_power(&sys_state, idx, true);
 
 	time = ktime_to_ns(ktime_get()) - time;
 	do_div(time, 1000);
 	dev->last_residency = (int)time;
 
+exit:
 	local_irq_enable();
-	return index;
+	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
+	return idx;
 }
 
 /**

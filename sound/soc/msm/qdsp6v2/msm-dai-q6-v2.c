@@ -1260,6 +1260,27 @@ static struct snd_soc_dai_ops msm_dai_q6_ops = {
 	.set_channel_map = msm_dai_q6_set_channel_map,
 };
 
+/*
+ * For single CPU DAI registration, the dai id needs to be
+ * set explicitly in the dai probe as ASoC does not read
+ * the cpu->driver->id field rather it assigns the dai id
+ * from the device name that is in the form %s.%d. This dai
+ * id should be assigned to back-end AFE port id and used
+ * during dai prepare. For multiple dai registration, it
+ * is not required to call this function, however the dai->
+ * driver->id field must be defined and set to corresponding
+ * AFE Port id.
+ */
+static inline void msm_dai_q6_set_dai_id(struct snd_soc_dai *dai)
+{
+	if (!dai->driver->id) {
+		dev_warn(dai->dev, "DAI driver id is not set\n");
+		return;
+	}
+	dai->id = dai->driver->id;
+	return;
+}
+
 static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
 {
 	struct msm_dai_q6_dai_data *dai_data;
@@ -1282,6 +1303,8 @@ static int msm_dai_q6_dai_probe(struct snd_soc_dai *dai)
 		rc = -ENOMEM;
 	} else
 		dev_set_drvdata(dai->dev, dai_data);
+
+	msm_dai_q6_set_dai_id(dai);
 
 	rc = msm_dai_q6_dai_add_route(dai);
 	return rc;
@@ -1323,6 +1346,7 @@ static struct snd_soc_dai_driver msm_dai_q6_afe_rx_dai[] = {
 			.rate_max =	48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = RT_PROXY_DAI_001_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1338,6 +1362,7 @@ static struct snd_soc_dai_driver msm_dai_q6_afe_rx_dai[] = {
 			 .rate_max =	48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = RT_PROXY_DAI_002_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1357,6 +1382,7 @@ static struct snd_soc_dai_driver msm_dai_q6_afe_tx_dai[] = {
 			.rate_max =	48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = RT_PROXY_DAI_002_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1372,6 +1398,7 @@ static struct snd_soc_dai_driver msm_dai_q6_afe_tx_dai[] = {
 			.rate_max =	48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = RT_PROXY_DAI_001_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1389,6 +1416,7 @@ static struct snd_soc_dai_driver msm_dai_q6_bt_sco_rx_dai = {
 		.rate_min = 8000,
 	},
 	.ops = &msm_dai_q6_ops,
+	.id = INT_BT_SCO_RX,
 	.probe = msm_dai_q6_dai_probe,
 	.remove = msm_dai_q6_dai_remove,
 };
@@ -1405,6 +1433,7 @@ static struct snd_soc_dai_driver msm_dai_q6_bt_sco_tx_dai = {
 		.rate_min = 8000,
 	},
 	.ops = &msm_dai_q6_ops,
+	.id = INT_BT_SCO_TX,
 	.probe = msm_dai_q6_dai_probe,
 	.remove = msm_dai_q6_dai_remove,
 };
@@ -1422,6 +1451,7 @@ static struct snd_soc_dai_driver msm_dai_q6_fm_rx_dai = {
 		.rate_min = 8000,
 	},
 	.ops = &msm_dai_q6_ops,
+	.id = INT_FM_RX,
 	.probe = msm_dai_q6_dai_probe,
 	.remove = msm_dai_q6_dai_remove,
 };
@@ -1439,23 +1469,46 @@ static struct snd_soc_dai_driver msm_dai_q6_fm_tx_dai = {
 		.rate_min = 8000,
 	},
 	.ops = &msm_dai_q6_ops,
+	.id = INT_FM_TX,
 	.probe = msm_dai_q6_dai_probe,
 	.remove = msm_dai_q6_dai_remove,
 };
 
-static struct snd_soc_dai_driver msm_dai_q6_voice_playback_tx_dai = {
-	.playback = {
-		.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
-		SNDRV_PCM_RATE_16000,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE,
-		.channels_min = 1,
-		.channels_max = 2,
-		.rate_min =     8000,
-		.rate_max =     48000,
+static struct snd_soc_dai_driver msm_dai_q6_voc_playback_dai[] = {
+	{
+		.playback = {
+			.stream_name = "Voice Farend Playback",
+			.aif_name = "VOICE_PLAYBACK_TX",
+			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
+				 SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min =     8000,
+			.rate_max =     48000,
+		},
+		.ops = &msm_dai_q6_ops,
+		.id = VOICE_PLAYBACK_TX,
+		.probe = msm_dai_q6_dai_probe,
+		.remove = msm_dai_q6_dai_remove,
 	},
-	.ops = &msm_dai_q6_ops,
-	.probe = msm_dai_q6_dai_probe,
-	.remove = msm_dai_q6_dai_remove,
+	{
+		.playback = {
+			.stream_name = "Voice2 Farend Playback",
+			.aif_name = "VOICE2_PLAYBACK_TX",
+			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
+				 SNDRV_PCM_RATE_16000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min =     8000,
+			.rate_max =     48000,
+		},
+		.ops = &msm_dai_q6_ops,
+		.id = VOICE2_PLAYBACK_TX,
+		.probe = msm_dai_q6_dai_probe,
+		.remove = msm_dai_q6_dai_remove,
+	},
 };
 
 static struct snd_soc_dai_driver msm_dai_q6_incall_record_dai[] = {
@@ -1472,6 +1525,7 @@ static struct snd_soc_dai_driver msm_dai_q6_incall_record_dai[] = {
 			.rate_max =     48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = VOICE_RECORD_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1488,6 +1542,7 @@ static struct snd_soc_dai_driver msm_dai_q6_incall_record_dai[] = {
 			.rate_max =     48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = VOICE_RECORD_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1625,7 +1680,6 @@ static int msm_auxpcm_dev_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&dai_data->rlock);
-	dev_set_name(&pdev->dev, "%s.%d", "msm-dai-q6-auxpcm", pdev->id);
 	dev_dbg(&pdev->dev, "dev name %s\n", dev_name(&pdev->dev));
 
 	dev_set_drvdata(&pdev->dev, dai_data);
@@ -1691,13 +1745,15 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai[] = {
 			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
 			SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_96000 |
 			SNDRV_PCM_RATE_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE,
 			.channels_min = 1,
 			.channels_max = 8,
 			.rate_min = 8000,
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_0_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1708,13 +1764,15 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai[] = {
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
 			SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
 			SNDRV_PCM_RATE_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE,
 			.channels_min = 1,
 			.channels_max = 2,
 			.rate_min = 8000,
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_1_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1725,13 +1783,15 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai[] = {
 			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
 			SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_96000 |
 			SNDRV_PCM_RATE_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE,
 			.channels_min = 1,
 			.channels_max = 8,
 			.rate_min = 8000,
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_2_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1742,13 +1802,15 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai[] = {
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
 			SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
 			SNDRV_PCM_RATE_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE,
 			.channels_min = 1,
 			.channels_max = 2,
 			.rate_min = 8000,
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_3_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1759,13 +1821,15 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai[] = {
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
 			SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 |
 			SNDRV_PCM_RATE_192000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE |
+				SNDRV_PCM_FMTBIT_S24_LE,
 			.channels_min = 1,
 			.channels_max = 2,
 			.rate_min = 8000,
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_4_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1784,6 +1848,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_rx_dai[] = {
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_6_RX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1804,6 +1869,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_0_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1820,6 +1886,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_1_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1837,6 +1904,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_2_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1853,6 +1921,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_3_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1869,6 +1938,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_4_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1886,6 +1956,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 192000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_5_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1902,6 +1973,7 @@ static struct snd_soc_dai_driver msm_dai_q6_slimbus_tx_dai[] = {
 			.rate_max = 48000,
 		},
 		.ops = &msm_dai_q6_ops,
+		.id = SLIMBUS_6_TX,
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
@@ -1959,18 +2031,22 @@ static int msm_dai_q6_dai_mi2s_probe(struct snd_soc_dai *dai)
 {
 	struct msm_dai_q6_mi2s_dai_data *mi2s_dai_data =
 			dev_get_drvdata(dai->dev);
+	struct msm_mi2s_pdata *mi2s_pdata =
+			(struct msm_mi2s_pdata *) dai->dev->platform_data;
 	struct snd_kcontrol *kcontrol = NULL;
 	int rc = 0;
 	const struct snd_kcontrol_new *ctrl = NULL;
 
+	dai->id = mi2s_pdata->intf_id;
+
 	if (mi2s_dai_data->rx_dai.mi2s_dai_data.port_config.i2s.channel_mode) {
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.0", 17))
+		if (dai->id == MSM_PRIM_MI2S)
 			ctrl = &mi2s_config_controls[0];
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.1", 17))
+		if (dai->id == MSM_SEC_MI2S)
 			ctrl = &mi2s_config_controls[1];
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.2", 17))
+		if (dai->id == MSM_TERT_MI2S)
 			ctrl = &mi2s_config_controls[2];
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.3", 17))
+		if (dai->id == MSM_QUAT_MI2S)
 			ctrl = &mi2s_config_controls[3];
 	}
 
@@ -1988,13 +2064,13 @@ static int msm_dai_q6_dai_mi2s_probe(struct snd_soc_dai *dai)
 
 	ctrl = NULL;
 	if (mi2s_dai_data->tx_dai.mi2s_dai_data.port_config.i2s.channel_mode) {
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.0", 17))
+		if (dai->id == MSM_PRIM_MI2S)
 			ctrl = &mi2s_config_controls[4];
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.1", 17))
+		if (dai->id == MSM_SEC_MI2S)
 			ctrl = &mi2s_config_controls[5];
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.2", 17))
+		if (dai->id == MSM_TERT_MI2S)
 			ctrl = &mi2s_config_controls[6];
-		if (!strncmp(dai->name, "msm-dai-q6-mi2s.3", 17))
+		if (dai->id == MSM_QUAT_MI2S)
 			ctrl = &mi2s_config_controls[7];
 	}
 
@@ -2367,6 +2443,7 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 			.rate_max =     48000,
 		},
 		.ops = &msm_dai_q6_mi2s_ops,
+		.id = MSM_PRIM_MI2S,
 		.probe = msm_dai_q6_dai_mi2s_probe,
 		.remove = msm_dai_q6_dai_mi2s_remove,
 	},
@@ -2390,6 +2467,7 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 			.rate_max =     48000,
 		},
 		.ops = &msm_dai_q6_mi2s_ops,
+		.id = MSM_SEC_MI2S,
 		.probe = msm_dai_q6_dai_mi2s_probe,
 		.remove = msm_dai_q6_dai_mi2s_remove,
 	},
@@ -2413,6 +2491,7 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 			.rate_max =     48000,
 		},
 		.ops = &msm_dai_q6_mi2s_ops,
+		.id = MSM_TERT_MI2S,
 		.probe = msm_dai_q6_dai_mi2s_probe,
 		.remove = msm_dai_q6_dai_mi2s_remove,
 	},
@@ -2436,6 +2515,7 @@ static struct snd_soc_dai_driver msm_dai_q6_mi2s_dai[] = {
 			.rate_max =     48000,
 		},
 		.ops = &msm_dai_q6_mi2s_ops,
+		.id = MSM_QUAT_MI2S,
 		.probe = msm_dai_q6_dai_mi2s_probe,
 		.remove = msm_dai_q6_dai_mi2s_remove,
 	},
@@ -2615,7 +2695,6 @@ static int msm_dai_q6_mi2s_dev_probe(struct platform_device *pdev)
 		goto rtn;
 	}
 
-	dev_set_name(&pdev->dev, "%s.%d", "msm-dai-q6-mi2s", mi2s_intf);
 	pdev->id = mi2s_intf;
 
 	mi2s_pdata = kzalloc(sizeof(struct msm_mi2s_pdata), GFP_KERNEL);
@@ -2644,6 +2723,7 @@ static int msm_dai_q6_mi2s_dev_probe(struct platform_device *pdev)
 		dev_name(&pdev->dev), rx_line, tx_line);
 	mi2s_pdata->rx_sd_lines = rx_line;
 	mi2s_pdata->tx_sd_lines = tx_line;
+	mi2s_pdata->intf_id = mi2s_intf;
 
 	dai_data = kzalloc(sizeof(struct msm_dai_q6_mi2s_dai_data),
 			   GFP_KERNEL);
@@ -2702,7 +2782,6 @@ static int msm_dai_q6_dev_probe(struct platform_device *pdev)
 	}
 
 	pdev->id = id;
-	dev_set_name(&pdev->dev, "%s.%d", "msm-dai-q6-dev", id);
 
 	pr_debug("%s: dev name %s, id:%d\n", __func__,
 		 dev_name(&pdev->dev), pdev->id);
@@ -2842,9 +2921,26 @@ register_afe_capture:
 			__func__, stream_name);
 		break;
 	case VOICE_PLAYBACK_TX:
+		strlcpy(stream_name, "Voice Farend Playback", 80);
+		goto register_voice_playback;
 	case VOICE2_PLAYBACK_TX:
-		rc = snd_soc_register_component(&pdev->dev, &msm_dai_q6_component,
-		&msm_dai_q6_voice_playback_tx_dai, 1);
+		strlcpy(stream_name, "Voice2 Farend Playback", 80);
+register_voice_playback:
+		rc = -ENODEV;
+		len = strnlen(stream_name , 80);
+		for (i = 0; i < ARRAY_SIZE(msm_dai_q6_voc_playback_dai); i++) {
+			if (msm_dai_q6_voc_playback_dai[i].playback.stream_name
+			    && !strcmp(stream_name,
+			 msm_dai_q6_voc_playback_dai[i].playback.stream_name)) {
+				rc = snd_soc_register_component(&pdev->dev,
+					&msm_dai_q6_component,
+					&msm_dai_q6_voc_playback_dai[i], 1);
+				break;
+			}
+		}
+		if (rc)
+			pr_err("%s Device not found stream name %s\n",
+			       __func__, stream_name);
 		break;
 	case VOICE_RECORD_RX:
 		strlcpy(stream_name, "Voice Downlink Capture", 80);
@@ -2990,7 +3086,6 @@ static int msm_dai_q6_spdif_dev_probe(struct platform_device *pdev)
 	int rc;
 
 	pdev->id = AFE_PORT_ID_SPDIF_RX;
-	dev_set_name(&pdev->dev, "%s", "msm-dai-q6-spdif");
 
 	pr_debug("%s: dev name %s, id:%d\n", __func__,
 			dev_name(&pdev->dev), pdev->id);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,12 +11,15 @@
  *
  */
 
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
+#ifndef _ANDROID_ASHMEM_H
+#define _ANDROID_ASHMEM_H
 
-int msm_show_resume_irq_mask = 1;
+#include <linux/compat.h>
 
-module_param_named(
-	debug_mask, msm_show_resume_irq_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
-);
+/* support of 32bit userspace on 64bit platforms */
+#ifdef CONFIG_COMPAT
+#define COMPAT_ASHMEM_SET_SIZE		_IOW(__ASHMEMIOC, 3, compat_size_t)
+#define COMPAT_ASHMEM_SET_PROT_MASK	_IOW(__ASHMEMIOC, 5, unsigned int)
+#endif
+
+#endif

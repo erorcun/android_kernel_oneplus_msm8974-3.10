@@ -29,7 +29,6 @@
 #include <linux/device.h>
 #include <linux/notifier.h>
 #include <linux/slab.h>
-#include <linux/workqueue.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -78,6 +77,7 @@ struct msm_rpm_driver_data {
 static ATOMIC_NOTIFIER_HEAD(msm_rpm_sleep_notifier);
 static bool standalone;
 static int probe_status = -EPROBE_DEFER;
+static int msm_rpm_read_smd_data(char *buf);
 
 int msm_rpm_register_notifier(struct notifier_block *nb)
 {
@@ -88,8 +88,6 @@ int msm_rpm_unregister_notifier(struct notifier_block *nb)
 {
 	return atomic_notifier_chain_unregister(&msm_rpm_sleep_notifier, nb);
 }
-
-static struct workqueue_struct *msm_rpm_smd_wq;
 
 enum {
 	MSM_RPM_MSG_REQUEST_TYPE = 0,
@@ -393,12 +391,27 @@ static struct msm_rpm_driver_data msm_rpm_data = {
 	.smd_open = COMPLETION_INITIALIZER(msm_rpm_data.smd_open),
 };
 
+/*
+ * Returns
+ *	= 0 on successful reads
+ *	> 0 on successful reads with no further data
+ *	standard Linux error codes on failure.
+ */
+static int msm_rpm_read_sleep_ack(void)
+{
+	int ret;
+	char buf[MAX_ERR_BUFFER_SIZE] = {0};
+
+	ret = msm_rpm_read_smd_data(buf);
+	if (!ret)
+		ret = smd_is_pkt_avail(msm_rpm_data.ch_info);
+	return ret;
+}
+
 static int msm_rpm_flush_requests(bool print)
 {
 	struct rb_node *t;
 	int ret;
-	int pkt_sz;
-	char buf[MAX_ERR_BUFFER_SIZE] = {0};
 	int count = 0;
 
 	for (t = rb_first(&tr_root); t; t = rb_next(t)) {
@@ -433,36 +446,12 @@ static int msm_rpm_flush_requests(bool print)
 		 * process these sleep set acks.
 		 */
 		if (count >= MAX_WAIT_ON_ACK) {
-			int len;
-			int timeout = 10;
+			int ret = msm_rpm_read_sleep_ack();
 
-			while (timeout) {
-				if (smd_is_pkt_avail(msm_rpm_data.ch_info))
-					break;
-				/*
-				 * Sleep for 50us at a time before checking
-				 * for packet availability. The 50us is based
-				 * on the the time rpm could take to process
-				 * and send an ack for the sleep set request.
-				 */
-				udelay(50);
-				timeout--;
-			}
-			/*
-			 * On timeout return an error and exit the spinlock
-			 * control on this cpu. This will allow any other
-			 * core that has wokenup and trying to acquire the
-			 * spinlock from being locked out.
-			 */
-			if (!timeout) {
-				pr_err("%s: Timed out waiting for RPM ACK\n",
-					__func__);
-				return -EAGAIN;
-			}
-
-			pkt_sz = smd_cur_packet_size(msm_rpm_data.ch_info);
-			len = smd_read(msm_rpm_data.ch_info, buf, pkt_sz);
-			count--;
+			if (ret >= 0)
+				count--;
+			else
+				return ret;
 		}
 	}
 	return 0;
@@ -504,6 +493,8 @@ struct msm_rpm_ack_msg {
 };
 
 LIST_HEAD(msm_rpm_ack_list);
+
+static struct tasklet_struct data_tasklet;
 
 static DECLARE_COMPLETION(data_ready);
 
@@ -701,7 +692,7 @@ static void msm_rpm_notify(void *data, unsigned event)
 
 	switch (event) {
 	case SMD_EVENT_DATA:
-		complete(&data_ready);
+		tasklet_schedule(&data_tasklet);
 		break;
 	case SMD_EVENT_OPEN:
 		complete(&pdata->smd_open);
@@ -891,25 +882,21 @@ static int msm_rpm_read_smd_data(char *buf)
 	return 0;
 }
 
-static void msm_rpm_smd_work(struct work_struct *work)
+static void data_fn_tasklet(unsigned long data)
 {
 	uint32_t msg_id;
 	int errno;
 	char buf[MAX_ERR_BUFFER_SIZE] = {0};
 
-	while (1) {
-		wait_for_completion(&data_ready);
-
-		spin_lock(&msm_rpm_data.smd_lock_read);
-		while (smd_is_pkt_avail(msm_rpm_data.ch_info)) {
-			if (msm_rpm_read_smd_data(buf))
-				break;
-			msg_id = msm_rpm_get_msg_id_from_ack(buf);
-			errno = msm_rpm_get_error_from_ack(buf);
-			msm_rpm_process_ack(msg_id, errno);
-		}
-		spin_unlock(&msm_rpm_data.smd_lock_read);
+	spin_lock(&msm_rpm_data.smd_lock_read);
+	while (smd_is_pkt_avail(msm_rpm_data.ch_info)) {
+		if (msm_rpm_read_smd_data(buf))
+			break;
+		msg_id = msm_rpm_get_msg_id_from_ack(buf);
+		errno = msm_rpm_get_error_from_ack(buf);
+		msm_rpm_process_ack(msg_id, errno);
 	}
+	spin_unlock(&msm_rpm_data.smd_lock_read);
 }
 
 static void msm_rpm_log_request(struct msm_rpm_request *cdata)
@@ -1291,7 +1278,7 @@ wait_ack_cleanup:
 	spin_unlock_irqrestore(&msm_rpm_data.smd_lock_read, flags);
 
 	if (smd_is_pkt_avail(msm_rpm_data.ch_info))
-		complete(&data_ready);
+		tasklet_schedule(&data_tasklet);
 	return rc;
 }
 EXPORT_SYMBOL(msm_rpm_wait_for_ack_noirq);
@@ -1378,8 +1365,14 @@ EXPORT_SYMBOL(msm_rpm_enter_sleep);
  */
 void msm_rpm_exit_sleep(void)
 {
+	int ret;
+
 	if (standalone)
 		return;
+
+	do  {
+		ret =  msm_rpm_read_sleep_ack();
+	} while (ret > 0);
 
 	smd_mask_receive_interrupt(msm_rpm_data.ch_info, false, NULL);
 }
@@ -1431,20 +1424,11 @@ static int msm_rpm_dev_probe(struct platform_device *pdev)
 
 	spin_lock_init(&msm_rpm_data.smd_lock_write);
 	spin_lock_init(&msm_rpm_data.smd_lock_read);
-	INIT_WORK(&msm_rpm_data.work, msm_rpm_smd_work);
+	tasklet_init(&data_tasklet, data_fn_tasklet, 0);
 
 	wait_for_completion(&msm_rpm_data.smd_open);
 
 	smd_disable_read_intr(msm_rpm_data.ch_info);
-
-	msm_rpm_smd_wq = alloc_workqueue("rpm-smd",
-			WQ_UNBOUND | WQ_MEM_RECLAIM | WQ_HIGHPRI, 1);
-	if (!msm_rpm_smd_wq) {
-		pr_err("%s: Unable to alloc rpm-smd workqueue\n", __func__);
-		ret = -EINVAL;
-		goto fail;
-	}
-	queue_work(msm_rpm_smd_wq, &msm_rpm_data.work);
 
 	probe_status = ret;
 skip_smd_init:

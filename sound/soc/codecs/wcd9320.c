@@ -3795,7 +3795,7 @@ static int taiko_codec_enable_anc(struct snd_soc_dapm_widget *w,
 			snd_soc_write(codec, reg, (old_val & ~mask) |
 				(val & mask));
 		}
-		release_firmware(fw);
+
 		if (!hwdep_cal)
 			release_firmware(fw);
 		break;
@@ -5185,7 +5185,7 @@ static int taiko_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_codec *codec = dai->codec;
 	struct taiko_priv *taiko = snd_soc_codec_get_drvdata(dai->codec);
-	u8 tx_fs_rate, rx_fs_rate;
+	u8 tx_fs_rate, rx_fs_rate, i2s_bit_mode;
 	u32 compander_fs;
 	int ret;
 
@@ -5242,26 +5242,33 @@ static int taiko_hw_params(struct snd_pcm_substream *substream,
 			}
 		}
 
+		taiko->dai[dai->id].rate   = params_rate(params);
+
+		switch (params_format(params)) {
+		case SNDRV_PCM_FORMAT_S16_LE:
+			i2s_bit_mode = 0x01;
+			taiko->dai[dai->id].bit_width = 16;
+			break;
+		case SNDRV_PCM_FORMAT_S24_LE:
+			taiko->dai[dai->id].bit_width = 24;
+			i2s_bit_mode = 0x00;
+			break;
+		case SNDRV_PCM_FORMAT_S32_LE:
+			taiko->dai[dai->id].bit_width = 32;
+			i2s_bit_mode = 0x00;
+			break;
+		default:
+			dev_err(codec->dev,
+				"%s: Invalid format 0x%x\n",
+				 __func__, params_format(params));
+			return -EINVAL;
+		}
+
 		if (taiko->intf_type == WCD9XXX_INTERFACE_TYPE_I2C) {
-			switch (params_format(params)) {
-			case SNDRV_PCM_FORMAT_S16_LE:
-				snd_soc_update_bits(codec,
-					TAIKO_A_CDC_CLK_TX_I2S_CTL,
-					0x20, 0x20);
-				break;
-			case SNDRV_PCM_FORMAT_S32_LE:
-				snd_soc_update_bits(codec,
-					TAIKO_A_CDC_CLK_TX_I2S_CTL,
-					0x20, 0x00);
-				break;
-			default:
-				pr_err("invalid format\n");
-				break;
-			}
+			snd_soc_update_bits(codec, TAIKO_A_CDC_CLK_TX_I2S_CTL,
+					    0x20, i2s_bit_mode << 5);
 			snd_soc_update_bits(codec, TAIKO_A_CDC_CLK_TX_I2S_CTL,
 					    0x07, tx_fs_rate);
-		} else {
-			taiko->dai[dai->id].rate   = params_rate(params);
 		}
 		break;
 
@@ -5678,7 +5685,9 @@ static int taiko_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 						dai->grph);
 		if (!dai->bus_down_in_recovery)
 			ret = taiko_codec_enable_slim_chmask(dai, false);
-
+		else
+			pr_debug("%s: bus in recovery skip enable slim_chmask",
+					__func__);
 		if (ret < 0) {
 			ret = wcd9xxx_disconnect_port(core,
 						      &dai->wcd9xxx_ch_list,
@@ -5686,7 +5695,6 @@ static int taiko_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 			pr_debug("%s: Disconnect RX port, ret = %d\n",
 				 __func__, ret);
 		}
-		dai->bus_down_in_recovery = false;
 		break;
 	}
 	return ret;
@@ -5763,7 +5771,6 @@ static int taiko_codec_enable_slimvi_feedback(struct snd_soc_dapm_widget *w,
 		snd_soc_update_bits(codec, TAIKO_A_SPKR_PROT_EN,
 				0x88, 0x00);
 
-		dai->bus_down_in_recovery = false;
 		break;
 	}
 out_vi:
@@ -5817,7 +5824,6 @@ static int taiko_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 				 __func__, ret);
 		}
 
-		dai->bus_down_in_recovery = false;
 		break;
 	}
 	return ret;
@@ -7210,11 +7216,16 @@ static void taiko_init_slim_slave_cfg(struct snd_soc_codec *codec)
 
 static int taiko_device_down(struct wcd9xxx *wcd9xxx)
 {
+	int count;
 	struct snd_soc_codec *codec;
+	struct taiko_priv *taiko;
 
 	codec = (struct snd_soc_codec *)(wcd9xxx->ssr_priv);
 	snd_soc_card_change_online_state(codec->card, 0);
+	taiko = snd_soc_codec_get_drvdata(codec);
 
+	for (count = 0; count < NUM_CODEC_DAIS; count++)
+		taiko->dai[count].bus_down_in_recovery = true;
 	return 0;
 }
 
@@ -7438,7 +7449,6 @@ static int taiko_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	struct snd_soc_codec *codec;
 	struct taiko_priv *taiko;
 	int rco_clk_rate;
-	int count;
 
 	codec = (struct snd_soc_codec *)(wcd9xxx->ssr_priv);
 	taiko = snd_soc_codec_get_drvdata(codec);
@@ -7510,9 +7520,6 @@ static int taiko_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	ret = taiko_setup_irqs(taiko);
 	if (ret)
 		pr_err("%s: Failed to setup irq: %d\n", __func__, ret);
-
-	for (count = 0; count < NUM_CODEC_DAIS; count++)
-		taiko->dai[count].bus_down_in_recovery = true;
 
 	mutex_unlock(&codec->mutex);
 	return ret;
