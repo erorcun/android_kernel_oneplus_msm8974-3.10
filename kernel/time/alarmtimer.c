@@ -25,7 +25,7 @@
 #include <linux/posix-timers.h>
 #include <linux/workqueue.h>
 #include <linux/freezer.h>
-#include "lpm-levels.h"
+//#include "lpm-levels.h"
 
 #define ALARM_DELTA 120
 
@@ -329,6 +329,7 @@ ktime_t alarm_expires_remaining(const struct alarm *alarm)
  * will wake us from suspend.
  */
 #if defined(CONFIG_RTC_DRV_QPNP) && defined(CONFIG_MSM_PM)
+extern void lpm_suspend_wake_time(uint64_t wakeup_time);
 static int alarmtimer_suspend(struct device *dev)
 {
 	struct rtc_time tm;
@@ -731,9 +732,6 @@ static int alarm_timer_create(struct k_itimer *new_timer)
 	if (!alarmtimer_get_rtcdev())
 		return -ENOTSUPP;
 
-	if (flags & ~TIMER_ABSTIME)
-		return -EINVAL;
-
 	if (!capable(CAP_WAKE_ALARM))
 		return -EPERM;
 
@@ -953,6 +951,9 @@ static int alarm_timer_nsleep(const clockid_t which_clock, int flags,
 
 	if (!alarmtimer_get_rtcdev())
 		return -ENOTSUPP;
+
+	if (flags & ~TIMER_ABSTIME)
+		return -EINVAL;
 
 	if (!capable(CAP_WAKE_ALARM))
 		return -EPERM;
