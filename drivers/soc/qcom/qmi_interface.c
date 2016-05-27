@@ -49,6 +49,7 @@ struct qmi_notify_event_work {
 	struct work_struct work;
 };
 static void qmi_notify_event_worker(struct work_struct *work);
+static void clean_txn_info(struct qmi_handle *handle);
 
 #define HANDLE_HASH_TBL_SZ 1
 static DEFINE_HASHTABLE(handle_hash_tbl, HANDLE_HASH_TBL_SZ);
@@ -531,6 +532,10 @@ static int handle_rmv_server(struct qmi_handle *handle,
 	svc_addr = (struct msm_ipc_addr *)(handle->dest_info);
 	if (svc_addr->addr.port_addr.node_id == ctl_msg->srv.node_id &&
 	    svc_addr->addr.port_addr.port_id == ctl_msg->srv.port_id) {
+		/* Wakeup any threads waiting for the response */
+		handle->handle_reset = 1;
+		clean_txn_info(handle);
+
 		spin_lock_irqsave(&handle->notify_lock, flags);
 		handle->notify(handle, QMI_SERVER_EXIT, handle->notify_priv);
 		spin_unlock_irqrestore(&handle->notify_lock, flags);
