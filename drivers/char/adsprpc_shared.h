@@ -21,7 +21,6 @@
 #define FASTRPC_IOCTL_MUNMAP  _IOWR('R', 3, struct fastrpc_ioctl_munmap)
 #define FASTRPC_IOCTL_INVOKE_FD  _IOWR('R', 4, struct fastrpc_ioctl_invoke_fd)
 #define FASTRPC_IOCTL_SETMODE    _IOWR('R', 5, uint32_t)
-#define FASTRPC_IOCTL_INIT       _IOWR('R', 6, struct fastrpc_ioctl_init)
 #define FASTRPC_SMD_GUID "fastrpcsmd-apps-dsp"
 #define DEVICE_NAME      "adsprpc-smd"
 
@@ -30,10 +29,6 @@
 
 /* Driver should operate in serial mode with the co-processor */
 #define FASTRPC_MODE_SERIAL      1
-
-/* INIT a new process or attach to guestos */
-#define FASTRPC_INIT_ATTACH      0
-#define FASTRPC_INIT_CREATE      1
 
 /* Retrives number of input buffers from the scalars parameter */
 #define REMOTE_SCALARS_INBUFS(sc)        (((sc) >> 16) & 0x0ff)
@@ -112,16 +107,6 @@ struct fastrpc_ioctl_invoke_fd {
 	int *fds;		/* fd list */
 };
 
-struct fastrpc_ioctl_init {
-	uint32_t flags;		/* one of FASTRPC_INIT_* macros */
-	uintptr_t __user file;	/* pointer to elf file */
-	int32_t filelen;	/* elf file length */
-	int32_t filefd;		/* ION fd for the file */
-	uintptr_t __user mem;	/* mem for the PD */
-	int32_t memlen;		/* mem length */
-	int32_t memfd;		/* ION fd for the mem */
-};
-
 struct fastrpc_ioctl_munmap {
 	uintptr_t vaddrout;	/* address to unmap */
 	ssize_t size;		/* size */
@@ -143,7 +128,7 @@ struct smq_null_invoke {
 };
 
 struct smq_phy_page {
-	unsigned long addr;	/* physical address */
+	ion_phys_addr_t addr;	/* physical address */
 	ssize_t size;		/* size of contiguous region */
 };
 
