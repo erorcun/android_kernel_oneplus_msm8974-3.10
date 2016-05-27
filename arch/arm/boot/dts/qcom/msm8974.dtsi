@@ -158,6 +158,21 @@
 			reg = <0 0xC04000>;
 			label = "audio_mem";
 		};
+
+		peripheral_mem: peripheral_region@5d00000 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0x5d00000 0x7d00000>;
+			label = "peripheral_mem";
+		};
+
+		external_image_mem: external_image_region@fa00000 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0xfa00000 0x500000>;
+		};
 	};
 
 	soc: soc { };
@@ -1728,6 +1743,7 @@
 
 		/* GPIO output to lpass */
 		qcom,gpio-force-stop = <&smp2pgpio_ssr_smp2p_2_out 0 0>;
+		linux,contiguous-region = <&peripheral_mem>;
 	};
 
 	qcom,msm-adsp-loader {
@@ -2004,6 +2020,7 @@
 
 		/* GPIO output to mss */
 		qcom,gpio-force-stop = <&smp2pgpio_ssr_smp2p_1_out 0 0>;
+		linux,contiguous-region = <&peripheral_mem>;
 	};
 
 	qcom,pronto@fb21b000 {
@@ -2025,6 +2042,7 @@
 
 		/* GPIO output to wcnss */
 		qcom,gpio-force-stop = <&smp2pgpio_ssr_smp2p_4_out 0 0>;
+		linux,contiguous-region = <&peripheral_mem>;
 	};
 
 	qcom,iris-fm {
@@ -2165,6 +2183,7 @@
 		qcom,pas-id = <9>;
 		qcom,proxy-timeout-ms = <2000>;
 		qcom,firmware-name = "venus";
+		linux,contiguous-region = <&peripheral_mem>;
 	};
 
 	qcom,cache_erp@f9012000 {
@@ -2392,11 +2411,11 @@
 		qcom,rx-ring-size = <64>;
 	};
 
-        memory_hole: qcom,msm-mem-hole {
+/*        memory_hole: qcom,msm-mem-hole {
                 compatible = "qcom,msm-mem-hole";
                 qcom,memblock-remove = <0x5d00000 0x7d00000
-					0xfa00000 0x500000>; /* Address and Size of Hole */
-        };
+					0xfa00000 0x500000>; 
+        }; */
 
 	uart7: uart@f995d000 { /*BLSP #2, UART #7 */
 		compatible = "qcom,msm-hsuart-v14";
