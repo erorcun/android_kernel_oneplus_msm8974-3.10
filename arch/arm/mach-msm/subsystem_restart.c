@@ -432,7 +432,7 @@ static void notify_each_subsys_device(struct subsys_device **list,
 
 		notif_data.crashed = subsys_get_crash_status(dev);
 		notif_data.enable_ramdump = enable_ramdumps;
-		notif_data.no_auth = dev->desc->no_auth;
+		notif_data.no_auth = 0; //dev->desc->no_auth;
 		notif_data.pdev = pdev;
 
 		subsys_notif_queue_notification(dev->notify, notif,
