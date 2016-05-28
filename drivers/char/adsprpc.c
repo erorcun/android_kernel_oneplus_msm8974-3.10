@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  *
  */
+#include "adsprpc_shared.h"
 
 #include <linux/slab.h>
 #include <linux/completion.h>
@@ -33,8 +34,6 @@
 #include <linux/dma-buf.h>
 #include <linux/iommu.h>
 #include <linux/kref.h>
-#include "adsprpc_shared.h"
-#include "adsprpc_compat.h"
 
 #ifndef ION_ADSPRPC_HEAP_ID
 #define ION_ADSPRPC_HEAP_ID ION_AUDIO_HEAP_ID
@@ -61,22 +60,22 @@
 
 #define IS_CACHE_ALIGNED(x) (((x) & ((L1_CACHE_BYTES)-1)) == 0)
 
-static inline uintptr_t buf_page_start(void *buf)
+static inline uint32_t buf_page_start(void *buf)
 {
-	uintptr_t start = (uintptr_t) buf & PAGE_MASK;
+	uint32_t start = (uint32_t) buf & PAGE_MASK;
 	return start;
 }
 
-static inline uintptr_t buf_page_offset(void *buf)
+static inline uint32_t buf_page_offset(void *buf)
 {
-	uintptr_t offset = (uintptr_t) buf & (PAGE_SIZE - 1);
+	uint32_t offset = (uint32_t) buf & (PAGE_SIZE - 1);
 	return offset;
 }
 
-static inline int buf_num_pages(void *buf, ssize_t len)
+static inline int buf_num_pages(void *buf, int len)
 {
-	uintptr_t start = buf_page_start(buf) >> PAGE_SHIFT;
-	uintptr_t end = (((uintptr_t) buf + len - 1) & PAGE_MASK) >> PAGE_SHIFT;
+	uint32_t start = buf_page_start(buf) >> PAGE_SHIFT;
+	uint32_t end = (((uint32_t) buf + len - 1) & PAGE_MASK) >> PAGE_SHIFT;
 	int nPages = end - start + 1;
 	return nPages;
 }
@@ -87,13 +86,12 @@ static inline uint32_t buf_page_size(uint32_t size)
 	return sz > PAGE_SIZE ? sz : PAGE_SIZE;
 }
 
-static inline int buf_get_pages(void *addr, ssize_t sz, int nr_pages,
-				int access, struct smq_phy_page *pages,
-				int nr_elems)
+static inline int buf_get_pages(void *addr, int sz, int nr_pages, int access,
+				  struct smq_phy_page *pages, int nr_elems)
 {
 	struct vm_area_struct *vma, *vmaend;
-	uintptr_t start = buf_page_start(addr);
-	uintptr_t end = buf_page_start((void *)((uintptr_t)addr + sz - 1));
+	uint32_t start = buf_page_start(addr);
+	uint32_t end = buf_page_start((void *)((uint32_t)addr + sz - 1));
 	uint32_t len = nr_pages << PAGE_SHIFT;
 	unsigned long pfn, pfnend;
 	int n = -1, err = 0;
@@ -121,9 +119,6 @@ static inline int buf_get_pages(void *addr, ssize_t sz, int nr_pages,
 	VERIFY(err, nr_elems > 0);
 	if (err)
 		goto bail;
-	VERIFY(err, __pfn_to_phys(pfnend) <= UINT_MAX);
-	if (err)
-		goto bail;
 	pages->addr = __pfn_to_phys(pfn);
 	pages->size = len;
 	n++;
@@ -135,7 +130,7 @@ struct fastrpc_buf {
 	struct ion_handle *handle;
 	void *virt;
 	ion_phys_addr_t phys;
-	ssize_t size;
+	int size;
 	int used;
 };
 
@@ -147,7 +142,6 @@ struct smq_invoke_ctx {
 	int retval;
 	int cid;
 	int pid;
-	int tgid;
 	remote_arg_t *pra;
 	remote_arg_t *rpra;
 	struct fastrpc_buf obuf;
@@ -190,7 +184,6 @@ struct fastrpc_apps {
 	struct class *class;
 	struct mutex smd_mutex;
 	dev_t dev_no;
-	int compat;
 	spinlock_t wrlock;
 	spinlock_t hlock;
 	struct hlist_head htbl[RPC_HASH_SZ];
@@ -201,9 +194,9 @@ struct fastrpc_mmap {
 	struct ion_handle *handle;
 	void *virt;
 	ion_phys_addr_t phys;
-	uintptr_t *vaddrin;
-	uintptr_t vaddrout;
-	ssize_t size;
+	uint32_t vaddrin;
+	uint32_t vaddrout;
+	int size;
 };
 
 struct file_data {
@@ -369,7 +362,6 @@ static int context_alloc(struct fastrpc_apps *me, uint32_t kernel,
 		goto bail;
 
 	INIT_HLIST_NODE(&ctx->hn);
-	hlist_add_fake(&ctx->hn);
 	ctx->pra = (remote_arg_t *)(&ctx[1]);
 	ctx->fds = invokefd->fds == 0 ? 0 : (int *)(&ctx->pra[bufs]);
 	ctx->handles = invokefd->fds == 0 ? 0 :
@@ -398,7 +390,6 @@ static int context_alloc(struct fastrpc_apps *me, uint32_t kernel,
 	ctx->retval = -1;
 	ctx->cid = cid;
 	ctx->pid = current->pid;
-	ctx->tgid = current->tgid;
 	ctx->apps = me;
 	init_completion(&ctx->work);
 	spin_lock(&clst->hlock);
@@ -514,9 +505,8 @@ static int get_page_list(uint32_t kernel, struct smq_invoke_ctx *ctx, int cid)
 	struct fastrpc_buf *ibuf = &ctx->dev->buf;
 	struct fastrpc_buf *obuf = &ctx->obuf;
 	remote_arg_t *pra = ctx->pra;
-	ssize_t rlen;
 	uint32_t sc = ctx->sc;
-	int i, err = 0;
+	int i, rlen, err = 0;
 	int inbufs = REMOTE_SCALARS_INBUFS(sc);
 	int outbufs = REMOTE_SCALARS_OUTBUFS(sc);
 
@@ -526,9 +516,9 @@ static int get_page_list(uint32_t kernel, struct smq_invoke_ctx *ctx, int cid)
 	list = smq_invoke_buf_start((remote_arg_t *)obuf->virt, sc);
 	pgstart = smq_phy_page_start(sc, list);
 	pages = pgstart + 1;
-	rlen = obuf->size - ((uintptr_t)pages - (uintptr_t)obuf->virt);
+	rlen = obuf->size - ((uint32_t)pages - (uint32_t)obuf->virt);
 	if (rlen < 0) {
-		rlen = ((uintptr_t)pages - (uintptr_t)obuf->virt) - obuf->size;
+		rlen = ((uint32_t)pages - (uint32_t)obuf->virt) - obuf->size;
 		obuf->size += buf_page_size(rlen);
 		VERIFY(err, 0 == alloc_mem(obuf, cid));
 		if (err)
@@ -584,7 +574,7 @@ static int get_page_list(uint32_t kernel, struct smq_invoke_ctx *ctx, int cid)
 				goto bail;
 			goto retry;
 		}
-		rlen = obuf->size - ((uintptr_t)pages - (uintptr_t)obuf->virt);
+		rlen = obuf->size - ((uint32_t) pages - (uint32_t) obuf->virt);
 	}
 	obuf->used = obuf->size - rlen;
  bail:
@@ -606,9 +596,8 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx,
 	void *args;
 	remote_arg_t *pra = ctx->pra;
 	remote_arg_t *rpra = ctx->rpra;
-	ssize_t rlen, used, size;
 	uint32_t sc = ctx->sc, start;
-	int i, inh, bufs = 0, err = 0;
+	int i, rlen, size, used, inh, bufs = 0, err = 0;
 	int inbufs = REMOTE_SCALARS_INBUFS(sc);
 	int outbufs = REMOTE_SCALARS_OUTBUFS(sc);
 	int *fds = ctx->fds, idx, num;
@@ -674,7 +663,7 @@ static int get_args(uint32_t kernel, struct smq_invoke_ctx *ctx,
 		}
 		list[i].num = 1;
 		pages[list[i].pgidx].addr =
-			buf_page_start((void *)((uintptr_t)pbuf->phys +
+			buf_page_start((void *)((uint32_t)pbuf->phys +
 						 (pbuf->size - rlen)));
 		pages[list[i].pgidx].size =
 			buf_page_size(pra[i].buf.len);
@@ -757,7 +746,7 @@ static int put_args(uint32_t kernel, uint32_t sc, remote_arg_t *pra,
 static void inv_args_pre(uint32_t sc, remote_arg_t *rpra)
 {
 	int i, inbufs, outbufs;
-	uintptr_t end;
+	uint32_t end;
 
 	inbufs = REMOTE_SCALARS_INBUFS(sc);
 	outbufs = REMOTE_SCALARS_OUTBUFS(sc);
@@ -766,10 +755,10 @@ static void inv_args_pre(uint32_t sc, remote_arg_t *rpra)
 			continue;
 		if (buf_page_start(rpra) == buf_page_start(rpra[i].buf.pv))
 			continue;
-		if (!IS_CACHE_ALIGNED((uintptr_t)rpra[i].buf.pv))
+		if (!IS_CACHE_ALIGNED((uint32_t)rpra[i].buf.pv))
 			dmac_flush_range(rpra[i].buf.pv,
 				(char *)rpra[i].buf.pv + 1);
-		end = (uintptr_t)rpra[i].buf.pv + rpra[i].buf.len;
+		end = (uint32_t)rpra[i].buf.pv + rpra[i].buf.len;
 		if (!IS_CACHE_ALIGNED(end))
 			dmac_flush_range((char *)end,
 				(char *)end + 1);
@@ -854,7 +843,7 @@ static void fastrpc_read_handler(int cid)
 static void smd_event_handler(void *priv, unsigned event)
 {
 	struct fastrpc_apps *me = &gfa;
-	int cid = (int)(uintptr_t)priv;
+	int cid = (int)priv;
 
 	switch (event) {
 	case SMD_EVENT_OPEN:
@@ -1121,17 +1110,17 @@ static int fastrpc_mmap_on_dsp(struct fastrpc_apps *me,
 	struct {
 		int pid;
 		uint32_t flags;
-		uintptr_t vaddrin;
+		uint32_t vaddrin;
 		int num;
 	} inargs;
 
 	struct {
-		uintptr_t vaddrout;
+		uint32_t vaddrout;
 	} routargs;
 	inargs.pid = current->tgid;
-	inargs.vaddrin = (uintptr_t)mmap->vaddrin;
+	inargs.vaddrin = mmap->vaddrin;
 	inargs.flags = mmap->flags;
-	inargs.num = me->compat ? num * sizeof(*pages) : num;
+	inargs.num = num;
 	ra[0].buf.pv = &inargs;
 	ra[0].buf.len = sizeof(inargs);
 
@@ -1142,15 +1131,12 @@ static int fastrpc_mmap_on_dsp(struct fastrpc_apps *me,
 	ra[2].buf.len = sizeof(routargs);
 
 	ioctl.inv.handle = 1;
-	if (me->compat)
-		ioctl.inv.sc = REMOTE_SCALARS_MAKE(4, 2, 1);
-	else
-		ioctl.inv.sc = REMOTE_SCALARS_MAKE(2, 2, 1);
+	ioctl.inv.sc = REMOTE_SCALARS_MAKE(2, 2, 1);
 	ioctl.inv.pra = ra;
 	ioctl.fds = 0;
 	VERIFY(err, 0 == (err = fastrpc_internal_invoke(me,
 		FASTRPC_MODE_PARALLEL, 1, &ioctl, cid)));
-	mmap->vaddrout = (uintptr_t)routargs.vaddrout;
+	mmap->vaddrout = routargs.vaddrout;
 	if (err)
 		goto bail;
 bail:
@@ -1165,8 +1151,8 @@ static int fastrpc_munmap_on_dsp(struct fastrpc_apps *me,
 	int err = 0;
 	struct {
 		int pid;
-		uintptr_t vaddrout;
-		ssize_t size;
+		uint32_t vaddrout;
+		int size;
 	} inargs;
 
 	inargs.pid = current->tgid;
@@ -1176,10 +1162,7 @@ static int fastrpc_munmap_on_dsp(struct fastrpc_apps *me,
 	ra[0].buf.len = sizeof(inargs);
 
 	ioctl.inv.handle = 1;
-	if (me->compat)
-		ioctl.inv.sc = REMOTE_SCALARS_MAKE(5, 1, 0);
-	else
-		ioctl.inv.sc = REMOTE_SCALARS_MAKE(3, 1, 0);
+	ioctl.inv.sc = REMOTE_SCALARS_MAKE(3, 1, 0);
 	ioctl.inv.pra = ra;
 	ioctl.fds = 0;
 	VERIFY(err, 0 == (err = fastrpc_internal_invoke(me,
@@ -1328,19 +1311,10 @@ static int fastrpc_device_release(struct inode *inode, struct file *file)
 {
 	struct file_data *fdata = (struct file_data *)file->private_data;
 	struct fastrpc_apps *me = &gfa;
-	struct smq_context_list *clst = &me->clst;
-	struct smq_invoke_ctx *ictx = 0;
-	struct hlist_node *n;
 	int cid = MINOR(inode->i_rdev);
 
 	(void)fastrpc_release_current_dsp_process(cid);
 	cleanup_current_dev(cid);
-	spin_lock(&clst->hlock);
-	hlist_for_each_entry_safe(ictx, n, &clst->interrupted, hn) {
-		if (ictx->tgid == current->tgid)
-			context_free(ictx, 0);
-	}
-	spin_unlock(&clst->hlock);
 	if (fdata) {
 		struct fastrpc_mmap *map = 0;
 		struct hlist_node *n;
@@ -1368,8 +1342,7 @@ static int fastrpc_device_open(struct inode *inode, struct file *filp)
 		VERIFY(err, 0 == smd_named_open_on_edge(
 					FASTRPC_SMD_GUID,
 					gcinfo[cid].channel,
-					&me->channel[cid].chan,
-					(void *)(uintptr_t)cid,
+					&me->channel[cid].chan, (void *)cid,
 					smd_event_handler));
 		if (err)
 			goto smd_bail;
@@ -1493,7 +1466,6 @@ static const struct file_operations fops = {
 	.open = fastrpc_device_open,
 	.release = fastrpc_device_release,
 	.unlocked_ioctl = fastrpc_device_ioctl,
-	.compat_ioctl = compat_fastrpc_device_ioctl,
 };
 
 static int __init fastrpc_device_init(void)
@@ -1519,7 +1491,6 @@ static int __init fastrpc_device_init(void)
 	VERIFY(err, !IS_ERR(me->class));
 	if (err)
 		goto class_create_bail;
-	me->compat = (NULL == fops.compat_ioctl) ? 0 : 1;
 	for (i = 0; i < NUM_CHANNELS; i++) {
 		me->channel[i].dev = device_create(me->class, NULL,
 					MKDEV(MAJOR(me->dev_no), i),
