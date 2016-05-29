@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include "ion_priv.h"
 
@@ -34,7 +35,7 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 		return NULL;
 
 	if (pool->gfp_mask & __GFP_ZERO)
-		if (ion_heap_high_order_page_zero(page, pool->order))
+		if (msm_ion_heap_high_order_page_zero(page, pool->order))
 			goto error_free_pages;
 
 	return page;
@@ -129,7 +130,10 @@ int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
 	int i;
 	bool high;
 
-	high = !!(gfp_mask & __GFP_HIGHMEM);
+	if (current_is_kswapd())
+		high = 1;
+	else
+		high = !!(gfp_mask & __GFP_HIGHMEM);
 
 	if (nr_to_scan == 0)
 		return ion_page_pool_total(pool, high);

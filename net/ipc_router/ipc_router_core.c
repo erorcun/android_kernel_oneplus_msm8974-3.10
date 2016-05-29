@@ -857,7 +857,7 @@ static int post_pkt_to_port(struct msm_ipc_port *port_ptr,
 	}
 
 	mutex_lock(&port_ptr->port_rx_q_lock_lhb3);
-	__pm_stay_awake(&port_ptr->port_rx_ws);
+	__pm_stay_awake(port_ptr->port_rx_ws);
 	list_add_tail(&temp_pkt->list, &port_ptr->port_rx_q);
 	wake_up(&port_ptr->port_rx_wait_q);
 	notify = port_ptr->notify;
@@ -1005,7 +1005,11 @@ struct msm_ipc_port *msm_ipc_router_create_raw_port(void *endpoint,
 		 "ipc%08x_%s",
 		 port_ptr->this_port.port_id,
 		 current->comm);
-	wakeup_source_init(&port_ptr->port_rx_ws, port_ptr->rx_ws_name);
+	port_ptr->port_rx_ws = wakeup_source_register(port_ptr->rx_ws_name);
+	if (!port_ptr->port_rx_ws) {
+		kfree(port_ptr);
+		return NULL;
+	}
 
 	port_ptr->endpoint = endpoint;
 	port_ptr->notify = notify;
@@ -2701,7 +2705,7 @@ int msm_ipc_router_read(struct msm_ipc_port *port_ptr,
 	}
 	list_del(&pkt->list);
 	if (list_empty(&port_ptr->port_rx_q))
-		__pm_relax(&port_ptr->port_rx_ws);
+		__pm_relax(port_ptr->port_rx_ws);
 	*read_pkt = pkt;
 	mutex_unlock(&port_ptr->port_rx_q_lock_lhb3);
 	if (pkt->hdr.control_flag & CONTROL_FLAG_CONFIRM_RX)
@@ -2941,7 +2945,7 @@ int msm_ipc_router_close_port(struct msm_ipc_port *port_ptr)
 		up_write(&server_list_lock_lha2);
 	}
 
-	wakeup_source_trash(&port_ptr->port_rx_ws);
+	wakeup_source_unregister(port_ptr->port_rx_ws);
 	kfree(port_ptr);
 	return 0;
 }
@@ -3335,6 +3339,8 @@ static void msm_ipc_router_remove_xprt(struct msm_ipc_router_xprt *xprt)
 		list_del(&xprt_info->list);
 		up_write(&xprt_info_list_lock_lha5);
 
+		msm_ipc_cleanup_routing_table(xprt_info);
+
 		flush_workqueue(xprt_info->workqueue);
 		destroy_workqueue(xprt_info->workqueue);
 		wakeup_source_trash(&xprt_info->ws);
@@ -3364,7 +3370,6 @@ static void xprt_close_worker(struct work_struct *work)
 	struct msm_ipc_router_xprt_work *xprt_work =
 		container_of(work, struct msm_ipc_router_xprt_work, work);
 
-	msm_ipc_cleanup_routing_table(xprt_work->xprt->priv);
 	msm_ipc_router_remove_xprt(xprt_work->xprt);
 	xprt_work->xprt->sft_close_done(xprt_work->xprt);
 	kfree(xprt_work);

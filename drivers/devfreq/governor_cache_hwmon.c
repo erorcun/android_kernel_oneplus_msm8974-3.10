@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -42,6 +42,7 @@ struct cache_hwmon_node {
 	unsigned int decay_rate;
 	unsigned long prev_mhz;
 	ktime_t prev_ts;
+	bool mon_started;
 	struct list_head list;
 	void *orig_data;
 	struct cache_hwmon *hw;
@@ -52,7 +53,9 @@ static LIST_HEAD(cache_hwmon_list);
 static DEFINE_MUTEX(list_lock);
 
 static int use_cnt;
-static DEFINE_MUTEX(state_lock);
+static DEFINE_MUTEX(register_lock);
+
+static DEFINE_MUTEX(monitor_lock);
 
 #define show_attr(name) \
 static ssize_t show_##name(struct device *dev,				\
@@ -167,18 +170,30 @@ static void compute_cache_freq(struct cache_hwmon_node *node,
 }
 
 #define TOO_SOON_US	(1 * USEC_PER_MSEC)
-static irqreturn_t mon_intr_handler(int irq, void *dev)
+int update_cache_hwmon(struct cache_hwmon *hwmon)
 {
-	struct cache_hwmon_node *node = dev;
-	struct devfreq *df = node->hw->df;
+	struct cache_hwmon_node *node;
+	struct devfreq *df;
 	ktime_t ts;
 	unsigned int us;
 	int ret;
 
-	if (!node->hw->is_valid_irq(node->hw))
-		return IRQ_NONE;
+	if (!hwmon)
+		return -EINVAL;
+	df = hwmon->df;
+	if (!df)
+		return -ENODEV;
+	node = df->data;
+	if (!node)
+		return -ENODEV;
 
-	dev_dbg(df->dev.parent, "Got interrupt\n");
+	mutex_lock(&monitor_lock);
+	if (!node->mon_started) {
+		mutex_unlock(&monitor_lock);
+		return -EBUSY;
+	}
+
+	dev_dbg(df->dev.parent, "Got update request\n");
 	devfreq_monitor_stop(df);
 
 	/*
@@ -200,13 +215,14 @@ static irqreturn_t mon_intr_handler(int irq, void *dev)
 		ret = update_devfreq(df);
 		if (ret)
 			dev_err(df->dev.parent,
-				"Unable to update freq on IRQ!\n");
+				"Unable to update freq on request!\n");
 		mutex_unlock(&df->lock);
 	}
 
 	devfreq_monitor_start(df);
 
-	return IRQ_HANDLED;
+	mutex_unlock(&monitor_lock);
+	return 0;
 }
 
 static int devfreq_cache_hwmon_get_freq(struct devfreq *df,
@@ -279,16 +295,10 @@ static int start_monitoring(struct devfreq *df)
 		goto err_start;
 	}
 
+	mutex_lock(&monitor_lock);
 	devfreq_monitor_start(df);
-
-	if (hw->irq)
-		ret = request_threaded_irq(hw->irq, NULL, mon_intr_handler,
-			  IRQF_ONESHOT | IRQF_SHARED,
-			  "cache_hwmon", node);
-	if (ret) {
-		dev_err(dev, "Unable to register interrupt handler!\n");
-		goto req_irq_fail;
-	}
+	node->mon_started = true;
+	mutex_unlock(&monitor_lock);
 
 	ret = sysfs_create_group(&df->dev.kobj, &dev_attr_group);
 	if (ret) {
@@ -299,12 +309,10 @@ static int start_monitoring(struct devfreq *df)
 	return 0;
 
 sysfs_fail:
-	if (hw->irq) {
-		disable_irq(hw->irq);
-		free_irq(hw->irq, node);
-	}
-req_irq_fail:
+	mutex_lock(&monitor_lock);
+	node->mon_started = false;
 	devfreq_monitor_stop(df);
+	mutex_unlock(&monitor_lock);
 	hw->stop_hwmon(hw);
 err_start:
 	df->data = node->orig_data;
@@ -319,11 +327,10 @@ static void stop_monitoring(struct devfreq *df)
 	struct cache_hwmon *hw = node->hw;
 
 	sysfs_remove_group(&df->dev.kobj, &dev_attr_group);
-	if (hw->irq) {
-		disable_irq(hw->irq);
-		free_irq(hw->irq, node);
-	}
+	mutex_lock(&monitor_lock);
+	node->mon_started = false;
 	devfreq_monitor_stop(df);
+	mutex_unlock(&monitor_lock);
 	hw->stop_hwmon(hw);
 	df->data = node->orig_data;
 	node->orig_data = NULL;
@@ -396,13 +403,13 @@ int register_cache_hwmon(struct device *dev, struct cache_hwmon *hwmon)
 	node->hw = hwmon;
 	node->attr_grp = &dev_attr_group;
 
-	mutex_lock(&state_lock);
+	mutex_lock(&register_lock);
 	if (!use_cnt) {
 		ret = devfreq_add_governor(&devfreq_cache_hwmon);
 		if (!ret)
 			use_cnt++;
 	}
-	mutex_unlock(&state_lock);
+	mutex_unlock(&register_lock);
 
 	if (!ret) {
 		dev_info(dev, "Cache HWmon governor registered.\n");

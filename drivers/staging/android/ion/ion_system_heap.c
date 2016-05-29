@@ -112,6 +112,10 @@ static struct page_info *alloc_largest_available(struct ion_system_heap *heap,
 	int i;
 	bool from_pool;
 
+	info = kmalloc(sizeof(struct page_info), GFP_KERNEL);
+	if (!info)
+		return NULL;
+
 	for (i = 0; i < num_orders; i++) {
 		if (size < order_to_size(orders[i]))
 			continue;
@@ -122,14 +126,14 @@ static struct page_info *alloc_largest_available(struct ion_system_heap *heap,
 		if (!page)
 			continue;
 
-		info = kmalloc(sizeof(struct page_info), GFP_KERNEL);
-		if (info) {
-			info->page = page;
-			info->order = orders[i];
-			info->from_pool = from_pool;
-		}
+		info->page = page;
+		info->order = orders[i];
+		info->from_pool = from_pool;
+		INIT_LIST_HEAD(&info->list);
 		return info;
 	}
+	kfree(info);
+
 	return NULL;
 }
 static unsigned int process_info(struct page_info *info,
@@ -186,6 +190,9 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	if (align > PAGE_SIZE)
 		return -EINVAL;
 
+	if (size / PAGE_SIZE > totalram_pages / 2)
+		return -ENOMEM;
+
 	data.size = 0;
 	INIT_LIST_HEAD(&pages);
 	INIT_LIST_HEAD(&pages_from_pool);
@@ -209,7 +216,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 		i++;
 	}
 
-	ret = ion_heap_alloc_pages_mem(&data);
+	ret = msm_ion_heap_alloc_pages_mem(&data);
 
 	if (ret)
 		goto err;
@@ -261,7 +268,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 
 	} while (sg);
 
-	ret = ion_heap_pages_zero(data.pages, data.size >> PAGE_SHIFT);
+	ret = msm_ion_heap_pages_zero(data.pages, data.size >> PAGE_SHIFT);
 	if (ret) {
 		pr_err("Unable to zero pages\n");
 		goto err_free_sg2;
@@ -274,7 +281,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	buffer->priv_virt = table;
 	if (nents_sync)
 		sg_free_table(&table_sync);
-	ion_heap_free_pages_mem(&data);
+	msm_ion_heap_free_pages_mem(&data);
 	return 0;
 err_free_sg2:
 	/* We failed to zero buffers. Bypass pool */
@@ -290,7 +297,7 @@ err_free_sg:
 err1:
 	kfree(table);
 err_free_data_pages:
-	ion_heap_free_pages_mem(&data);
+	msm_ion_heap_free_pages_mem(&data);
 err:
 	list_for_each_entry_safe(info, tmp_info, &pages, list) {
 		free_buffer_page(sys_heap, buffer, info->page, info->order);
@@ -315,7 +322,7 @@ void ion_system_heap_free(struct ion_buffer *buffer)
 	int i;
 
 	if (!(buffer->flags & ION_FLAG_FREED_FROM_SHRINKER))
-		ion_heap_buffer_zero(buffer);
+		msm_ion_heap_buffer_zero(buffer);
 
 	for_each_sg(table->sgl, sg, table->nents, i)
 		free_buffer_page(sys_heap, buffer, sg_page(sg),

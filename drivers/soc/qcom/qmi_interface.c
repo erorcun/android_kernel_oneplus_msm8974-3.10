@@ -49,6 +49,7 @@ struct qmi_notify_event_work {
 	struct work_struct work;
 };
 static void qmi_notify_event_worker(struct work_struct *work);
+static void clean_txn_info(struct qmi_handle *handle);
 
 #define HANDLE_HASH_TBL_SZ 1
 static DEFINE_HASHTABLE(handle_hash_tbl, HANDLE_HASH_TBL_SZ);
@@ -531,6 +532,10 @@ static int handle_rmv_server(struct qmi_handle *handle,
 	svc_addr = (struct msm_ipc_addr *)(handle->dest_info);
 	if (svc_addr->addr.port_addr.node_id == ctl_msg->srv.node_id &&
 	    svc_addr->addr.port_addr.port_id == ctl_msg->srv.port_id) {
+		/* Wakeup any threads waiting for the response */
+		handle->handle_reset = 1;
+		clean_txn_info(handle);
+
 		spin_lock_irqsave(&handle->notify_lock, flags);
 		handle->notify(handle, QMI_SERVER_EXIT, handle->notify_priv);
 		spin_unlock_irqrestore(&handle->notify_lock, flags);
@@ -722,7 +727,7 @@ static void clean_txn_info(struct qmi_handle *handle)
 
 int qmi_handle_destroy(struct qmi_handle *handle)
 {
-	int rc;
+	DEFINE_WAIT(wait);
 
 	if (!handle)
 		return -EINVAL;
@@ -739,8 +744,17 @@ int qmi_handle_destroy(struct qmi_handle *handle)
 	mutex_unlock(&handle->handle_lock);
 	flush_workqueue(handle->handle_wq);
 	destroy_workqueue(handle->handle_wq);
-	rc = wait_event_interruptible(handle->reset_waitq,
-				      list_empty(&handle->txn_list));
+	mutex_lock(&handle->handle_lock);
+	while (!list_empty(&handle->txn_list) ||
+		    !list_empty(&handle->pending_txn_list)) {
+		prepare_to_wait(&handle->reset_waitq, &wait,
+				TASK_UNINTERRUPTIBLE);
+		mutex_unlock(&handle->handle_lock);
+		schedule();
+		mutex_lock(&handle->handle_lock);
+		finish_wait(&handle->reset_waitq, &wait);
+	}
+	mutex_unlock(&handle->handle_lock);
 
 	kfree(handle->dest_info);
 	kfree(handle);
@@ -945,8 +959,8 @@ int qmi_send_req_wait(struct qmi_handle *handle,
 send_req_wait_err:
 	list_del(&txn_handle->list);
 	kfree(txn_handle);
-	mutex_unlock(&handle->handle_lock);
 	wake_up(&handle->reset_waitq);
+	mutex_unlock(&handle->handle_lock);
 	return rc;
 }
 EXPORT_SYMBOL(qmi_send_req_wait);

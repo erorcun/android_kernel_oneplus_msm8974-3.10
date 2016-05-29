@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,20 +11,10 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _ASM_DMA_CONTIGUOUS_H
-#define _ASM_DMA_CONTIGUOUS_H
+#include <linux/notifier.h>
 
-#ifdef __KERNEL__
-#ifdef CONFIG_CMA
+int show_mem_notifier_register(struct notifier_block *nb);
 
-#include <linux/types.h>
-#include <asm-generic/dma-contiguous.h>
+int show_mem_notifier_unregister(struct notifier_block *nb);
 
-static inline void
-dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
-static inline void __init dma_contiguous_early_removal_fixup(void) { }
-
-#endif
-#endif
-
-#endif
+void show_mem_call_notifiers(void);

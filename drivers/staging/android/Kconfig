@@ -87,14 +87,13 @@ config ANDROID_LOW_MEMORY_KILLER_AUTODETECT_OOM_ADJ_VALUES
 	  /sys/module/lowmemorykiller/parameters/adj and convert them
 	  to oom_score_adj values.
 
-config ANDROID_INTF_ALARM_DEV
-	bool "Android alarm driver"
-	depends on RTC_CLASS
-	default n
+config ANDROID_LMK_ADJ_RBTREE
+	bool "Use RBTREE for Android Low Memory Killer"
+	depends on ANDROID_LOW_MEMORY_KILLER
+	default y
 	---help---
-	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
-	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
-	  Also exports the alarm interface to user-space.
+	    Use oom_score_adj rbtree to select the best proecss to kill
+	    when system in low memory status.
 
 config SYNC
 	bool "Synchronization framework"
@@ -104,6 +103,15 @@ config SYNC
 	  This option enables the framework for synchronization between multiple
 	  drivers.  Sync implementations can take advantage of hardware
 	  synchronization built into devices like GPUs.
+
+config ANDROID_INTF_ALARM_DEV
+	bool "Android alarm driver"
+	depends on RTC_CLASS
+	default n
+	---help---
+	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
+	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
+	  Also exports the alarm interface to user-space.
 
 config SW_SYNC
 	bool "Software synchronization objects"
