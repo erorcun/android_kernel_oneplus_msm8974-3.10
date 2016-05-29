@@ -86,7 +86,6 @@ static int devfreq_clock_probe(struct platform_device *pdev)
 	struct devfreq_dev_profile *p;
 	u32 *data, poll;
 	const char *gov_name;
-	const char *clk_name;
 	int ret, len, i, j;
 	unsigned long f;
 
@@ -95,21 +94,12 @@ static int devfreq_clock_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, d);
 
-	if (of_property_read_string(dev->of_node, "clock-name", &clk_name)) {
-		pr_err("%s can't find clock-name attribute!", __func__);
-		return -EINVAL;
-	}
-
-	d->clk = devm_clk_get(dev, clk_name);
-	if (IS_ERR(d->clk)) {
-        pr_err("%s clock lookup failed! %s", __func__, clk_name);
+	d->clk = devm_clk_get(dev, "devfreq_clk");
+	if (IS_ERR(d->clk))
 		return PTR_ERR(d->clk);
-    }
 
-	if (!of_find_property(dev->of_node, PROP_TBL, &len)) {
-        pr_err("%s prop table lookup failed!", __func__);
+	if (!of_find_property(dev->of_node, PROP_TBL, &len))
 		return -EINVAL;
-    }
 
 	len /= sizeof(*data);
 	data = devm_kzalloc(dev, len * sizeof(*data), GFP_KERNEL);
@@ -119,10 +109,8 @@ static int devfreq_clock_probe(struct platform_device *pdev)
 	p = &d->profile;
 	p->freq_table = devm_kzalloc(dev, len * sizeof(*p->freq_table),
 				     GFP_KERNEL);
-	if (!p->freq_table) {
-        pr_err("%s no freq table!", __func__);
+	if (!p->freq_table)
 		return -ENOMEM;
-    }
 
 	ret = of_property_read_u32_array(dev->of_node, PROP_TBL, data, len);
 	if (ret)
