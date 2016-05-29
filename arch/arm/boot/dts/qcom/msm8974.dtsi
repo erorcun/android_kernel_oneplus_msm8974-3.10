@@ -12,6 +12,7 @@
 
 #include "skeleton.dtsi"
 #include <dt-bindings/clock/msm-clocks-8974.h>
+#include <dt-bindings/clock/msm-clocks-krait.h>
 
 / {
 	model = "Qualcomm MSM 8974";
@@ -909,7 +910,7 @@
 		qcom,master-id = <86>;
 	};
 
-	qcom,clock-krait@f9016000 {
+	clock_krait: qcom,clock-krait@f9016000 {
 		compatible = "qcom,clock-krait-8974";
 		reg = <0xf9016000 0x20>,
 			<0xf908a000 0x20>,
@@ -931,6 +932,7 @@
 		qcom,hfpll-config-val = <0x04D0405D>;
 		qcom,hfpll-user-vco-mask = <0x00100000>;
 		qcom,pvs-config-ver = <1>;
+		#clock-cells = <1>;
 
 		qcom,l2-fmax =
 			<          0 0			 >,
@@ -1534,10 +1536,10 @@
 			< 2265600000  925000 691 >;
 	};
 
-	cache: qcom,cache@0 {
-		reg = <0 4>;
+	cache: qcom,cache {
 		compatible = "devfreq-simple-dev";
-		clock-name = "l2_clk";
+		clock-names = "devfreq_clk";
+		clocks = <&clock_krait clk_l2_clk>;
 		governor = "cpufreq";
 		freq-tbl-khz =
 			<  300000 >,
@@ -1617,9 +1619,15 @@
 		};
 	};
 
-	qcom,msm-cpufreq@0 {
-		reg = <0 4>;
+	qcom,msm-cpufreq {
 		compatible = "qcom,msm-cpufreq";
+		clock-names = "l2_clk", "cpu0_clk", "cpu1_clk", "cpu2_clk",
+				"cpu3_clk";
+		clocks = <&clock_krait clk_l2_clk>,
+			 <&clock_krait clk_krait0_clk>,
+			 <&clock_krait clk_krait1_clk>,
+			 <&clock_krait clk_krait2_clk>,
+			 <&clock_krait clk_krait3_clk>;
 		qcom,cpufreq-table =
 			<  300000 >,
 			<  422400 >,
@@ -2832,6 +2840,7 @@
 
 &gdsc_mdss {
 	clock-names = "core_clk", "lut_clk";
+	qcom,clock-names = "core_clk", "lut_clk";
 	clocks = <&clock_mmss clk_mdss_mdp_clk>,
 	         <&clock_mmss clk_mdss_mdp_lut_clk>;
 	status = "ok";
