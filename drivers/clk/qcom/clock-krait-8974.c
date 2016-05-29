@@ -27,6 +27,7 @@
 #include <linux/clk/msm-clock-generic.h>
 #include <soc/qcom/clock-local2.h>
 #include <soc/qcom/clock-krait.h>
+#include <dt-bindings/clock/msm-clocks-krait.h>
 
 #include <asm/cputype.h>
 
@@ -463,7 +464,7 @@ static struct clk_lookup kpss_clocks_8974[] = {
 	CLK_LOOKUP_OF("",	krait1_pri_mux_clk,		""),
 	CLK_LOOKUP_OF("",	krait2_pri_mux_clk,		""),
 	CLK_LOOKUP_OF("",	krait3_pri_mux_clk,		""),
-	CLK_LOOKUP_OF("",	l2_pri_mux_clk.c,		""),
+	CLK_LOOKUP_OF("",	l2_pri_mux_clk,		""),
 	CLK_LOOKUP_OF("l2_clk",	l2_clk,     "0.qcom,msm-cpufreq"),
 	CLK_LOOKUP_OF("cpu0_clk",	krait0_clk, "0.qcom,msm-cpufreq"),
 	CLK_LOOKUP_OF("cpu1_clk",	krait1_clk, "0.qcom,msm-cpufreq"),
