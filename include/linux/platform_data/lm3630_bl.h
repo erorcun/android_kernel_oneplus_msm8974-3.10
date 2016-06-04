@@ -54,4 +54,6 @@ struct lm3630_platform_data {
 	void (*pwm_set_intensity) (int brightness, int max_brightness);
 };
 
+void lm3630_cabc_changed(int state);
+
 #endif /* __LINUX_LM3630_H */

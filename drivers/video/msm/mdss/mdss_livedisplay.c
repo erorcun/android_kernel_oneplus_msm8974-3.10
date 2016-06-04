@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/sysfs.h>
 #include <linux/workqueue.h>
+#include <linux/platform_data/lm3630_bl.h>
 
 #include "mdss_dsi.h"
 #include "mdss_fb.h"
@@ -316,6 +317,7 @@ static ssize_t mdss_livedisplay_set_cabc(struct device *dev,
 		mutex_lock(&mlc->lock);
 		mlc->cabc_level = level;
 		mutex_unlock(&mlc->lock);
+		lm3630_cabc_changed(level == CABC_OFF ? 0 : 1);
 		mdss_livedisplay_update(mlc, MODE_CABC);
 	}
 
