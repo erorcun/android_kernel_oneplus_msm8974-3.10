@@ -243,7 +243,6 @@ struct synaptics_rmi4_data {
 	bool fingers_on_2d;
 	bool sensor_sleep;
 	bool stay_awake;
-	bool staying_awake;
 	int (*i2c_read)(struct synaptics_rmi4_data *pdata, unsigned short addr,
 			unsigned char *data, unsigned short length);
 	int (*i2c_write)(struct synaptics_rmi4_data *pdata, unsigned short addr,
@@ -274,7 +273,6 @@ struct synaptics_rmi4_data {
 	unsigned short f54_ctrl_base_addr;
 	unsigned short f54_data_base_addr;
 	unsigned char gesturemode;
-	bool pwrrunning;
 	unsigned int old_status;
 	unsigned int reset_count; //for reset count
 	unsigned short points[2*7];
@@ -293,6 +291,9 @@ struct synaptics_rmi4_data {
 	unsigned char bcontinue;
 	struct workqueue_struct *reportqueue;  //for work queue
 	struct work_struct reportwork;
+
+	bool suspended;
+	struct work_struct init_work;
 };
 
 enum exp_fn {
