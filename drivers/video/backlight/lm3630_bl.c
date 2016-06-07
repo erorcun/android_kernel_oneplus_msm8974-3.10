@@ -216,7 +216,7 @@ int set_backlight_pwm(int state)
     int rc = 0;
 	//if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
         if (get_boot_mode() == MSM_BOOT_MODE__NORMAL) {
-			if( state == 0 && backlight_level <= 0x14 ) return rc;
+			if( state == 1 && backlight_level <= 0x14 ) return rc;
         	if(state == 1)
     		{
     	
@@ -287,12 +287,12 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 		ret = regmap_write(pchip->regmap,
 				   REG_BRT_A, bl_level);
 #ifdef CONFIG_MACH_OPPO
-		if(!cabc) {
+		if(bl_level <= 0x14) {
 			if(pwm_flag == true)
 				set_backlight_pwm(0);
 		} else {
-			if(pwm_flag == false)
-				set_backlight_pwm(1);
+			if(pwm_flag == !cabc)
+				set_backlight_pwm(cabc);
 		}
 #endif
 
