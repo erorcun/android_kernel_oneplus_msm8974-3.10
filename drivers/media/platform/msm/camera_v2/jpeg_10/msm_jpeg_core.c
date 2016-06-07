@@ -32,7 +32,7 @@ int msm_jpeg_core_reset(struct msm_jpeg_device *pgmn_dev, uint8_t op_mode,
 	pgmn_dev->reset_done_ack = 0;
 	msm_jpeg_hw_reset(base, size);
 	spin_unlock_irqrestore(&pgmn_dev->reset_lock, flags);
-	rc = wait_event_interruptible_timeout(
+	rc = wait_event_timeout(
 			pgmn_dev->reset_wait,
 			pgmn_dev->reset_done_ack,
 			msecs_to_jiffies(tm));
