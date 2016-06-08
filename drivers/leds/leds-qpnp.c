@@ -110,6 +110,12 @@
 #define FLASH_VREG_OK_FORCE(base)	(base + 0x4F)
 #define FLASH_ENABLE_CONTROL(base)	(base + 0x46)
 #define FLASH_LED_STROBE_CTRL(base)	(base + 0x47)
+
+#ifdef CONFIG_MACH_OPPO
+#define FLASH_LED_UNLOCK_SECURE(base)	(base + 0xD0)
+#define FLASH_LED_TORCH(base)		(base + 0xE4)
+#endif
+
 #define FLASH_WATCHDOG_TMR(base)	(base + 0x49)
 #define FLASH_FAULT_DETECT(base)	(base + 0x51)
 #define FLASH_PERIPHERAL_SUBTYPE(base)	(base + 0x05)
@@ -161,6 +167,14 @@
 #define FLASH_DURATION_200ms		0x13
 #define TORCH_DURATION_12s		0x0A
 #define FLASH_CLAMP_200mA		0x0F
+
+#ifdef CONFIG_MACH_OPPO
+#define FLASH_TORCH_MASK		0x03
+#define FLASH_LED_TORCH_ENABLE		0x00
+#define FLASH_LED_TORCH_DISABLE		0x03
+#define FLASH_UNLOCK_SECURE		0xA5
+#define FLASH_SECURE_MASK		0xFF
+#endif
 
 #define FLASH_SUBTYPE_DUAL		0x01
 #define FLASH_SUBTYPE_SINGLE		0x02
@@ -1294,9 +1308,14 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 				}
 			}
 
-			qpnp_led_masked_write(led, FLASH_MAX_CURR(led->base),
-				FLASH_CURRENT_MASK,
-				TORCH_MAX_LEVEL);
+			rc = qpnp_led_masked_write(led,
+#ifdef CONFIG_MACH_OPPO
+				FLASH_LED_UNLOCK_SECURE(led->base),
+				FLASH_SECURE_MASK, FLASH_UNLOCK_SECURE);
+#else
+				FLASH_MAX_CURR(led->base),
+				FLASH_CURRENT_MASK, TORCH_MAX_LEVEL);
+#endif
 			if (rc) {
 				dev_err(&led->spmi_dev->dev,
 					"Max current reg write failed(%d)\n",
@@ -1304,10 +1323,16 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 				goto error_reg_write;
 			}
 
-			qpnp_led_masked_write(led,
+			rc = qpnp_led_masked_write(led,
+#ifdef CONFIG_MACH_OPPO
+				FLASH_LED_TORCH(led->base),
+				FLASH_TORCH_MASK,
+				FLASH_LED_TORCH_ENABLE);
+#else
 				FLASH_LED_TMR_CTRL(led->base),
 				FLASH_TMR_MASK,
 				FLASH_TMR_WATCHDOG);
+#endif
 			if (rc) {
 				dev_err(&led->spmi_dev->dev,
 					"Timer control reg write failed(%d)\n",
@@ -1337,9 +1362,15 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 			}
 
 			qpnp_led_masked_write(led,
+#ifdef CONFIG_MACH_OPPO
+				FLASH_MAX_CURR(led->base),
+				FLASH_CURRENT_MASK,
+				TORCH_MAX_LEVEL);
+#else
 				FLASH_WATCHDOG_TMR(led->base),
 				FLASH_WATCHDOG_MASK,
 				led->flash_cfg->duration);
+#endif
 			if (rc) {
 				dev_err(&led->spmi_dev->dev,
 					"Max current reg write failed(%d)\n",
@@ -1488,6 +1519,26 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 		}
 
 		if (led->flash_cfg->torch_enable) {
+#ifdef CONFIG_MACH_OPPO
+			rc = qpnp_led_masked_write(led,
+				FLASH_LED_UNLOCK_SECURE(led->base),
+				FLASH_SECURE_MASK, FLASH_UNLOCK_SECURE);
+			if (rc) {
+				dev_err(&led->spmi_dev->dev,
+					"Secure reg write failed(%d)\n", rc);
+				goto error_torch_set;
+			}
+
+			rc = qpnp_led_masked_write(led,
+					FLASH_LED_TORCH(led->base),
+					FLASH_TORCH_MASK,
+					FLASH_LED_TORCH_DISABLE);
+			if (rc) {
+				dev_err(&led->spmi_dev->dev,
+					"Torch reg write failed(%d)\n", rc);
+				goto error_torch_set;
+			}
+#endif
 			if (led->flash_cfg->peripheral_subtype ==
 							FLASH_SUBTYPE_DUAL) {
 				if (!led->flash_cfg->no_smbb_support)
