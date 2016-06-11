@@ -2461,8 +2461,7 @@ static int synaptics_rmi4_int_enable(struct synaptics_rmi4_data *rmi4_data,
  * and calls synaptics_rmi4_report_touch() with the appropriate
  * function handler for each function with valid data inputs.
  */
-static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, const ktime_t timestamp
-/*		,bool report*/)
+static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, const ktime_t timestamp)
 {
 	int retval;
 	unsigned char data[MAX_INTR_REGISTERS + 1];
@@ -2506,9 +2505,9 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, 
 
 	}
 
-/*	if (!report)
+	if (timestamp.tv64 == 0)
 		return;
-*/
+
 	/*
 	 * Traverse the function handler list and service the source(s)
 	 * of the interrupt accordingly.
@@ -2557,7 +2556,7 @@ static irqreturn_t synaptics_rmi4_irq(int irq, void *data)
 	struct synaptics_rmi4_data *rmi4_data = data;
 	ktime_t timestamp = ktime_get();
 
-	synaptics_rmi4_sensor_report(rmi4_data, timestamp/*, true*/);
+	synaptics_rmi4_sensor_report(rmi4_data, timestamp);
 
 	return IRQ_HANDLED;
 }
@@ -2578,7 +2577,6 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 	int retval = 0;
 	const struct synaptics_dsx_platform_data *platform_data =
 		rmi4_data->i2c_client->dev.platform_data;
-	ktime_t timestamp;
 
 	if (enable) {
 		if (rmi4_data->irq_enabled)
@@ -2589,8 +2587,7 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 			return retval;
 
 		/* Process and clear interrupts */
-		timestamp = ktime_get();
-		synaptics_rmi4_sensor_report(rmi4_data, timestamp/*, false*/);
+		synaptics_rmi4_sensor_report(rmi4_data, ktime_set(0,0));
 		retval = request_threaded_irq(rmi4_data->irq, NULL,
 				synaptics_rmi4_irq, platform_data->irq_flags,
 				DRIVER_NAME, rmi4_data);
