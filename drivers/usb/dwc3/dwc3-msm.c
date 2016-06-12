@@ -1272,7 +1272,7 @@ static void dwc3_chg_detect_work(struct work_struct *w)
 			dwc3_msm_write_readback(mdwc->base,
 					CHARGING_DET_CTRL_REG, 0x1F, 0x10);
 			if (mdwc->ext_chg_opened) {
-				init_completion(&mdwc->ext_chg_wait);
+				complete(&mdwc->ext_chg_wait);
 				mdwc->ext_chg_active = true;
 			}
 		}
@@ -1815,7 +1815,7 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TYPE:
 		psy->type = val->intval;
 
-		switch (psy->type) {
+/*		switch (psy->type) {
 		case POWER_SUPPLY_TYPE_USB:
 			mdwc->charger.chg_type = DWC3_SDP_CHARGER;
 			break;
@@ -1838,7 +1838,7 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 
 		dev_dbg(mdwc->dev, "%s: charger type: %s\n", __func__,
 				chg_to_string(mdwc->charger.chg_type)); 
-		break;
+*/		break;
 #ifdef CONFIG_MACH_OPPO
 	case POWER_SUPPLY_PROP_POWER_NOW:
 		mdwc->power_now = val->intval;

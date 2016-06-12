@@ -57,7 +57,6 @@ struct dwc3_otg {
 /* OPPO 2013-11-21 wangjc Add begin for delay charger detect */
 #ifdef CONFIG_VENDOR_EDIT
 	struct delayed_work	detect_work;
-	struct delayed_work	plugout_work;
 #endif
 /* OPPO 2013-11-21 wangjc Add end */
 	struct dwc3_charger	*charger;

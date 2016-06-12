@@ -570,19 +570,24 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	dev_info(phy->dev, "Avail curr from USB = %u , is USB = %u\n", mA, power_supply_type == POWER_SUPPLY_TYPE_USB);
 
 	if (dotg->charger->max_power <= 2 && mA > 2) {
-		cancel_delayed_work_sync(&dotg->plugout_work);
 		/* Enable charging */
 		if (power_supply_set_online(dotg->psy, true))
 			goto psy_error;
 		if (power_supply_set_current_limit(dotg->psy, 1000*mA))
 			goto psy_error;
 	} else if (dotg->charger->max_power > 0 && (mA == 0 || mA == 2)) {
-		cancel_delayed_work_sync(&dotg->plugout_work);
-		if(power_supply_type ==  POWER_SUPPLY_TYPE_USB || power_supply_type ==  POWER_SUPPLY_TYPE_UNKNOWN) {
-			queue_delayed_work(system_nrt_wq, &dotg->plugout_work, msecs_to_jiffies(500));
-		} else {
-			queue_delayed_work(system_nrt_wq, &dotg->plugout_work, 0);
-		}
+#ifdef CONFIG_MACH_OPPO
+		if (power_supply_type != POWER_SUPPLY_TYPE_USB &&
+				power_supply_set_online(dotg->psy, false))
+			goto psy_error;
+#else
+		/* Disable charging */
+		if (power_supply_set_online(dotg->psy, false))
+			goto psy_error;
+#endif
+		/* Set max current limit */
+		if (power_supply_set_current_limit(dotg->psy, 0))
+			goto psy_error;
 	}
 
 	power_supply_changed(dotg->psy);
@@ -708,18 +713,6 @@ static void dwc3_otg_detect_work(struct work_struct *w)
 
 	charger->start_detection(charger, true);
 }
-
-// 3.10 workaround
-static void dwc3_charger_plugged_out(struct work_struct *w)
-{
-	struct dwc3_otg *dotg = container_of(w, struct dwc3_otg, plugout_work.work);
-
-	/* Disable charging */
-	power_supply_set_online(dotg->psy, false);
-
-	/* Set max current limit */
-	power_supply_set_current_limit(dotg->psy, 0);
-}
 #endif
 /* OPPO 2013-11-21 wangjc Add end */
 
@@ -816,7 +809,6 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					phy->state = OTG_STATE_B_PERIPHERAL;
 					work = 1;
 #ifdef CONFIG_MACH_OPPO
-					cancel_delayed_work_sync(&dotg->plugout_work);
 					power_supply_set_online(dotg->psy, true);
 					power_supply_changed(dotg->psy);
 #endif
@@ -874,11 +866,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 					break;
 				}
 			} else {
-				/*
-				 * no charger registered, assuming SDP
-				 * and start peripheral
-				 */
-				phy->state = OTG_STATE_B_PERIPHERAL;
+				/* no charger registered, start peripheral */
 				if (dwc3_otg_start_peripheral(&dotg->otg, 1)) {
 					/*
 					 * Probably set_peripheral not called
@@ -1102,7 +1090,6 @@ int dwc3_otg_init(struct dwc3 *dwc)
 /* OPPO 2013-11-21 wangjc Add begin for delay charger detect */
 #ifdef CONFIG_VENDOR_EDIT
 	INIT_DELAYED_WORK(&dotg->detect_work, dwc3_otg_detect_work);
-	INIT_DELAYED_WORK(&dotg->plugout_work, dwc3_charger_plugged_out);
 #endif
 /* OPPO 2013-11-21 wangjc Add end */
 
