@@ -130,7 +130,7 @@ static int
 bq24196_ibatmax_set(struct bq24196_device_info *di, int chg_current)
 {
 	u8 value = 0;
-	pr_info("%s chg_current:%d\n",__func__,chg_current);
+//	pr_info("%s chg_current:%d\n",__func__,chg_current);
 	if(chg_current == 200) {
 		value = (1024 - BQ24196_CHG_IBATMAX_MIN)/64;
 		value <<= 2;
@@ -193,7 +193,7 @@ static int
 bq24196_iusbmax_set(struct bq24196_device_info *di, int mA)
 {
 	u8 value = 0;
-	pr_info("%s mA:%d\n",__func__,mA);
+//	pr_info("%s mA:%d\n",__func__,mA);
 
 	if( (mA < BQ24196_CHG_IUSBMAX_MIN) || ( mA > BQ24196_CHG_IUSBMAX_MAX )){
 		pr_info("bad iusbmA:%d asked to set\n",mA);
