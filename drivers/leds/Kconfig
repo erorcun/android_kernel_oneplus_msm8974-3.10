@@ -5,6 +5,10 @@ config LEDS_GPIO_REGISTER
 	  As this function is used by arch code it must not be compiled as a
 	  module.
 
+config DONT_LIGHT_LED_ON_TOUCH
+	bool "Don't light led on touch for OPO"
+	depends on MACH_FIND7OP
+
 menuconfig NEW_LEDS
 	bool "LED Support"
 	help

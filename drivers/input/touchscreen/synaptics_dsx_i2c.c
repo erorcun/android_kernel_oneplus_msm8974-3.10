@@ -1138,13 +1138,6 @@ static int synaptics_ts_init_virtual_key(struct synaptics_rmi4_data *ts )
 static int get_virtual_key_button(int x, int y)
 {
 	int i;
-	int lcdheight = LCD_MAX_Y;
-
-	if (get_pcb_version() >= HW_VERSION__20)
-		lcdheight = LCD_MAX_Y_FIND7S;
-
-	if (y <= lcdheight)
-		return 0;
 
 	for (i = 0; i < TP_VKEY_NONE; ++i) {
 		struct tp_vkey_button* button = &vkey_buttons[i];
@@ -2070,6 +2063,11 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 	return keyvalue;
 }
 
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+extern int prevent_bl;
+extern void enable_bttn_bl(void);
+#endif
+
 /**
  * synaptics_rmi4_f12_abs_report()
  *
@@ -2112,7 +2110,11 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	extra_data = (struct synaptics_rmi4_f12_extra_data *)fhandler->extra;
 	size_of_2d_data = sizeof(struct synaptics_rmi4_f12_finger_data);
 
+
 	if (rmi4_data->old_status && atomic_read(&rmi4_data->syna_use_gesture)) {
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+		prevent_bl = 0;
+#endif
 		retval = synaptics_rmi4_i2c_read(rmi4_data,
 				SYNA_ADDR_GESTURE_OFFSET,
 				gesture,
@@ -2134,6 +2136,10 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 					gestureext[0],gestureext[1],gestureext[2],gestureext[3],gestureext[4],gestureext[5],gestureext[6],gestureext[7],gestureext[24]);
 		}
 	}
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+	else
+		prevent_bl = 1;
+#endif
 
 	//check pdoze status
 	if (rmi4_data->pdoze_enable) {
@@ -2191,8 +2197,15 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 					continue;
 				}
 			}
-			if (get_virtual_key_button(x, y) == TP_VKEY_NONE) {
-				continue;
+
+			if (y > LCD_MAX_Y)
+			{
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+				prevent_bl = 0;
+#endif
+				if (get_virtual_key_button(x, y) == TP_VKEY_NONE) {
+					continue;
+				}
 			}
 
 #if 0
@@ -2240,6 +2253,11 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			finger_info |= 1;
 		}
 	}
+
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+	if(!prevent_bl)
+		enable_bttn_bl();
+#endif
 
 	for (finger = 0; finger < fingers_to_process; finger++) {
 		finger_status = (finger_info >> (fingers_to_process-finger - 1)) & 1;
