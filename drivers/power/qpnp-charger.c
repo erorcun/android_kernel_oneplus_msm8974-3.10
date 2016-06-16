@@ -532,6 +532,9 @@ struct qpnp_chg_chip {
 	bool	aicl_interrupt;
 /* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 	unsigned int aicl_current;
+	bool lcd_is_on;
+	int last_iusbmax;
+	int last_ibatmax;
 #endif
 /* OPPO 2013-06-08 wangjc Add end */
 /* OPPO 2013-10-24 liaofuchun add begin for enable/disable charge*/
@@ -1256,6 +1259,11 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 			|| mA > QPNP_CHG_I_MAX_MAX_MA) {
 		pr_err("bad mA=%d asked to set\n", mA);
 		return -EINVAL;
+	}
+
+	if(chip->last_iusbmax != mA) {
+		pr_info("%d mA\n", mA);
+		chip->last_iusbmax = mA;
 	}
 
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_iusbmax_set)
@@ -2374,10 +2382,6 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 			qpnp_chg_iusb_trim_set(chip, chip->usb_trim_default);
 #else
 			schedule_work(&chip->stop_charge_work);
-
-			// Nobody does that, so I thought that can be useful - 3.10
-			power_supply_set_supply_type(chip->usb_psy,
-				POWER_SUPPLY_TYPE_UNKNOWN);
 #endif
 /*OPPO 2013-10-25 liaofuchun modify end*/
 			chip->prev_usb_max_ma = -EINVAL;
@@ -4141,6 +4145,11 @@ qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
 		}
 	}
 #endif
+
+	if(chip->last_ibatmax != chg_current) {
+		pr_info("%d mA\n", chg_current);
+		chip->last_ibatmax = chg_current;
+	}
 
 	if (qpnp_ext_charger && qpnp_ext_charger->chg_ibatmax_set)
 		return qpnp_ext_charger->chg_ibatmax_set(chg_current);
@@ -6741,12 +6750,13 @@ static int set_prop_batt_health(struct qpnp_chg_chip *chip, int batt_health)
 #define MAX_COUNT	50
 #ifdef CONFIG_VENDOR_EDIT
 /* jingchun.wang@Onlinerd.Driver, 2014/01/02  Add for set soft aicl voltage to 4.4v */
-#define SOFT_AICL_VOL	4555
+#define SOFT_AICL_VOL	4465 // 4555
 #endif /*CONFIG_VENDOR_EDIT*/
 /* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 static int soft_aicl(struct qpnp_chg_chip *chip)
 {
-	int i, chg_vol;
+	int i, chg_vol, lon;
+	lon = chip->lcd_is_on;
 
 	chip->aicl_interrupt = false;
 	qpnp_chg_vinmin_set(chip, 4440);
@@ -6864,14 +6874,13 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			qpnp_chg_ibatmax_set(chip, 2112);
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL - 30) {
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
+			if(lon) {
 			qpnp_chg_iusbmax_set(chip, 1200);
 			qpnp_chg_iusbmax_set(chip, 1200);
-#else
+			} else {
 			qpnp_chg_iusbmax_set(chip, 1500);
 			qpnp_chg_iusbmax_set(chip, 1500);
-#endif
+			}
 			chip->aicl_current = 1500;
 			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);///4.68V sjc0401 add for improving current noise (bq24196 hardware bug)
 			if (!chip->usb_present) {
@@ -6880,14 +6889,14 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			return 0;
 		}
 	}
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
+
+	if(!lon) {
+	qpnp_chg_iusbmax_set(chip, 2000);
+	qpnp_chg_iusbmax_set(chip, 2000);
+	} else {
 	qpnp_chg_iusbmax_set(chip, 1200);
 	qpnp_chg_iusbmax_set(chip, 1200);
-#else
-	qpnp_chg_iusbmax_set(chip, 1500);
-	qpnp_chg_iusbmax_set(chip, 1500);
-#endif
+	}
 	chip->aicl_current = 2000;
 	return 0;
 	
@@ -6973,19 +6982,8 @@ static int qpnp_start_charging(struct qpnp_chg_chip *chip)
 			if(chip->aicl_current == 0) {
 				soft_aicl(chip);
 			} else {
-				if (chip->aicl_current >= 1500) {
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
-					qpnp_chg_iusbmax_set(chip, 1200);
-					qpnp_chg_iusbmax_set(chip, 1200);
-#else
-					qpnp_chg_iusbmax_set(chip, 1500);
-					qpnp_chg_iusbmax_set(chip, 1500);//set 2 times
-#endif
-				} else {
-					qpnp_chg_iusbmax_set(chip, chip->aicl_current);
-					qpnp_chg_iusbmax_set(chip, chip->aicl_current);
-				}
+				qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+				qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 			}	
 		}
 		
@@ -7021,15 +7019,9 @@ static int qpnp_start_charging(struct qpnp_chg_chip *chip)
 			if(chip->aicl_current == 0) {
 				soft_aicl(chip);
 			} else {
-				if (chip->aicl_current >= 1500) {
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
+				if (chip->aicl_current >= 1500 && chip->lcd_is_on) {
 					qpnp_chg_iusbmax_set(chip, 1200);
-					qpnp_chg_iusbmax_set(chip, 1200);
-#else
-					qpnp_chg_iusbmax_set(chip, 1500);
-					qpnp_chg_iusbmax_set(chip, 1500);//set 2 times
-#endif
+					qpnp_chg_iusbmax_set(chip, 1200);//set 2 times
 				} else {
 					qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 					qpnp_chg_iusbmax_set(chip, chip->aicl_current);
@@ -7343,16 +7335,7 @@ static int handle_batt_temp_little_cool(struct qpnp_chg_chip *chip)
 				if(chip->aicl_current == 0) {
 					soft_aicl(chip);
 				} else {
-					if (chip->aicl_current >= 1500) {
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
-						qpnp_chg_iusbmax_set(chip, 1200);
-#else
-						qpnp_chg_iusbmax_set(chip, 1500);
-#endif
-					} else {
-						qpnp_chg_iusbmax_set(chip, chip->aicl_current);
-					}
+					qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 				}
 			}
 		}
@@ -7426,13 +7409,8 @@ static int handle_batt_temp_normal(struct qpnp_chg_chip *chip)
 				if(chip->aicl_current == 0) {
 					soft_aicl(chip);
 				} else {
-					if (chip->aicl_current >= 1500) {
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
+					if (chip->aicl_current >= 1500 && chip->lcd_is_on) {
 						qpnp_chg_iusbmax_set(chip, 1200);
-#else
-						qpnp_chg_iusbmax_set(chip, 1500);
-#endif
 					} else {
 						qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 					}
@@ -8114,6 +8092,7 @@ static void qpnp_charge_info_init(struct qpnp_chg_chip *chip)
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 	chip->aicl_current = 0;
 	chip->aicl_interrupt = false;
+	chip->lcd_is_on = false;
 	chip->usb_present_count = 0;/* yangfangbiao@oneplus.cn, 2014/12/27  Add for  sync with android 4.4  */
 }
 
@@ -8198,6 +8177,13 @@ static int fb_notifier_callback(struct notifier_block *self,
 	if (evdata && evdata->data && chip) {
 		if (event == FB_EVENT_BLANK) {
 			blank = evdata->data;
+
+			if (*blank == FB_BLANK_UNBLANK)
+				chip->lcd_is_on = true;
+
+			if (*blank == FB_BLANK_POWERDOWN)
+				chip->lcd_is_on = false;
+
 			chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 			/* jingchun.wang@Onlinerd.Driver, 2013/12/30  Add for recognize dcp use 2000mA */
@@ -8205,7 +8191,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 				//not DCP charger, don't care
 				return 0;
 			}
-			
+
 			/* jingchun.wang@Onlinerd.Driver, 2013/12/14  Add for reset charge current when temp is normal */
 			if(qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__NORMAL) {
 				if (*blank == FB_BLANK_UNBLANK) {
@@ -8213,18 +8199,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 					/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 					if(chip->aicl_current != 0) {
 						if (chip->aicl_current >= 1500) {
-#ifdef CONFIG_MACH_FIND7OP
-/* OPPO 2014-06-03 sjc Modify for Find7op temp rising problem */
-								qpnp_chg_iusbmax_set(chip, 1200);
-#else
-							/* OPPO 2014-05-22 sjc Add for Find7s temp rising problem */
-							if (get_pcb_version() >= HW_VERSION__20 && get_pcb_version() < HW_VERSION__30) {//Find7s
-								if (chip->usbin_counts == USBIN_COUNT_FLAG && !qpnp_get_fast_chg_ing(chip))
-									qpnp_chg_iusbmax_set(chip, 900);
-							} else {
-								qpnp_chg_iusbmax_set(chip, 1500);
-							}
-#endif
+							qpnp_chg_iusbmax_set(chip, 1200);
 						} else {
 							qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 						}
