@@ -25,6 +25,18 @@
 
 static struct class *leds_class;
 
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+int prevent_bl = 0;
+int bl_br = 0;
+static struct led_classdev *bttn_bl;
+
+void enable_bttn_bl(void)
+{
+	if(bttn_bl)
+		__led_set_brightness(bttn_bl, bl_br);
+}
+#endif
+
 static void led_update_brightness(struct led_classdev *led_cdev)
 {
 	if (led_cdev->brightness_get)
@@ -52,6 +64,21 @@ static ssize_t led_brightness_store(struct device *dev,
 	ret = kstrtoul(buf, 10, &state);
 	if (ret)
 		return ret;
+
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+	if(!bttn_bl && !strcmp(led_cdev->name,"button-backlight"))
+		bttn_bl = led_cdev;
+
+	if(prevent_bl && !strcmp(led_cdev->name,"button-backlight")) {
+		prevent_bl = 0;
+
+		if(state != bl_br) {
+			if(state != 0) bl_br = state;
+		} else {
+			return 0;
+		}
+	}
+#endif
 
 	if (state == LED_OFF)
 		led_trigger_remove(led_cdev);
