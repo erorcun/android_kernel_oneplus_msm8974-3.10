@@ -1970,6 +1970,11 @@ hw_shutdown:
 	return 0;
 }
 
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+extern int prevent_bl;
+extern void enable_bttn_bl(void);
+#endif
+
 static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 		unsigned char *gestureext)
 {
@@ -1991,7 +1996,13 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 		case SYNA_ONE_FINGER_CIRCLE:
 			gesturemode = Circle;
 			if (atomic_read(&syna_rmi4_data->camera_enable))
+			{
 				keyvalue = KEY_GESTURE_CIRCLE;
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+				// Enable button backlight - don't worry, won't work if button backlight is disabled in userspace (needs reboot though)
+				enable_bttn_bl();
+#endif
+			}
 			break;
 
 		case SYNA_TWO_FINGER_SWIPE:
@@ -2017,7 +2028,13 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 		case SYNA_ONE_FINGER_DOUBLE_TAP:
 			gesturemode = DouTap;
 			if (atomic_read(&syna_rmi4_data->double_tap_enable))
+			{
 				keyvalue = KEY_WAKEUP;
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+				// Enable button backlight - don't worry, won't work if button backlight is disabled in userspace (needs reboot though)
+				enable_bttn_bl();
+#endif
+			}
 			break;
 
 		case SYNA_ONE_FINGER_DIRECTION:
@@ -2063,11 +2080,6 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 	return keyvalue;
 }
 
-#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-extern int prevent_bl;
-extern void enable_bttn_bl(void);
-#endif
-
 /**
  * synaptics_rmi4_f12_abs_report()
  *
@@ -2110,11 +2122,11 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	extra_data = (struct synaptics_rmi4_f12_extra_data *)fhandler->extra;
 	size_of_2d_data = sizeof(struct synaptics_rmi4_f12_finger_data);
 
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
+	prevent_bl = 1;
+#endif
 
 	if (rmi4_data->old_status && atomic_read(&rmi4_data->syna_use_gesture)) {
-#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-		prevent_bl = 0;
-#endif
 		retval = synaptics_rmi4_i2c_read(rmi4_data,
 				SYNA_ADDR_GESTURE_OFFSET,
 				gesture,
@@ -2136,10 +2148,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 					gestureext[0],gestureext[1],gestureext[2],gestureext[3],gestureext[4],gestureext[5],gestureext[6],gestureext[7],gestureext[24]);
 		}
 	}
-#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-	else
-		prevent_bl = 1;
-#endif
 
 	//check pdoze status
 	if (rmi4_data->pdoze_enable) {
@@ -4411,7 +4419,7 @@ static int fb_notifier_callback(struct notifier_block *p,
 				case FB_BLANK_NORMAL:
 				case FB_BLANK_VSYNC_SUSPEND:
 				case FB_BLANK_HSYNC_SUSPEND:
-					new_status = 0;
+					new_status = 0;		
 					break;
 				default:
 					/* Default to screen off to match previous
