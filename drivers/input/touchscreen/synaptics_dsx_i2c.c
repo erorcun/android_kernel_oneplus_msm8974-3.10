@@ -2200,14 +2200,12 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 			if (rmi4_data->board->y_flip)
 				y = rmi4_data->sensor_max_y - y;
 
-			if (y > rmi4_data->sensor_max_y- rmi4_data->snap_top - rmi4_data->snap_bottom-rmi4_data->virtual_key_height) {
+			if (y > LCD_MAX_Y)
+			{
 				if (!atomic_read(&rmi4_data->keypad_enable)) {
 					continue;
 				}
-			}
 
-			if (y > LCD_MAX_Y)
-			{
 #ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
 				prevent_bl = 0;
 #endif
