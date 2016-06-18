@@ -126,9 +126,6 @@ struct cpufreq_interactive_tunables {
 	int timer_slack_val;
 	bool io_is_busy;
 
-	/* scheduler input related flags */
-	bool use_migration_notif;
-
 	/*
 	 * Whether to align timer windows across all CPUs. When
 	 * use_sched_load is true, this flag is ignored and windows
@@ -137,10 +134,10 @@ struct cpufreq_interactive_tunables {
 	bool align_windows;
 
 	/*
-	 * Stay at max freq for at least max_freq_hysteresis before dropping
+	 * Stay at max freq for at least sampling_down_factor before dropping
 	 * frequency.
 	 */
-	unsigned int max_freq_hysteresis;
+	unsigned int sampling_down_factor;
 };
 
 /* For cases where we have single governor instance for system */
@@ -505,7 +502,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 
 	if (new_freq < ppol->target_freq &&
 	    now - ppol->max_freq_hyst_start_time <
-	    tunables->max_freq_hysteresis) {
+	    tunables->sampling_down_factor) {
 		trace_cpufreq_interactive_notyet(max_cpu, cpu_load,
 			ppol->target_freq, ppol->policy->cur, new_freq);
 		spin_unlock_irqrestore(&ppol->target_freq_lock, flags);
@@ -864,7 +861,7 @@ static ssize_t store_##file_name(					\
 	tunables->file_name = val;					\
 	return count;							\
 }
-show_store_one(max_freq_hysteresis);
+show_store_one(sampling_down_factor);
 show_store_one(align_windows);
 
 static ssize_t show_go_hispeed_load(struct cpufreq_interactive_tunables
@@ -1038,31 +1035,6 @@ static ssize_t store_io_is_busy(struct cpufreq_interactive_tunables *tunables,
 	return count;
 }
 
-static ssize_t show_use_migration_notif(
-		struct cpufreq_interactive_tunables *tunables, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n",
-			tunables->use_migration_notif);
-}
-
-static ssize_t store_use_migration_notif(
-			struct cpufreq_interactive_tunables *tunables,
-			const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	if (tunables->use_migration_notif == (bool) val)
-		return count;
-	tunables->use_migration_notif = val;
-
-	return count;
-}
-
 /*
  * Create show/store routines
  * - sys: One governor instance for complete SYSTEM
@@ -1110,8 +1082,7 @@ show_store_gov_pol_sys(boost);
 store_gov_pol_sys(boostpulse);
 show_store_gov_pol_sys(boostpulse_duration);
 show_store_gov_pol_sys(io_is_busy);
-show_store_gov_pol_sys(use_migration_notif);
-show_store_gov_pol_sys(max_freq_hysteresis);
+show_store_gov_pol_sys(sampling_down_factor);
 show_store_gov_pol_sys(align_windows);
 
 #define gov_sys_attr_rw(_name)						\
@@ -1136,8 +1107,7 @@ gov_sys_pol_attr_rw(timer_slack);
 gov_sys_pol_attr_rw(boost);
 gov_sys_pol_attr_rw(boostpulse_duration);
 gov_sys_pol_attr_rw(io_is_busy);
-gov_sys_pol_attr_rw(use_migration_notif);
-gov_sys_pol_attr_rw(max_freq_hysteresis);
+gov_sys_pol_attr_rw(sampling_down_factor);
 gov_sys_pol_attr_rw(align_windows);
 
 static struct global_attr boostpulse_gov_sys =
@@ -1159,8 +1129,7 @@ static struct attribute *interactive_attributes_gov_sys[] = {
 	&boostpulse_gov_sys.attr,
 	&boostpulse_duration_gov_sys.attr,
 	&io_is_busy_gov_sys.attr,
-	&use_migration_notif_gov_sys.attr,
-	&max_freq_hysteresis_gov_sys.attr,
+	&sampling_down_factor_gov_sys.attr,
 	&align_windows_gov_sys.attr,
 	NULL,
 };
@@ -1183,8 +1152,7 @@ static struct attribute *interactive_attributes_gov_pol[] = {
 	&boostpulse_gov_pol.attr,
 	&boostpulse_duration_gov_pol.attr,
 	&io_is_busy_gov_pol.attr,
-	&use_migration_notif_gov_pol.attr,
-	&max_freq_hysteresis_gov_pol.attr,
+	&sampling_down_factor_gov_pol.attr,
 	&align_windows_gov_pol.attr,
 	NULL,
 };
