@@ -25,7 +25,8 @@
 		qcom,scl-gpio = <&msmgpio 30 0>;
 		qcom,sda-gpio = <&msmgpio 29 0>;
 		qcom,active-only;
-
+		qcom,master-id = <86>;
+	
 		pn544-nxp-nfc@28 {
 			compatible = "pn544,nxp-nfc";
 			reg = <0x28>;
