@@ -666,60 +666,11 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
 		},
 	},
-//OPPO yuyi 2014-03-18 add begin for 14001 NFC spi clk
-#ifdef CONFIG_MACH_FIND7OP
 	{
-		.gpio = 49, //BLSP1_QUP5 (BLSP6) MOSI
+		.gpio      = 3,		/* BLSP1 QUP SPI_CLK */
 		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi3_config,
-			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
-		},
-	},
-	{
-		.gpio = 50, //BLSP1_QUP5 (BLSP6) MISO
-		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi2_config,
-			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
-		},
-	},
-	{
-		.gpio = 51, //BLSP1_QUP5 (BLSP6) CS
-		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi1_config,
-			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
-		},
-	},
-	{
-		.gpio = 52, //BLSP1_QUP5 (BLSP6) CLK
-		.settings = {
-			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi1_config,
-			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
-		},
-	},
-#endif
-//wangjc add.
-#ifdef CONFIG_VENDOR_EDIT
-	{
-		/* BLSP1 QUP I2C_DATA */
-		.gpio      = 2,
-		.settings = {
-#ifdef CONFIG_VENDOR_EDIT
-/* jingchun.wang@Onlinerd.Driver, 2014/01/08  Add for add i2c active setting */
-			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
-#endif /*CONFIG_VENDOR_EDIT*/
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
-		},
-	},
-#endif
-	{
-		/* BLSP1 QUP I2C_CLK */
-		.gpio      = 3,
-		.settings = {
-#ifdef CONFIG_VENDOR_EDIT
-/* jingchun.wang@Onlinerd.Driver, 2014/01/08  Add for add i2c active setting */
-			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
-#endif /*CONFIG_VENDOR_EDIT*/
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+			[GPIOMUX_ACTIVE] = &gpio_spi_config,
+			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
 		},
 	},
 	{
@@ -734,6 +685,21 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_ACTIVE] = &gpio_spi_cs1_config,
 			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
+		},
+	},
+#else
+	{
+		.gpio      = 2,		/* BLSP1 QUP I2C_DATA */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		},
+	},
+	{
+		.gpio      = 3,		/* BLSP1 QUP I2C_CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
 #endif
@@ -751,29 +717,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
 		},
 	},
-/*OPPO yuyi 2013-03-22 add begin for nfc*/
-#ifdef CONFIG_VENDOR_EDIT
-	{
-		.gpio	   = 29, 	/* BLSP1 QUP5 I2C_DAT */
-		.settings = {
-#ifdef CONFIG_VENDOR_EDIT
-/* jingchun.wang@Onlinerd.Driver, 2014/01/08  Add for add i2c active setting */
-			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
-#endif /*CONFIG_VENDOR_EDIT*/
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
-		},
-	},
-	{
-		.gpio	   = 30, 	/* BLSP1 QUP5 I2C_CLK */
-		.settings = {
-#ifdef CONFIG_VENDOR_EDIT
-/* jingchun.wang@Onlinerd.Driver, 2014/01/08  Add for add i2c active setting */
-			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
-#endif /*CONFIG_VENDOR_EDIT*/
-			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
-		},
-	},
-#endif
 	{
 		.gpio      = 83,		/* BLSP11 QUP I2C_DAT */
 		.settings = {
@@ -798,6 +741,50 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_uart_config,
 		},
 	},
+	{                           /* NFC */
+		.gpio      = 29,		/* BLSP1 QUP5 I2C_DAT */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 30,		/* BLSP1 QUP5 I2C_CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		},
+	},
+#ifdef CONFIG_MACH_FIND7OP
+	{                           /* NFC */
+		.gpio      = 49,		/* BLSP1 QUP5 (BLSP6) MOSI */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi3_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 50,		/* BLSP1 QUP5 (BLSP6) MISO */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi2_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 51,		/* BLSP1 QUP5 (BLSP6) CS */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi1_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+	{                           /* NFC */
+		.gpio      = 52,		/* BLSP1 QUP5 (BLSP6) CLK */
+		.settings = {
+			[GPIOMUX_ACTIVE] = &gpio_blsp6_spi1_config,
+			[GPIOMUX_SUSPENDED] = &gpio_blsp6_spi_suspend_config,
+		},
+	},
+#endif
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
 	{
 		.gpio      = 53,		/* BLSP2 QUP4 SPI_DATA_MOSI */
