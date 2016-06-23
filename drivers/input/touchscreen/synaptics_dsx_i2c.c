@@ -1995,12 +1995,10 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 	switch (gesture[0]) {
 		case SYNA_ONE_FINGER_CIRCLE:
 			gesturemode = Circle;
-			if (atomic_read(&syna_rmi4_data->camera_enable))
-			{
+			if (atomic_read(&syna_rmi4_data->camera_enable)) {
 				keyvalue = KEY_GESTURE_CIRCLE;
 #ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-				// Enable button backlight - don't worry, won't work if button backlight is disabled in userspace (needs reboot though)
-				enable_bttn_bl();
+				prevent_bl = 2;
 #endif
 			}
 			break;
@@ -2027,12 +2025,10 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 
 		case SYNA_ONE_FINGER_DOUBLE_TAP:
 			gesturemode = DouTap;
-			if (atomic_read(&syna_rmi4_data->double_tap_enable))
-			{
+			if (atomic_read(&syna_rmi4_data->double_tap_enable)) {
 				keyvalue = KEY_WAKEUP;
 #ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-				// Enable button backlight - don't worry, won't work if button backlight is disabled in userspace (needs reboot though)
-				enable_bttn_bl();
+				prevent_bl = 2;
 #endif
 			}
 			break;
@@ -4417,7 +4413,7 @@ static int fb_notifier_callback(struct notifier_block *p,
 				case FB_BLANK_NORMAL:
 				case FB_BLANK_VSYNC_SUSPEND:
 				case FB_BLANK_HSYNC_SUSPEND:
-					new_status = 0;		
+					new_status = 0;
 					break;
 				default:
 					/* Default to screen off to match previous
