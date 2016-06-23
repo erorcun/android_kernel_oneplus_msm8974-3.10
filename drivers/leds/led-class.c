@@ -69,7 +69,7 @@ static ssize_t led_brightness_store(struct device *dev,
 	if(!bttn_bl && !strcmp(led_cdev->name,"button-backlight"))
 		bttn_bl = led_cdev;
 
-	if(prevent_bl && !strcmp(led_cdev->name,"button-backlight")) {
+	if(prevent_bl == 1 && !strcmp(led_cdev->name,"button-backlight")) {
 		prevent_bl = 0;
 
 		if(state != bl_br) {
