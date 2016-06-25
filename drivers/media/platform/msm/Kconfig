@@ -27,6 +27,10 @@ menuconfig MSMB_CAMERA
 	  adds support for the camera driver stack including sensor, isp
 	  and postprocessing drivers.
 
+config CAF_CAMERA_DRIVER
+	bool "for find7 series"
+	depends on MSMB_CAMERA && MACH_OPPO
+
 config MSMB_CAMERA_DEBUG
 	bool "Qualcomm MSM camera 2.0 debugging with printk"
 	depends on MSMB_CAMERA
