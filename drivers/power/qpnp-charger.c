@@ -564,6 +564,8 @@ static void
 qpnp_chg_set_appropriate_battery_current(struct qpnp_chg_chip *chip);
 static int get_prop_authenticate(struct qpnp_chg_chip *chip);
 
+extern void bq24196_wait_for_resume(void);
+
 static struct of_device_id qpnp_charger_match_table[] = {
 	{ .compatible = QPNP_CHARGER_DEV_NAME, },
 	{}
@@ -3768,6 +3770,8 @@ qpnp_batt_external_power_changed(struct power_supply *psy)
 		pr_info("%s chg done\n",__func__);
 		return ;
 	}	
+
+	bq24196_wait_for_resume();
 #endif
 /*OPPO 2013-10-24 liaofuchun add end*/
 	if (!chip->bms_psy)
@@ -4485,6 +4489,8 @@ static void qpnp_chg_ext_charger_hwinit(struct qpnp_chg_chip *chip)
 		pr_info("%s fast chg started,don't init bq24196\n",__func__);
 		return ;
 	}
+
+	bq24196_wait_for_resume();
 #endif
 /* OPPO 2014-05-21 liaofuchun modify end*/
 
