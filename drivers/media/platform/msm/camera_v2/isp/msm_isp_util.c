@@ -256,7 +256,7 @@ int msm_isp_unsubscribe_event(struct v4l2_subdev *sd, struct v4l2_fh *fh,
 	}
 	return rc;
 }
-/*
+#ifdef CONFIG_CAF_CAMERA_DRIVER
 static int msm_isp_get_max_clk_rate(struct vfe_device *vfe_dev, long *rate)
 {
 	int           clk_idx = 0;
@@ -293,7 +293,7 @@ static int msm_isp_get_max_clk_rate(struct vfe_device *vfe_dev, long *rate)
 	*rate = round_rate;
 	return 0;
 }
-*/
+#endif
 static int msm_isp_set_clk_rate(struct vfe_device *vfe_dev, long *rate)
 {
 	int rc = 0;
@@ -684,6 +684,35 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 		}
 		break;
 	}
+#ifdef CONFIG_CAF_CAMERA_DRIVER
+	case VFE_HW_UPDATE_LOCK: {
+		uint32_t update_id =
+			vfe_dev->axi_data.src_info[VFE_PIX_0].last_updt_frm_id;
+		if (vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id != *cfg_data
+			|| update_id == *cfg_data) {
+			ISP_DBG("hw update lock failed,acquire id %u\n",
+				*cfg_data);
+			ISP_DBG("hw update lock failed,current id %lu\n",
+				vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id);
+			ISP_DBG("hw update lock failed,last id %u\n",
+				update_id);
+			return -EINVAL;
+		}
+		break;
+	}
+	case VFE_HW_UPDATE_UNLOCK: {
+		if (vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id
+			!= *cfg_data) {
+			ISP_DBG("hw update across frame boundary,begin id %u\n",
+				*cfg_data);
+			ISP_DBG("hw update across frame boundary,end id %lu\n",
+				vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id);
+		}
+		vfe_dev->axi_data.src_info[VFE_PIX_0].last_updt_frm_id =
+			vfe_dev->axi_data.src_info[VFE_PIX_0].frame_id;
+		break;
+	}
+#endif
 	case VFE_READ: {
 		int i;
 		uint32_t *data_ptr = cfg_data +
@@ -701,14 +730,22 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 		}
 		break;
 	}
-	case GET_SOC_HW_VER:
-		*cfg_data = vfe_dev->soc_hw_version;
-/*		break;
+	case GET_SOC_HW_VER: {
+	  if (cmd_len < sizeof(uint32_t)) {
+			pr_err("%s:%d failed: invalid cmd len %u exp %zu\n",
+				__func__, __LINE__, cmd_len,
+				sizeof(uint32_t));
+			return -EINVAL;
+		}
+	  *cfg_data = vfe_dev->soc_hw_version;
+	  break;
+	}
+#ifdef CONFIG_CAF_CAMERA_DRIVER
 	case GET_MAX_CLK_RATE: {
 		int rc = 0;
 
 		if (cmd_len < sizeof(unsigned long)) {
-			pr_err("%s:%d failed: invalid cmd len %u exp %zu\n",
+			pr_err("%s:%d failed: invalid cmd len %d exp %d\n",
 				__func__, __LINE__, cmd_len,
 				sizeof(unsigned long));
 			return -EINVAL;
@@ -721,20 +758,18 @@ static int msm_isp_send_hw_cmd(struct vfe_device *vfe_dev,
 		}
 		break;
 	}
-	case GET_ISP_ID: {
-		uint32_t *isp_id = NULL;
-
-		if (cmd_len < sizeof(uint32_t)) {
-			pr_err("%s:%d failed: invalid cmd len %u exp %u\n",
+	case SET_WM_UB_SIZE: {
+	  	  if (cmd_len < sizeof(uint32_t)) {
+			pr_err("%s:%d failed: invalid cmd len %u exp %zu\n",
 				__func__, __LINE__, cmd_len,
 				sizeof(uint32_t));
 			return -EINVAL;
 		}
-
-		isp_id = (uint32_t *)cfg_data;
-		*isp_id = vfe_dev->pdev->id;
+		vfe_dev->vfe_ub_size = *cfg_data;
+		break;
 	}
-*/	}
+#endif
+	}
 	return 0;
 }
 

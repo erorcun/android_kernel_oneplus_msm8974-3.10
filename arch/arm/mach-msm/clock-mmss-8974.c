@@ -2311,10 +2311,10 @@ static struct clk_lookup msm_camera_clocks_8974pro_only[] = {
 	CLK_LOOKUP_OF("cam_clk", camss_mclk2_clk, "6c.qcom,camera"),
 	CLK_LOOKUP_OF("cam_clk", camss_mclk1_clk, "90.qcom,camera"),
 	CLK_LOOKUP_OF("cam_src_clk", mclk0_clk_src, "0.qcom,camera"),
-	CLK_LOOKUP_OF("cam_src_clk", mclk1_clk_src, "1.qcom,camera"),
+	CLK_LOOKUP_OF("cam_src_clk", mclk2_clk_src, "1.qcom,camera"),
 	CLK_LOOKUP_OF("cam_src_clk", mclk2_clk_src, "2.qcom,camera"),
 	CLK_LOOKUP_OF("cam_clk", camss_mclk0_clk, "0.qcom,camera"),
-	CLK_LOOKUP_OF("cam_clk", camss_mclk1_clk, "1.qcom,camera"),
+	CLK_LOOKUP_OF("cam_clk", camss_mclk2_clk, "1.qcom,camera"),
 	CLK_LOOKUP_OF("cam_clk", camss_mclk2_clk, "2.qcom,camera"),
 };
 

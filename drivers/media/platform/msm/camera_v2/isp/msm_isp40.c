@@ -36,10 +36,16 @@
 #define VFE40_8x26_VERSION 0x20000013
 #define VFE40_8x26V2_VERSION 0x20010014
 
+#ifndef CONFIG_CAF_CAMERA_DRIVER
 #define VFE40_BURST_LEN 1
 #define VFE40_STATS_BURST_LEN 1
 #define VFE40_UB_SIZE 1536
 #define VFE40_EQUAL_SLICE_UB 228
+#else
+/* STATS_SIZE (BE + BG + BF+ RS + CS + IHIST + BHIST ) = 392 */
+#define VFE40_STATS_SIZE 392
+#endif
+
 #define VFE40_WM_BASE(idx) (0x6C + 0x24 * idx)
 #define VFE40_RDI_BASE(idx) (0x2E8 + 0x4 * idx)
 #define VFE40_XBAR_BASE(idx) (0x58 + 0x4 * (idx / 2))
@@ -375,15 +381,25 @@ static void msm_vfe40_process_camif_irq(struct vfe_device *vfe_dev,
 	uint32_t irq_status0, uint32_t irq_status1,
 	struct msm_isp_timestamp *ts)
 {
+#ifdef CONFIG_CAF_CAMERA_DRIVER
+	int cnt;
+#endif
+
 	if (!(irq_status0 & 0xF))
 		return;
 
 	if (irq_status0 & (1 << 0)) {
 		ISP_DBG("%s: SOF IRQ\n", __func__);
+#ifndef CONFIG_CAF_CAMERA_DRIVER
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].raw_stream_count > 0
 			&& vfe_dev->axi_data.src_info[VFE_PIX_0].
 			pix_stream_count == 0) {
 			msm_isp_sof_notify(vfe_dev, VFE_PIX_0, ts);
+#else
+		cnt = vfe_dev->axi_data.src_info[VFE_PIX_0].raw_stream_count;
+		if (cnt > 0) {
+			msm_isp_sof_notify(vfe_dev, VFE_RAW_0, ts);
+#endif
 			if (vfe_dev->axi_data.stream_update)
 				msm_isp_axi_stream_update(vfe_dev);
 			msm_isp_update_framedrop_reg(vfe_dev);
@@ -977,6 +993,13 @@ static void msm_vfe40_axi_cfg_wm_reg(
 	uint8_t plane_idx)
 {
 	uint32_t val;
+#ifdef CONFIG_CAF_CAMERA_DRIVER
+
+	struct msm_vfe_axi_shared_data *axi_data =
+		&vfe_dev->axi_data;
+	uint32_t burst_len = axi_data->burst_len;
+
+#endif
 	uint32_t wm_base = VFE40_WM_BASE(stream_info->wm[plane_idx]);
 
 	if (!stream_info->frame_based) {
@@ -998,7 +1021,11 @@ static void msm_vfe40_axi_cfg_wm_reg(
 				plane_idx].output_stride) << 16 |
 			(stream_info->plane_cfg[
 				plane_idx].output_height - 1) << 4 |
+#ifndef CONFIG_CAF_CAMERA_DRIVER
 			VFE40_BURST_LEN;
+#else
+			burst_len;
+#endif
 		msm_camera_io_w(val, vfe_dev->vfe_base + wm_base + 0x18);
 	} else {
 		msm_camera_io_w(0x2, vfe_dev->vfe_base + wm_base);
@@ -1008,7 +1035,11 @@ static void msm_vfe40_axi_cfg_wm_reg(
 				plane_idx].output_width) << 16 |
 			(stream_info->plane_cfg[
 				plane_idx].output_height - 1) << 4 |
+#ifndef CONFIG_CAF_CAMERA_DRIVER
 			VFE40_BURST_LEN;
+#else
+			burst_len;
+#endif
 		msm_camera_io_w(val, vfe_dev->vfe_base + wm_base + 0x18);
 	}
 
@@ -1123,6 +1154,9 @@ static void msm_vfe40_cfg_axi_ub_equal_default(
 	uint8_t num_used_wms = 0;
 	uint32_t prop_size = 0;
 	uint32_t wm_ub_size;
+#ifdef CONFIG_CAF_CAMERA_DRIVER
+	uint32_t axi_wm_ub;
+#endif
 
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
 		if (axi_data->free_wm[i] > 0) {
@@ -1130,7 +1164,13 @@ static void msm_vfe40_cfg_axi_ub_equal_default(
 			total_image_size += axi_data->wm_image_size[i];
 		}
 	}
+#ifdef CONFIG_CAF_CAMERA_DRIVER
+	axi_wm_ub = vfe_dev->vfe_ub_size - VFE40_STATS_SIZE;
+
+	prop_size = axi_wm_ub -
+#else
 	prop_size = MSM_ISP40_TOTAL_WM_UB -
+#endif
 		axi_data->hw_info->min_wm_ub * num_used_wms;
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
 		if (axi_data->free_wm[i]) {
@@ -1155,11 +1195,23 @@ static void msm_vfe40_cfg_axi_ub_equal_slicing(
 	int i;
 	uint32_t ub_offset = 0;
 	struct msm_vfe_axi_shared_data *axi_data = &vfe_dev->axi_data;
+#ifdef CONFIG_CAF_CAMERA_DRIVER
+	uint32_t axi_equal_slice_ub =
+		(vfe_dev->vfe_ub_size - VFE40_STATS_SIZE)/
+			(axi_data->hw_info->num_wm - 1);
+
+ 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
+		msm_camera_io_w(ub_offset << 16 | (axi_equal_slice_ub - 1),
+			vfe_dev->vfe_base + VFE40_WM_BASE(i) + 0x10);
+		ub_offset += axi_equal_slice_ub;
+ 	}
+#else
 	for (i = 0; i < axi_data->hw_info->num_wm; i++) {
 		msm_camera_io_w(ub_offset << 16 | (VFE40_EQUAL_SLICE_UB - 1),
 			vfe_dev->vfe_base + VFE40_WM_BASE(i) + 0x10);
 		ub_offset += VFE40_EQUAL_SLICE_UB;
 	}
+#endif
 }
 
 static void msm_vfe40_cfg_axi_ub(struct vfe_device *vfe_dev)
@@ -1348,7 +1400,14 @@ static void msm_vfe40_stats_clear_wm_reg(
 static void msm_vfe40_stats_cfg_ub(struct vfe_device *vfe_dev)
 {
 	int i;
+#ifndef CONFIG_CAF_CAMERA_DRIVER
 	uint32_t ub_offset = VFE40_UB_SIZE;
+#else
+	struct msm_vfe_stats_shared_data *stats_data = &vfe_dev->stats_data;
+	uint32_t ub_offset = vfe_dev->vfe_ub_size;
+	uint32_t stats_burst_len = stats_data->stats_burst_len;
+
+#endif
 	uint32_t ub_size[VFE40_NUM_STATS_TYPE] = {
 		64, /*MSM_ISP_STATS_BE*/
 		128, /*MSM_ISP_STATS_BG*/
@@ -1362,7 +1421,11 @@ static void msm_vfe40_stats_cfg_ub(struct vfe_device *vfe_dev)
 
 	for (i = 0; i < VFE40_NUM_STATS_TYPE; i++) {
 		ub_offset -= ub_size[i];
+#ifndef CONFIG_CAF_CAMERA_DRIVER
 		msm_camera_io_w(VFE40_STATS_BURST_LEN << 30 |
+#else
+		msm_camera_io_w(stats_burst_len << 30 |
+#endif
 			ub_offset << 16 | (ub_size[i] - 1),
 			vfe_dev->vfe_base + VFE40_STATS_BASE(i) + 0xC);
 	}
