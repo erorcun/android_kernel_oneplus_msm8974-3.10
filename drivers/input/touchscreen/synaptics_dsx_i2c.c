@@ -4515,8 +4515,8 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 		goto out;
 	}
 
-	if (!rmi4_data->sensor_sleep) {
-		goto out;
+	if (!rmi4_data->suspended) {
+		return;
 	}
 
 	synaptics_rmi4_sensor_wake(rmi4_data);
@@ -4924,15 +4924,9 @@ static int synaptics_rmi4_suspend(struct device *dev)
 		goto out;
 	}
 
-	if (rmi4_data->stay_awake) {
-		goto out;
-	}
-
-	if (!rmi4_data->sensor_sleep) {
-		synaptics_rmi4_irq_enable(rmi4_data, false);
-		synaptics_rmi4_sensor_sleep(rmi4_data);
-		synaptics_rmi4_free_fingers(rmi4_data);
-	}
+	synaptics_rmi4_irq_enable(rmi4_data, false);
+	synaptics_rmi4_sensor_sleep(rmi4_data);
+	synaptics_rmi4_free_fingers(rmi4_data);
 
 out:
 	mutex_lock(&suspended_mutex);
