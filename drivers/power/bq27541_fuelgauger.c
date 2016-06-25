@@ -170,7 +170,7 @@ extern int pic16f_fw_update(bool pull96);
 #define	SOC_SHUTDOWN_VALID_LIMITS	20 /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
 #define TEN_MINUTES		600
 
-#define BATT_SOC_INTERVAL					6000//6S
+#define BATT_SOC_INTERVAL					30000//6S -> 30S
 
 #endif
 
@@ -1630,7 +1630,7 @@ static void update_soc(struct work_struct *work)
 
 	bq27541_battery_soc(di, false);
 		
-	/*update time 6s*/
+	/*update time 30s*/
 	schedule_delayed_work(&di->update_soc_work,
 			      round_jiffies_relative(msecs_to_jiffies
 						     (BATT_SOC_INTERVAL)));
