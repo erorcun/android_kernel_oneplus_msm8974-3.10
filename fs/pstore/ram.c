@@ -232,6 +232,7 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 	    reason != KMSG_DUMP_RESTART &&
 	    reason != KMSG_DUMP_EMERG &&
 	    reason != KMSG_DUMP_HALT &&
+	    reason != KMSG_DUMP_POWEROFF &&
 	    reason != KMSG_DUMP_PANIC)
 		return -EINVAL;
 
@@ -246,6 +247,9 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 		return -EINVAL;
 
 	if (reason == KMSG_DUMP_HALT && cxt->log_level < 4)
+		return -EINVAL;
+
+	if (reason == KMSG_DUMP_POWEROFF && cxt->log_level < 5)
 		return -EINVAL;
 
 	/* Explicitly only take the first part of any new crash.
