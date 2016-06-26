@@ -61,7 +61,7 @@ static struct ramoops_platform_data oppo_ramoops_data = {
 	.console_size = /* OPPO_PERSISTENT_RAM_SIZE, */ (256 * SZ_1K),
 	.mem_address  = OPPO_RAM_CONSOLE_BASE,
 	.mem_size     = OPPO_PERSISTENT_RAM_SIZE,
-	.log_level	= 4,
+	.log_level	= 5,
 };
 
 static struct platform_device oppo_ramoops_dev = {
