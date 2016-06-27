@@ -295,6 +295,7 @@ struct hid_item {
 #define HID_GROUP_GENERIC			0x0001
 #define HID_GROUP_MULTITOUCH			0x0002
 #define HID_GROUP_SENSOR_HUB			0x0003
+#define HID_GROUP_LOGITECH_DJ_DEVICE			0x0004
 
 /*
  * This is the global environment of the parser. This information is
