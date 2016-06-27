@@ -137,7 +137,7 @@ static const char kbd_descriptor[] = {
 	0x91, 0x02,		/*   OUTPUT (Data, Variable, Absolute)  */
 	0x95, 0x01,		/*   REPORT COUNT (1)           */
 	0x75, 0x03,		/*   REPORT SIZE (3)            */
-	0x91, 0x01,		/*   OUTPUT (Constant)  
+	0x91, 0x01,		/*   OUTPUT (Constant)   */
 	0x95, 0x06,		/*   REPORT_COUNT (6)           */
 	0x75, 0x08,		/*   REPORT_SIZE (8)            */
 	0x15, 0x00,		/*   LOGICAL_MINIMUM (0)        */
