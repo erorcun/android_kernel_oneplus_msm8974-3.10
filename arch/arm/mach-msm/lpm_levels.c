@@ -265,10 +265,15 @@ static int lpm_system_mode_select(struct lpm_system_state *system_state,
 	int i;
 	uint32_t best_level_pwr = ~0U;
 	uint32_t pwr;
-	uint32_t latency_us = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+	struct cpumask mask;
+	uint32_t latency_us = ~0U;
 
 	if (!system_state->system_level)
 		return -EINVAL;
+
+	if (cpumask_and(&mask, cpu_online_mask, &num_powered_cores))
+		latency_us = pm_qos_request_for_cpumask(PM_QOS_CPU_DMA_LATENCY,
+							&mask);
 
 	for (i = 0; i < system_state->num_system_levels; i++) {
 		struct lpm_system_level *system_level =
@@ -539,7 +544,7 @@ static int lpm_cpu_power_select(struct cpuidle_device *dev, int *index)
 {
 	int best_level = -1;
 	uint32_t best_level_pwr = ~0U;
-	uint32_t latency_us = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+	uint32_t latency_us = pm_qos_request_for_cpu(PM_QOS_CPU_DMA_LATENCY, dev->cpu);
 	uint32_t sleep_us =
 		(uint32_t)(ktime_to_us(tick_nohz_get_sleep_length()));
 	uint32_t modified_time_us = 0;
