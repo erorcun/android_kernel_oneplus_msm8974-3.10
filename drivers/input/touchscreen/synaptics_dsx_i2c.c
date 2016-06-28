@@ -1321,6 +1321,12 @@ static ssize_t synaptics_rmi4_proc_double_tap_write(struct file *file, const cha
 
 	atomic_set(&syna_rmi4_data->double_tap_enable, enable);
 
+	atomic_set(&syna_rmi4_data->syna_use_gesture,
+			enable ||
+			atomic_read(&syna_rmi4_data->camera_enable) ||
+			atomic_read(&syna_rmi4_data->music_enable) ||
+			atomic_read(&syna_rmi4_data->flashlight_enable) ? 1 : 0);
+
 	return count;
 }
 
@@ -1349,6 +1355,12 @@ static ssize_t synaptics_rmi4_proc_camera_write(struct file *file, const char __
 	enable = (buf[0] == '0') ? 0 : 1;
 
 	atomic_set(&syna_rmi4_data->camera_enable, enable);
+
+	atomic_set(&syna_rmi4_data->syna_use_gesture,
+			atomic_read(&syna_rmi4_data->double_tap_enable) ||
+			enable ||
+			atomic_read(&syna_rmi4_data->music_enable) ||
+			atomic_read(&syna_rmi4_data->flashlight_enable) ? 1 : 0);
 
 	return count;
 }
@@ -1379,6 +1391,12 @@ static ssize_t synaptics_rmi4_proc_music_write(struct file *file, const char __u
 
 	atomic_set(&syna_rmi4_data->music_enable, enable);
 
+	atomic_set(&syna_rmi4_data->syna_use_gesture,
+			atomic_read(&syna_rmi4_data->double_tap_enable) ||
+			atomic_read(&syna_rmi4_data->camera_enable) ||
+			enable ||
+			atomic_read(&syna_rmi4_data->flashlight_enable) ? 1 : 0);
+
 	return count;
 }
 
@@ -1407,6 +1425,12 @@ static ssize_t synaptics_rmi4_proc_flashlight_write(struct file *file, const cha
 	enable = (buf[0] == '0') ? 0 : 1;
 
 	atomic_set(&syna_rmi4_data->flashlight_enable, enable);
+
+	atomic_set(&syna_rmi4_data->syna_use_gesture,
+			atomic_read(&syna_rmi4_data->double_tap_enable) ||
+			atomic_read(&syna_rmi4_data->camera_enable) ||
+			atomic_read(&syna_rmi4_data->music_enable) ||
+			enable ? 1 : 0);
 
 	return count;
 }
@@ -2122,7 +2146,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	prevent_bl = 1;
 #endif
 
-	if (rmi4_data->old_status && atomic_read(&rmi4_data->syna_use_gesture)) {
+	if (rmi4_data->suspended && !rmi4_data->sensor_sleep) {
 		retval = synaptics_rmi4_i2c_read(rmi4_data,
 				SYNA_ADDR_GESTURE_OFFSET,
 				gesture,
@@ -4503,20 +4527,11 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
 				&val, sizeof(val));
 
-	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
+	if (!rmi4_data->sensor_sleep || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,false);
 		synaptics_enable_pdoze(rmi4_data,false);
 		synaptics_enable_irqwake(rmi4_data,false);
-		atomic_set(&rmi4_data->syna_use_gesture,
-			atomic_read(&rmi4_data->double_tap_enable) ||
-			atomic_read(&rmi4_data->camera_enable) ||
-			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 		goto out;
-	}
-
-	if (!rmi4_data->suspended) {
-		return;
 	}
 
 	synaptics_rmi4_sensor_wake(rmi4_data);
@@ -4910,12 +4925,6 @@ static int synaptics_rmi4_suspend(struct device *dev)
 	if (rmi4_data->glove_enable)
 		synaptics_rmi4_i2c_write(syna_rmi4_data, SYNA_ADDR_GLOVE_FLAG,
 				&val, sizeof(val));
-
-	atomic_set(&rmi4_data->syna_use_gesture,
-			atomic_read(&rmi4_data->double_tap_enable) ||
-			atomic_read(&rmi4_data->camera_enable) ||
-			atomic_read(&rmi4_data->music_enable) ||
-			atomic_read(&rmi4_data->flashlight_enable) ? 1 : 0);
 
 	if (atomic_read(&rmi4_data->syna_use_gesture) || rmi4_data->pdoze_enable) {
 		synaptics_enable_gesture(rmi4_data,true);
