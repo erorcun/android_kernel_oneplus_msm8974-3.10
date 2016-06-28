@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2013,2015 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
+#include <linux/regulator/rpm-smd-regulator.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/mfd/pm8xxx/gpio.h>
 #include <linux/wcnss_wlan.h>
@@ -23,9 +24,6 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
-#include <mach/msm_xo.h>
-#include <mach/msm_iomap.h>
-#include <linux/regulator/rpm-smd-regulator.h>
 
 
 static void __iomem *msm_wcnss_base;
@@ -33,6 +31,7 @@ static LIST_HEAD(power_on_lock_list);
 static DEFINE_MUTEX(list_lock);
 static DEFINE_SEMAPHORE(wcnss_power_on_lock);
 static int auto_detect;
+static int is_power_on;
 
 #define MSM_RIVA_PHYS           0x03204000
 #define MSM_PRONTO_PHYS         0xfb21b000
@@ -123,6 +122,41 @@ static struct vregs_info pronto_vregs[] = {
 		1800000, 0,    NULL},
 };
 
+/* IRIS regulators for Pronto v2 hardware */
+static struct vregs_info iris_vregs_pronto_v2[] = {
+	{"qcom,iris-vddxo",  VREG_NULL_CONFIG, 1800000, 0,
+		1800000, 10000,  NULL},
+	{"qcom,iris-vddrfa", VREG_NULL_CONFIG, 1300000, 0,
+		1300000, 100000, NULL},
+	{"qcom,iris-vddpa",  VREG_NULL_CONFIG, 3300000, 0,
+		3300000, 515000, NULL},
+	{"qcom,iris-vdddig", VREG_NULL_CONFIG, 1800000, 0,
+		1800000, 10000,  NULL},
+};
+
+/* WCNSS regulators for Pronto v2 hardware */
+static struct vregs_info pronto_vregs_pronto_v2[] = {
+	{"qcom,pronto-vddmx",  VREG_NULL_CONFIG, 1287500,  0,
+		1287500, 0,    NULL},
+	{"qcom,pronto-vddcx",  VREG_NULL_CONFIG, RPM_REGULATOR_CORNER_NORMAL,
+		RPM_REGULATOR_CORNER_NONE, RPM_REGULATOR_CORNER_SUPER_TURBO,
+		0,             NULL},
+	{"qcom,pronto-vddpx",  VREG_NULL_CONFIG, 1800000, 0,
+		1800000, 0,    NULL},
+};
+
+/* WCNSS regulators for Pronto v3 hardware */
+static struct vregs_info pronto_vregs_pronto_v3[] = {
+	{"qcom,pronto-vddmx",  VREG_NULL_CONFIG, RPM_REGULATOR_CORNER_NORMAL,
+		RPM_REGULATOR_CORNER_NONE, RPM_REGULATOR_CORNER_SUPER_TURBO,
+		0,             NULL},
+	{"qcom,pronto-vddcx",  VREG_NULL_CONFIG, RPM_REGULATOR_CORNER_NORMAL,
+		RPM_REGULATOR_CORNER_NONE, RPM_REGULATOR_CORNER_SUPER_TURBO,
+		0,             NULL},
+	{"qcom,pronto-vddpx",  VREG_NULL_CONFIG, 1800000, 0,
+		1800000, 0,    NULL},
+};
+
 
 struct host_driver {
 	char name[20];
@@ -131,7 +165,8 @@ struct host_driver {
 
 enum {
 	IRIS_3660, /* also 3660A and 3680 */
-	IRIS_3620
+	IRIS_3620,
+	IRIS_3610
 };
 
 
@@ -144,6 +179,9 @@ int xo_auto_detect(u32 reg)
 		return WCNSS_XO_48MHZ;
 
 	case IRIS_3620:
+		return WCNSS_XO_19MHZ;
+
+	case IRIS_3610:
 		return WCNSS_XO_19MHZ;
 
 	default:
@@ -195,6 +233,7 @@ int wcnss_get_iris_name(char *iris_name)
 }
 EXPORT_SYMBOL(wcnss_get_iris_name);
 
+
 int validate_iris_chip_id(u32 reg)
 {
 	int iris_id;
@@ -230,24 +269,26 @@ void  wcnss_iris_reset(u32 reg, void __iomem *pmu_conf_reg)
 	writel_relaxed(reg, pmu_conf_reg);
 }
 
-static int configure_iris_xo(struct device *dev, bool use_48mhz_xo, int on,
-			int *iris_xo_set)
+static int
+configure_iris_xo(struct device *dev,
+			struct wcnss_wlan_config *cfg,
+			int on, int *iris_xo_set)
 {
 	u32 reg = 0, i = 0;
 	u32 iris_reg = WCNSS_INVALID_IRIS_REG;
 	int rc = 0;
 	int size = 0;
+	unsigned long wcnss_phys_addr;
 	int pmu_offset = 0;
 	int spare_offset = 0;
-	unsigned long wcnss_phys_addr;
 	void __iomem *pmu_conf_reg;
 	void __iomem *spare_reg;
 	void __iomem *iris_read_reg;
 	struct clk *clk;
 	struct clk *clk_rf = NULL;
-        struct wcnss_wlan_config *cfg = NULL;
+	bool use_48mhz_xo;
 
-        cfg = wcnss_get_wlan_config();
+	use_48mhz_xo = cfg->use_48mhz_xo;
 
 	if (wcnss_hardware_type() == WCNSS_PRONTO_HW) {
 		wcnss_phys_addr = MSM_PRONTO_PHYS;
@@ -539,16 +580,33 @@ fail:
 	return rc;
 
 }
+#if 0
+static inline void wcnss_vregs_put(void)
+{
+	int i;
 
-static void wcnss_iris_vregs_off(enum wcnss_hw_type hw_type)
+	for (i = (ARRAY_SIZE(iris_vregs_riva)-1); i >= 0; i--)
+		regulator_put(iris_vregs_riva[i].regulator);
+
+	for (i = (ARRAY_SIZE(iris_vregs_pronto)-1); i >= 0; i--)
+		regulator_put(iris_vregs_pronto[i].regulator);
+}
+#endif
+static void wcnss_iris_vregs_off(enum wcnss_hw_type hw_type,
+					struct wcnss_wlan_config *cfg)
 {
 	switch (hw_type) {
 	case WCNSS_RIVA_HW:
 		wcnss_vregs_off(iris_vregs_riva, ARRAY_SIZE(iris_vregs_riva));
 		break;
 	case WCNSS_PRONTO_HW:
-		wcnss_vregs_off(iris_vregs_pronto,
+		if (cfg->is_pronto_vt || cfg->is_pronto_v3) {
+			wcnss_vregs_off(iris_vregs_pronto_v2,
+				ARRAY_SIZE(iris_vregs_pronto_v2));
+		} else {
+			wcnss_vregs_off(iris_vregs_pronto,
 				ARRAY_SIZE(iris_vregs_pronto));
+		}
 		break;
 	default:
 		pr_err("%s invalid hardware %d\n", __func__, hw_type);
@@ -556,7 +614,9 @@ static void wcnss_iris_vregs_off(enum wcnss_hw_type hw_type)
 	}
 }
 
-static int wcnss_iris_vregs_on(struct device *dev, enum wcnss_hw_type hw_type)
+static int wcnss_iris_vregs_on(struct device *dev,
+				enum wcnss_hw_type hw_type,
+				struct wcnss_wlan_config *cfg)
 {
 	int ret = -1;
 
@@ -566,8 +626,13 @@ static int wcnss_iris_vregs_on(struct device *dev, enum wcnss_hw_type hw_type)
 				ARRAY_SIZE(iris_vregs_riva));
 		break;
 	case WCNSS_PRONTO_HW:
-		ret = wcnss_vregs_on(dev, iris_vregs_pronto,
-				ARRAY_SIZE(iris_vregs_pronto));
+		if (cfg->is_pronto_vt || cfg->is_pronto_v3) {
+			ret = wcnss_vregs_on(dev, iris_vregs_pronto_v2,
+					ARRAY_SIZE(iris_vregs_pronto_v2));
+		} else {
+			ret = wcnss_vregs_on(dev, iris_vregs_pronto,
+					ARRAY_SIZE(iris_vregs_pronto));
+		}
 		break;
 	default:
 		pr_err("%s invalid hardware %d\n", __func__, hw_type);
@@ -575,14 +640,24 @@ static int wcnss_iris_vregs_on(struct device *dev, enum wcnss_hw_type hw_type)
 	return ret;
 }
 
-static void wcnss_core_vregs_off(enum wcnss_hw_type hw_type)
+static void wcnss_core_vregs_off(enum wcnss_hw_type hw_type,
+					struct wcnss_wlan_config *cfg)
 {
 	switch (hw_type) {
 	case WCNSS_RIVA_HW:
 		wcnss_vregs_off(riva_vregs, ARRAY_SIZE(riva_vregs));
 		break;
 	case WCNSS_PRONTO_HW:
-		wcnss_vregs_off(pronto_vregs, ARRAY_SIZE(pronto_vregs));
+		if (cfg->is_pronto_vt) {
+			wcnss_vregs_off(pronto_vregs_pronto_v2,
+				ARRAY_SIZE(pronto_vregs_pronto_v2));
+		} else if (cfg->is_pronto_v3) {
+			wcnss_vregs_off(pronto_vregs_pronto_v3,
+				ARRAY_SIZE(pronto_vregs_pronto_v3));
+		} else {
+			wcnss_vregs_off(pronto_vregs,
+				ARRAY_SIZE(pronto_vregs));
+		}
 		break;
 	default:
 		pr_err("%s invalid hardware %d\n", __func__, hw_type);
@@ -590,7 +665,9 @@ static void wcnss_core_vregs_off(enum wcnss_hw_type hw_type)
 
 }
 
-static int wcnss_core_vregs_on(struct device *dev, enum wcnss_hw_type hw_type)
+static int wcnss_core_vregs_on(struct device *dev,
+				enum wcnss_hw_type hw_type,
+				struct wcnss_wlan_config *cfg)
 {
 	int ret = -1;
 
@@ -599,8 +676,16 @@ static int wcnss_core_vregs_on(struct device *dev, enum wcnss_hw_type hw_type)
 		ret = wcnss_vregs_on(dev, riva_vregs, ARRAY_SIZE(riva_vregs));
 		break;
 	case WCNSS_PRONTO_HW:
-		ret = wcnss_vregs_on(dev, pronto_vregs,
-				ARRAY_SIZE(pronto_vregs));
+		if (cfg->is_pronto_vt) {
+			ret = wcnss_vregs_on(dev, pronto_vregs_pronto_v2,
+					ARRAY_SIZE(pronto_vregs_pronto_v2));
+		} else if (cfg->is_pronto_v3) {
+			ret = wcnss_vregs_on(dev, pronto_vregs_pronto_v3,
+					ARRAY_SIZE(pronto_vregs_pronto_v3));
+		} else {
+			ret = wcnss_vregs_on(dev, pronto_vregs,
+					ARRAY_SIZE(pronto_vregs));
+		}
 		break;
 	default:
 		pr_err("%s invalid hardware %d\n", __func__, hw_type);
@@ -616,40 +701,54 @@ int wcnss_wlan_power(struct device *dev,
 {
 	int rc = 0;
 	enum wcnss_hw_type hw_type = wcnss_hardware_type();
+#if 0
+	static bool wcnss_power_state;
 
+	if (unlikely(wcnss_power_state && on)) {
+		pr_debug("%s: Already powered up, \
+			 freeing vregs.\n", __func__);
+		wcnss_vregs_put();
+	}
+#endif
+	down(&wcnss_power_on_lock);
 	if (on) {
-		down(&wcnss_power_on_lock);
 		/* RIVA regulator settings */
-		rc = wcnss_core_vregs_on(dev, hw_type);
+		rc = wcnss_core_vregs_on(dev, hw_type,
+			cfg);
 		if (rc)
 			goto fail_wcnss_on;
 
 		/* IRIS regulator settings */
-		rc = wcnss_iris_vregs_on(dev, hw_type);
+		rc = wcnss_iris_vregs_on(dev, hw_type,
+			cfg);
 		if (rc)
 			goto fail_iris_on;
 
 		/* Configure IRIS XO */
-		rc = configure_iris_xo(dev, cfg->use_48mhz_xo,
+		rc = configure_iris_xo(dev, cfg,
 				WCNSS_WLAN_SWITCH_ON, iris_xo_set);
 		if (rc)
 			goto fail_iris_xo;
-		up(&wcnss_power_on_lock);
 
-	} else {
-		configure_iris_xo(dev, cfg->use_48mhz_xo,
+		is_power_on = true;
+
+	}  else if (is_power_on) {
+		is_power_on = false;
+		configure_iris_xo(dev, cfg,
 				WCNSS_WLAN_SWITCH_OFF, NULL);
-		wcnss_iris_vregs_off(hw_type);
-		wcnss_core_vregs_off(hw_type);
+		wcnss_iris_vregs_off(hw_type, cfg);
+		wcnss_core_vregs_off(hw_type, cfg);
 	}
+//	wcnss_power_state = (on == WCNSS_WLAN_SWITCH_ON ? true : false);
 
+	up(&wcnss_power_on_lock);
 	return rc;
 
 fail_iris_xo:
-	wcnss_iris_vregs_off(hw_type);
+	wcnss_iris_vregs_off(hw_type, cfg);
 
 fail_iris_on:
-	wcnss_core_vregs_off(hw_type);
+	wcnss_core_vregs_off(hw_type, cfg);
 
 fail_wcnss_on:
 	up(&wcnss_power_on_lock);
@@ -711,4 +810,3 @@ int wcnss_free_power_on_lock(char *driver_name)
 	return ret;
 }
 EXPORT_SYMBOL(wcnss_free_power_on_lock);
-
