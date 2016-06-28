@@ -974,9 +974,14 @@ void wcnss_reset_fiq(bool clk_chk_en)
 				wcnss_log_iris_regs();
 #endif
 		}
-		/* Insert memory barrier before writing fiq register */
-		wmb();
-		__raw_writel(1 << 16, penv->fiq_reg);
+		if (!wcnss_device_is_shutdown()) {
+			/* Insert memory barrier before writing fiq register */
+			wmb();
+			__raw_writel(1 << 16, penv->fiq_reg);
+		} else {
+			pr_info("%s: Block FIQ during power up sequence\n",
+				__func__);
+		}
 	} else {
 		wcnss_riva_log_debug_regs();
 	}
