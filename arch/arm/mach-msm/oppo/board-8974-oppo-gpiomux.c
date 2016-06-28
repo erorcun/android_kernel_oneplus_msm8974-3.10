@@ -202,7 +202,7 @@ static struct gpiomux_setting gpio_epm_marker_config = {
 	.pull = GPIOMUX_PULL_NONE,
 	.dir = GPIOMUX_OUT_HIGH,
 };
-
+#if 0
 static struct gpiomux_setting wcnss_5wire_suspend_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv  = GPIOMUX_DRV_2MA,
@@ -226,7 +226,7 @@ static struct gpiomux_setting wcnss_5gpio_active_cfg = {
 	.drv  = GPIOMUX_DRV_6MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
-
+#endif
 static struct gpiomux_setting ath_gpio_active_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -975,6 +975,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
 		},
 	},
+#ifndef CONFIG_MACH_OPPO
 	{
 		.gpio = 23, /* FLASH_LED_EN */
 		.settings = {
@@ -1003,6 +1004,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &cam_settings[1],
 		},
 	},
+#endif
 	{
 		.gpio = 27, /* OIS_SYNC */
 		.settings = {
@@ -1097,6 +1099,7 @@ static struct msm_gpiomux_config msm_sensor_configs_dragonboard[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[0],
 		},
 	},
+#ifndef CONFIG_MACH_OPPO
 	{
 		.gpio = 23, /* FLASH_LED_EN */
 		.settings = {
@@ -1125,6 +1128,7 @@ static struct msm_gpiomux_config msm_sensor_configs_dragonboard[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &cam_settings[1],
 		},
 	},
+#endif
 	{
 		.gpio = 27, /* OIS_SYNC */
 		.settings = {
@@ -1275,6 +1279,7 @@ static struct msm_gpiomux_config msm8974_sec_auxpcm_configs[] __initdata = {
 	},
 };
 
+#if 0
 static struct msm_gpiomux_config wcnss_5wire_interface[] = {
 	{
 		.gpio = 36,
@@ -1350,7 +1355,7 @@ static struct msm_gpiomux_config wcnss_5gpio_interface[] = {
 		},
 	},
 };
-
+#endif
 static struct msm_gpiomux_config ath_gpio_configs[] = {
 #ifndef CONFIG_MACH_FIND7OP
 	{
@@ -1583,8 +1588,10 @@ void __init msm_8974_init_gpiomux(void)
 	msm_gpiomux_install(msm_blsp_configs, ARRAY_SIZE(msm_blsp_configs));
 	msm_gpiomux_install(msm_blsp2_uart7_configs,
 			 ARRAY_SIZE(msm_blsp2_uart7_configs));
+#if 0
 	msm_gpiomux_install(wcnss_5wire_interface,
 				ARRAY_SIZE(wcnss_5wire_interface));
+#endif
 	if (of_board_is_liquid())
 		msm_gpiomux_install_nowrite(ath_gpio_configs,
 					ARRAY_SIZE(ath_gpio_configs));
@@ -1659,6 +1666,7 @@ void __init msm_8974_init_gpiomux(void)
 			ARRAY_SIZE(apq8074_dragonboard_ts_config));
 }
 
+#if 0
 static void wcnss_switch_to_gpio(void)
 {
 	/* Switch MUX to GPIO */
@@ -1764,3 +1772,4 @@ u32 wcnss_rf_read_reg(u32 rf_reg_addr)
 
 	return rf_data_received;
 }
+#endif
