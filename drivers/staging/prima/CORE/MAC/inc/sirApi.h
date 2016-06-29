@@ -4745,6 +4745,19 @@ typedef PACKED_PRE struct PACKED_POST
     void             *data;
 }tSirBcnMissRateInfo;
 
+typedef PACKED_PRE struct PACKED_POST
+{
+  u32 stats;
+  tSirFWStatsCallback callback;
+  void *data;
+}tSirFWStatsGetReq;
+
+typedef PACKED_PRE struct PACKED_POST
+{
+  tSirFWStatsCallback callback;
+  void *data;
+}tSirFWStatsInfo;
+
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
 typedef struct
@@ -4769,19 +4782,6 @@ typedef struct
   u32  statsClearReqMask;
   u8   stopReq;
 }tSirLLStatsClearReq, *tpSirLLStatsClearReq;
-
-typedef PACKED_PRE struct PACKED_POST
-{
-  u32 stats;
-  tSirFWStatsCallback callback;
-  void *data;
-}tSirFWStatsGetReq;
-
-typedef PACKED_PRE struct PACKED_POST
-{
-  tSirFWStatsCallback callback;
-  void *data;
-}tSirFWStatsInfo;
 
 /*---------------------------------------------------------------------------
   WLAN_HAL_LL_NOTIFY_STATS
