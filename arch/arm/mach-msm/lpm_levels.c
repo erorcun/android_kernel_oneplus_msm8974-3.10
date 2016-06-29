@@ -265,15 +265,11 @@ static int lpm_system_mode_select(struct lpm_system_state *system_state,
 	int i;
 	uint32_t best_level_pwr = ~0U;
 	uint32_t pwr;
-	struct cpumask mask;
-	uint32_t latency_us = ~0U;
+	uint32_t latency_us = pm_qos_request_for_cpumask(PM_QOS_CPU_DMA_LATENCY,
+							&num_powered_cores);
 
 	if (!system_state->system_level)
 		return -EINVAL;
-
-	if (cpumask_and(&mask, cpu_online_mask, &num_powered_cores))
-		latency_us = pm_qos_request_for_cpumask(PM_QOS_CPU_DMA_LATENCY,
-							&mask);
 
 	for (i = 0; i < system_state->num_system_levels; i++) {
 		struct lpm_system_level *system_level =
