@@ -1054,16 +1054,14 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 
 	if (!pdev->dev.of_node) {
 		pr_err("of_node NULL\n");
-		rc = -EINVAL;
-		goto finish;
+		return -EINVAL;
 	}
 
 	msm_actuator_t = kzalloc(sizeof(struct msm_actuator_ctrl_t),
 		GFP_KERNEL);
 	if (!msm_actuator_t) {
 		pr_err("%s:%d failed no memory\n", __func__, __LINE__);
-		rc = -ENOMEM;
-		goto finish;
+		return -ENOMEM;
 	}
 	rc = of_property_read_u32((&pdev->dev)->of_node, "cell-index",
 		&pdev->id);
@@ -1071,7 +1069,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	if (rc < 0) {
 		kfree(msm_actuator_t);
 		pr_err("failed rc %d\n", rc);
-		goto finish;
+		return rc;
 	}
 
 	rc = of_property_read_u32((&pdev->dev)->of_node, "qcom,cci-master",
@@ -1080,7 +1078,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	if (rc < 0) {
 		kfree(msm_actuator_t);
 		pr_err("failed rc %d\n", rc);
-		goto finish;
+		return rc;
 	}
 
 	if (of_find_property((&pdev->dev)->of_node,
@@ -1091,7 +1089,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		if (rc < 0) {
 			kfree(msm_actuator_t);
 			pr_err("failed rc %d\n", rc);
-			goto finish;
+			return rc;
 		}
 	}
 
@@ -1110,8 +1108,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		kfree(msm_actuator_t->vreg_cfg.cam_vreg);
 		kfree(msm_actuator_t);
 		pr_err("failed no memory\n");
-		rc = -ENOMEM;
-		goto finish;
+		return -ENOMEM;
 	}
 
 	cci_client = msm_actuator_t->i2c_client.cci_client;
@@ -1120,7 +1117,6 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	v4l2_subdev_init(&msm_actuator_t->msm_sd.sd,
 		msm_actuator_t->act_v4l2_subdev_ops);
 	v4l2_set_subdevdata(&msm_actuator_t->msm_sd.sd, msm_actuator_t);
-	platform_set_drvdata(pdev, &msm_actuator_t->msm_sd.sd);
 	msm_actuator_t->msm_sd.sd.internal_ops = &msm_actuator_internal_ops;
 	msm_actuator_t->msm_sd.sd.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 	snprintf(msm_actuator_t->msm_sd.sd.name,
@@ -1132,10 +1128,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_sd_register(&msm_actuator_t->msm_sd);
 	msm_actuator_t->actuator_state = ACTUATOR_POWER_DOWN;
 	CDBG("Exit\n");
-finish:
-/*	if(rc != 0)
-		i2c_add_driver(&msm_actuator_i2c_driver);
-*/	return rc;
+	return rc;
 }
 
 static const struct of_device_id msm_actuator_i2c_dt_match[] = {
@@ -1163,8 +1156,7 @@ static const struct of_device_id msm_actuator_dt_match[] = {
 
 MODULE_DEVICE_TABLE(of, msm_actuator_dt_match);
 
-struct platform_driver msm_actuator2_platform_driver = {
-	.probe = msm_actuator_platform_probe,
+static struct platform_driver msm_actuator_platform_driver = {
 	.driver = {
 		.name = "qcom,actuator",
 		.owner = THIS_MODULE,
@@ -1176,7 +1168,7 @@ static int __init msm_actuator_init_module(void)
 {
 	int32_t rc = 0;
 	CDBG("Enter\n");
-	rc = platform_driver_probe(&msm_actuator2_platform_driver,
+	rc = platform_driver_probe(&msm_actuator_platform_driver,
 		msm_actuator_platform_probe);
 	if (!rc)
 		return rc;
@@ -1213,3 +1205,4 @@ static struct msm_actuator msm_piezo_actuator_table = {
 module_init(msm_actuator_init_module);
 MODULE_DESCRIPTION("MSM ACTUATOR");
 MODULE_LICENSE("GPL v2");
+
