@@ -55,13 +55,14 @@ static struct gpiomux_setting mdm2ap_pblrdy = {
 	.dir = GPIOMUX_IN,
 };
 
-
+#ifndef CONFIG_MACH_OPPO
 static struct gpiomux_setting ap2mdm_soft_reset_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 	.dir = GPIOMUX_OUT_LOW,
 };
+#endif
 
 static struct gpiomux_setting ap2mdm_wakeup = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -99,6 +100,7 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &ap2mdm_cfg,
 		}
 	},
+#ifndef CONFIG_MACH_OPPO
 	/* AP2MDM_SOFT_RESET, aka AP2MDM_PON_RESET_N */
 	{
 		.gpio = 24,
@@ -106,6 +108,7 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &ap2mdm_soft_reset_cfg,
 		}
 	},
+#endif
 	/* AP2MDM_WAKEUP */
 	{
 		.gpio = 104,
@@ -1012,6 +1015,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
+#ifndef CONFIG_MACH_OPPO
 	{
 		.gpio = 28, /* WEBCAM1_STANDBY */
 		.settings = {
@@ -1019,6 +1023,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
+#endif
 	{
 		.gpio = 89, /* CAM1_STANDBY_N */
 		.settings = {
@@ -1136,6 +1141,7 @@ static struct msm_gpiomux_config msm_sensor_configs_dragonboard[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
+#ifndef CONFIG_MACH_OPPO
 	{
 		.gpio = 28, /* WEBCAM1_STANDBY */
 		.settings = {
@@ -1143,6 +1149,7 @@ static struct msm_gpiomux_config msm_sensor_configs_dragonboard[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
+#endif
 	{
 		.gpio = 89, /* CAM1_STANDBY_N */
 		.settings = {
