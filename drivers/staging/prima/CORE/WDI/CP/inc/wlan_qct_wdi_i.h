@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -524,6 +524,8 @@ typedef enum
 
   /*Keep adding the indications to the max request
     such that we keep them separate */
+ WDI_SET_ALLOWED_ACTION_FRAMES_IND,
+
   WDI_MAX_UMAC_IND
 }WDI_RequestEnumType;
 
@@ -6313,6 +6315,21 @@ WDI_ProcessEnableDisableCAEventInd
 (
   WDI_ControlBlockType*  pWDICtx,
   WDI_EventInfoType*     pEventData
+);
+
+/**
+ *  WDI_ProcessSetAllowedActionFramesInd - Process Set allowed action
+ *                                         frames command
+ *
+ *  @pWDICtx: pointer to the WLAN DAL context
+ *  @pEventData: pointer to the event information structure
+ *
+ */
+WDI_Status
+WDI_ProcessSetAllowedActionFramesInd
+(
+ WDI_ControlBlockType*  pWDICtx,
+ WDI_EventInfoType*     pEventData
 );
 
 #endif /*WLAN_QCT_WDI_I_H*/
