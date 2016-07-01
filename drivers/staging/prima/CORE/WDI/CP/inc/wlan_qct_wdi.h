@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -6142,6 +6142,14 @@ typedef struct
 
 }WDI_MonStartReqType;
 
+/**
+ * struct WDI_AllowedActionFramesInd - Allowed Action frames details
+ *
+ */
+struct WDI_AllowedActionFramesInd {
+   wpt_uint32 bitmask;
+   wpt_uint32 reserved;
+};
 /*----------------------------------------------------------------------------
  *   WDI callback types
  *--------------------------------------------------------------------------*/
@@ -11615,5 +11623,17 @@ wpt_uint32 val
 #ifdef __cplusplus
  }
 #endif 
+
+/**
+ * WDI_SetAllowedActionFramesInd - This API is called to send Allowed
+ *                    Action frame details to FW
+ * @allowed_action_frames: Pointer to WDI_AllowedActionFramesInd structure
+ *                     which holds bitmask of allowed action frames
+ *
+ */
+WDI_Status
+WDI_SetAllowedActionFramesInd(
+		struct WDI_AllowedActionFramesInd *allowed_action_frames
+);
 
 #endif /* #ifndef WLAN_QCT_WDI_H */
