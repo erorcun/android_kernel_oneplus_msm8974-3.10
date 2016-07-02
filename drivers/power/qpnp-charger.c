@@ -2292,6 +2292,7 @@ qpnp_chg_regulator_batfet_set(struct qpnp_chg_chip *chip, bool enable)
 /* OPPO 2013-09-30 wangjc Add begin for get charger type */
 #ifdef CONFIG_VENDOR_EDIT
 static int qpnp_charger_type_get(struct qpnp_chg_chip *chip);
+static void oneplus_set_allow_read_iic(bool status);
 #endif
 
 
@@ -2394,6 +2395,7 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 			chip->usbin_counts = 0;//sjc0522 for Find7s temp rising problem
 #endif /*CONFIG_VENDOR_EDIT*/
 		} else {
+			oneplus_set_allow_read_iic(true);
 			/* when OVP clamped usbin, and then decrease
 			 * the charger voltage to lower than the OVP
 			 * threshold, a usbin_valid rising edge
@@ -4488,11 +4490,10 @@ static void qpnp_chg_ext_charger_hwinit(struct qpnp_chg_chip *chip)
 		pr_info("%s fast chg started,don't init bq24196\n",__func__);
 		return ;
 	}
-
-	bq24196_wait_for_resume();
 #endif
 /* OPPO 2014-05-21 liaofuchun modify end*/
 
+	bq24196_wait_for_resume();
 /* OPPO 2014-03-11 sjc Modify begin for OTG Vbus problem */
 	qpnp_chg_ext_charger_reset(chip, 1);
 /* OPPO 2014-03-11 sjc Modify end */
@@ -7694,11 +7695,12 @@ static void qpnp_check_battery_uovp(struct qpnp_chg_chip *chip)
 	int battery_voltage=0;
 	enum chg_battery_status_type battery_status_pre;
 	
+	battery_voltage = get_prop_battery_voltage_now(chip);
+
 	if (!qpnp_chg_is_usb_chg_plugged_in(chip))
 		return;
 	battery_status_pre = qpnp_battery_status_get(chip);	
 
-	battery_voltage = get_prop_battery_voltage_now(chip);
 	pr_debug("%s bat vol:%d\n", __func__, battery_voltage);
 	if(battery_voltage > BATTERY_SOFT_OVP_VOLTAGE) {
 		if (battery_status_pre == BATTERY_STATUS_GOOD) {
@@ -7722,9 +7724,10 @@ static int qpnp_check_battery_temp(struct qpnp_chg_chip *chip)
 	int rc = -1;
 	int temperature = 0;
 
+	temperature = get_prop_batt_temp(chip);
 	if (!qpnp_chg_is_usb_chg_plugged_in(chip))
 		return rc;
-	temperature = get_prop_batt_temp(chip);
+
 	pr_debug("%s temp:%d\n", __func__, temperature);
 	
 	if(temperature < chip->mBatteryTempBoundT0) /* battery is cold */
@@ -7785,11 +7788,7 @@ static void qpnp_check_recharging(struct qpnp_chg_chip *chip)
 	if (chip->charging_disabled)
 		return;
 /* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for battery display full wrong. */
-	if (!qpnp_chg_is_usb_chg_plugged_in(chip)) {
-		chip->chg_done = false;
-		chip->chg_display_full = false;
-		return;
-	}
+
 	if (!chip->chg_done)
 		return;
 
@@ -7969,62 +7968,68 @@ static void update_heartbeat(struct work_struct *work)
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct qpnp_chg_chip *chip = container_of(dwork,
 				struct qpnp_chg_chip, update_heartbeat_work);
+	bool is_there_charger = qpnp_chg_is_usb_chg_plugged_in(chip);
 	
-//	oneplus_set_allow_read_iic(true);	
+	oneplus_set_allow_read_iic(true);	
+	if (is_there_charger) {
+
 /* OPPO 2013-12-22 liaofuchun add for fastchg */
 #ifdef CONFIG_PIC1503_FASTCG	
-	int charge_type = qpnp_charger_type_get(chip);
+		int charge_type = qpnp_charger_type_get(chip);
 
-	if(get_prop_fast_chg_started(chip) == true) {
-		switch_fast_chg(chip);
-		pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
-		//lfc move it to fastcg_work_func in bq27541.c
-		//power_supply_changed(&chip->batt_psy);
-		//lfc add for disable normal charge begin
-		if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
-			qpnp_chg_charge_en(chip,false);
-			chip->normal_chg_stopped_by_fastchg = true;
+		if(get_prop_fast_chg_started(chip) == true) {
+			switch_fast_chg(chip);
+			pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
+			//lfc move it to fastcg_work_func in bq27541.c
+			//power_supply_changed(&chip->batt_psy);
+			//lfc add for disable normal charge begin
+			if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
+				qpnp_chg_charge_en(chip,false);
+				chip->normal_chg_stopped_by_fastchg = true;
+			}
+			//lfc add for disable normal charge end
+			/*update time 6s*/
+			schedule_delayed_work(&chip->update_heartbeat_work,
+					      round_jiffies_relative(msecs_to_jiffies
+								     (BATT_HEARTBEAT_INTERVAL)));
+			return;
+		} else {
+			if(true == chip->normal_chg_stopped_by_fastchg) {
+				qpnp_chg_charge_en(chip, 1);
+				chip->normal_chg_stopped_by_fastchg = false;
+			}
 		}
-		//lfc add for disable normal charge end
-		/*update time 6s*/
-		schedule_delayed_work(&chip->update_heartbeat_work,
-				      round_jiffies_relative(msecs_to_jiffies
-							     (BATT_HEARTBEAT_INTERVAL)));
-		return;
-	} else {
-		if(true == chip->normal_chg_stopped_by_fastchg) {
-			qpnp_chg_charge_en(chip, 1);
-			chip->normal_chg_stopped_by_fastchg = false;
-		}
-	}
 	
-	if(charge_type == POWER_SUPPLY_TYPE_USB_DCP) {
-		switch_fast_chg(chip);
-		//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
-	}
+		if(charge_type == POWER_SUPPLY_TYPE_USB_DCP) {
+			switch_fast_chg(chip);
+			//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
+		}
 #endif
 /* OPPO 2013-12-22 liaofuchun add end*/
+
+	}
+
 	qpnp_check_charger_uovp(chip);
 	qpnp_check_charge_timeout(chip);
 	qpnp_check_battery_uovp(chip);
+	get_prop_capacity(chip);
 	qpnp_check_battery_temp(chip);
 
 	pr_debug("%s current:%d\n", __func__, get_prop_current_now(chip));
 	
-	qpnp_check_recharging(chip);
-
-	if (qpnp_batt_gauge && qpnp_batt_gauge->get_battery_soc){
-		qpnp_batt_gauge->get_battery_soc();
-	}	
-
 #ifdef CONFIG_MACH_FIND7
 /* OPPO 2014-05-22 sjc Add for Find7s temp rising problem */
 	qpnp_check_chg_current(chip);
 #endif
 
-	power_supply_changed(&chip->batt_psy);
+	if (!is_there_charger) {
+		chip->chg_done = false;
+		chip->chg_display_full = false;
+		oneplus_set_allow_read_iic(false);	
+	} else
+		qpnp_check_recharging(chip);
 
-//	if(!chip->usb_present) oneplus_set_allow_read_iic(false);	
+	power_supply_changed(&chip->batt_psy);
 	
 	/*update time 6s*/
 	schedule_delayed_work(&chip->update_heartbeat_work,
@@ -8401,7 +8406,7 @@ bool get_oem_charge_done_status(void)/* yangfangbiao@oneplus.cn, 2015/05/15,add 
 	else
 		return false;
 }
-/*
+
 static void oneplus_set_allow_read_iic(bool status)
 {
 	if (qpnp_batt_gauge && qpnp_batt_gauge->set_alow_reading)
@@ -8413,7 +8418,7 @@ static void oneplus_set_allow_read_iic(bool status)
 	pr_info("set allow read extern fg iic fail\n");
 	}
 }
-*/
+
 static void oneplus_set_lcd_off_status(struct qpnp_chg_chip *chip, bool status)
 {
 	chip->lcd_is_on = status;

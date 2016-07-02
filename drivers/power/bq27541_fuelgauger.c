@@ -661,7 +661,7 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, int suspend_time_
 		}
 		soc_pre = soc;
 	} else {
-		dev_warn(di->dev, "di->alow_reading false\n");
+//		dev_warn(di->dev, "di->alow_reading false\n");
 		if(di->soc_pre)
 			return di->soc_pre;
 		else
@@ -674,7 +674,7 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, int suspend_time_
 			soc_delt  =  di->soc_pre - soc;
 			fg_soc_changed = (soc < TWENTY_PERCENT || (soc_delt > di->lcd_off_delt_soc)|| suspend_time_ms > TEN_MINUTES);
 			//allow capacity decrease 1% ,when capacity of FG really changed
-			dev_err(di->dev, "suspend_time_ms=%d,soc_delt=%d,di->lcd_off_delt_soc=%d\n",suspend_time_ms,soc_delt,di->lcd_off_delt_soc);
+//			dev_err(di->dev, "suspend_time_ms=%d,soc_delt=%d,di->lcd_off_delt_soc=%d\n",suspend_time_ms,soc_delt,di->lcd_off_delt_soc);
 			if(fg_soc_changed == true)
 			{
 			if(suspend_time_ms/TEN_MINUTES)
@@ -1985,7 +1985,7 @@ static int bq27541_battery_resume(struct i2c_client *client)
 		return 0;
 	}
 	suspend_time =  di->rtc_resume_time - di->rtc_suspend_time;
-	pr_err("%s: suspend_time=%d\n", __func__,suspend_time);
+//	pr_err("%s: suspend_time=%d\n", __func__,suspend_time);
 
 	/*update pre capacity when sleep time more than 1minutes*/
 	bq27541_battery_soc(bq27541_di, suspend_time);
