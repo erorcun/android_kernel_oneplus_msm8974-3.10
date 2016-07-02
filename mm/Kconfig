@@ -553,3 +553,8 @@ config KSWAPD_CPU_AFFINITY_MASK
 	  the resultant bitmask.
 	  For example to limit kswapd to the first 4 cores use the following:
 	  CONFIG_KSWAPD_CPU_AFFINITY_MASK="f"
+
+config KSWAPD_CPU_AFFINITY_MASK_ENABLED
+	bool "switch of kswapd cpu affinity mask"
+	depends on SMP
+	default n

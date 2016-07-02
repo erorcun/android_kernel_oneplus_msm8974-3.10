@@ -133,7 +133,7 @@ struct scan_control {
 int vm_swappiness = 60;
 unsigned long vm_total_pages;	/* The total number of pages which the VM controls */
 
-#ifdef CONFIG_KSWAPD_CPU_AFFINITY_MASK
+#ifdef CONFIG_KSWAPD_CPU_AFFINITY_MASK_ENABLED
 char *kswapd_cpu_mask = CONFIG_KSWAPD_CPU_AFFINITY_MASK;
 #else
 char *kswapd_cpu_mask = NULL;
