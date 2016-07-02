@@ -243,7 +243,7 @@
 #define POWER_STAGE_WA			BIT(2)
 /* OPPO 2013-06-08 wangjc Add begin for add macro. */
 #ifdef CONFIG_VENDOR_EDIT
-#define BATT_HEARTBEAT_INTERVAL					30000//30S // 3.10 = 6000 -> 30000
+#define BATT_HEARTBEAT_INTERVAL					6000//6S 
 #define BATT_CHG_TIMEOUT_COUNT_DCP				10*10*60//sjc1125//6*10*60//4	//6HOURS
 #define BATT_CHG_TIMEOUT_COUNT_USB_PRO			10*10*60 //10HOURS
 #define BATT_CHG_DONE_CHECK_COUNT				10//TIMES
@@ -502,7 +502,6 @@ struct qpnp_chg_chip {
 	struct qpnp_iadc_chip		*iadc_dev;
 	struct qpnp_adc_tm_chip		*adc_tm_dev;
 	struct mutex			jeita_configure_lock;
-	struct mutex			lcd_on_var_lock;
 	spinlock_t			usbin_health_monitor_lock;
 	struct mutex			batfet_vreg_lock;
 	struct alarm			reduce_power_stage_alarm;
@@ -7971,6 +7970,7 @@ static void update_heartbeat(struct work_struct *work)
 	struct qpnp_chg_chip *chip = container_of(dwork,
 				struct qpnp_chg_chip, update_heartbeat_work);
 	
+//	oneplus_set_allow_read_iic(true);	
 /* OPPO 2013-12-22 liaofuchun add for fastchg */
 #ifdef CONFIG_PIC1503_FASTCG	
 	int charge_type = qpnp_charger_type_get(chip);
@@ -7986,7 +7986,7 @@ static void update_heartbeat(struct work_struct *work)
 			chip->normal_chg_stopped_by_fastchg = true;
 		}
 		//lfc add for disable normal charge end
-		/*update time 30s*/
+		/*update time 6s*/
 		schedule_delayed_work(&chip->update_heartbeat_work,
 				      round_jiffies_relative(msecs_to_jiffies
 							     (BATT_HEARTBEAT_INTERVAL)));
@@ -8013,14 +8013,20 @@ static void update_heartbeat(struct work_struct *work)
 	
 	qpnp_check_recharging(chip);
 
+	if (qpnp_batt_gauge && qpnp_batt_gauge->get_battery_soc){
+		qpnp_batt_gauge->get_battery_soc();
+	}	
+
 #ifdef CONFIG_MACH_FIND7
 /* OPPO 2014-05-22 sjc Add for Find7s temp rising problem */
 	qpnp_check_chg_current(chip);
 #endif
 
 	power_supply_changed(&chip->batt_psy);
+
+//	if(!chip->usb_present) oneplus_set_allow_read_iic(false);	
 	
-	/*update time 30s*/
+	/*update time 6s*/
 	schedule_delayed_work(&chip->update_heartbeat_work,
 			      round_jiffies_relative(msecs_to_jiffies
 						     (BATT_HEARTBEAT_INTERVAL)));
@@ -8174,6 +8180,7 @@ void qpnp_external_charger_unregister(struct qpnp_external_charger *external_cha
 EXPORT_SYMBOL(qpnp_external_charger_unregister);
 
 #if defined(CONFIG_FB)
+static void oneplus_set_lcd_off_status(struct qpnp_chg_chip *chip, bool status);
 /* jingchun.wang@Onlinerd.Driver, 2013/12/14  Add for reset charge current when screen is off */
 static int fb_notifier_callback(struct notifier_block *self,
 				 unsigned long event, void *data)
@@ -8189,14 +8196,10 @@ static int fb_notifier_callback(struct notifier_block *self,
 			blank = evdata->data;
 
 			if (*blank == FB_BLANK_UNBLANK)
-				mutex_lock(&chip->lcd_on_var_lock);
-				chip->lcd_is_on = true;
-				mutex_unlock(&chip->lcd_on_var_lock);
+				oneplus_set_lcd_off_status(chip, true);
 
 			if (*blank == FB_BLANK_POWERDOWN)
-				mutex_lock(&chip->lcd_on_var_lock);
-				chip->lcd_is_on = false;
-				mutex_unlock(&chip->lcd_on_var_lock);
+				oneplus_set_lcd_off_status(chip, false);
 
 			chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
@@ -8391,6 +8394,39 @@ void backup_soc_ex(int soc)
 	backup_soc(g_chip, soc);
 }
 
+bool get_oem_charge_done_status(void)/* yangfangbiao@oneplus.cn, 2015/05/15,add for notifiy chg_done status  */
+{
+	if(g_chip != NULL)
+		return g_chip->chg_done;
+	else
+		return false;
+}
+/*
+static void oneplus_set_allow_read_iic(bool status)
+{
+	if (qpnp_batt_gauge && qpnp_batt_gauge->set_alow_reading)
+	{
+	  qpnp_batt_gauge->set_alow_reading(status);
+	}
+	else
+	{
+	pr_info("set allow read extern fg iic fail\n");
+	}
+}
+*/
+static void oneplus_set_lcd_off_status(struct qpnp_chg_chip *chip, bool status)
+{
+	chip->lcd_is_on = status;
+	if (qpnp_batt_gauge && qpnp_batt_gauge->set_lcd_off_status)
+	{
+	 qpnp_batt_gauge->set_lcd_off_status(!status);
+	}
+	else
+	{
+	pr_info("set lcd off status fail\n");
+	}
+}
+
 static int
 qpnp_charger_probe(struct spmi_device *spmi)
 {
@@ -8432,7 +8468,6 @@ qpnp_charger_probe(struct spmi_device *spmi)
 			qpnp_chg_batfet_lcl_work);
 	INIT_WORK(&chip->insertion_ocv_work,
 			qpnp_chg_insertion_ocv_work);
-	mutex_init(&chip->lcd_on_var_lock);
 
 	/* Get all device tree properties */
 	rc = qpnp_charger_read_dt_props(chip);
@@ -8889,7 +8924,6 @@ qpnp_charger_remove(struct spmi_device *spmi)
 
 	mutex_destroy(&chip->batfet_vreg_lock);
 	mutex_destroy(&chip->jeita_configure_lock);
-	mutex_destroy(&chip->lcd_on_var_lock);
 
 	regulator_unregister(chip->otg_vreg.rdev);
 	regulator_unregister(chip->boost_vreg.rdev);
