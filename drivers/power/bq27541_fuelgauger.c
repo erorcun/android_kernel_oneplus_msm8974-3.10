@@ -38,6 +38,7 @@
 #ifdef CONFIG_MACH_OPPO
 /*OPPO 2013-09-22 liaofuchun add for bq27541 encryption*/
 #include <linux/random.h>
+#include <linux/rtc.h>
 
 struct bq27520_platform_data {
 	const char *name;
@@ -77,7 +78,7 @@ void mcu_en_gpio_set(int value)
 
 extern int load_soc(void);//sjc1121
 extern void backup_soc_ex(int soc); /* yangfangbiao@oneplus.cn, 2015/01/19  Add for  sync with android 4.4  */
-
+extern bool get_oem_charge_done_status(void);
 
 /* OPPO 2013-12-20 liaofuchun add for fastchg firmware update */
 #ifdef CONFIG_PIC1503_FASTCG
@@ -154,19 +155,71 @@ extern int pic16f_fw_update(bool pull96);
 #define BQ27541_INIT_DELAY   ((HZ)*1)
 /* OPPO 2013-08-24 wangjc Add begin for filter soc. */
 #ifdef CONFIG_MACH_OPPO
-#define CAPACITY_SALTATE_COUNTER 4
-#define CAPACITY_SALTATE_COUNTER_NOT_CHARGING	13//40sec
-#ifdef CONFIG_MACH_OPPO
-/* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
-#define CAPACITY_SALTATE_COUNTER_60				20//40	1min
-#define CAPACITY_SALTATE_COUNTER_95				50//60	2.5min
-#define CAPACITY_SALTATE_COUNTER_FULL			100//120	5min
-#define CAPACITY_SALTATE_COUNTER_CHARGING_TERM	20//30	1min
-#endif /*CONFIG_MACH_OPPO*/
 
-
-#define	SOC_SHUTDOWN_VALID_LIMITS	20 /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
+#define	TEN_PERCENT	10
+#define	SOC_SHUTDOWN_VALID_LIMITS	20
 #define TEN_MINUTES		600
+#define FIVE_MINUTES	300
+#define TWO_POINT_FIVE_MINUTES	150
+#define ONE_MINUTE	60
+#define TWENTY_MINUTES		1200
+#define TWENTY_PERCENT		20
+
+#define CAPACITY_SALTATE_COUNTER_60				38//40	1min
+#define CAPACITY_SALTATE_COUNTER_95				78//60	2.5min
+#define CAPACITY_SALTATE_COUNTER_FULL			200//150//120	5min
+#define CAPACITY_SALTATE_COUNTER_CHARGING_TERM	30//30	1min
+#define CAPACITY_SALTATE_COUNTER 4
+#define CAPACITY_SALTATE_COUNTER_NOT_CHARGING	24// >=40sec
+#define LOW_BATTERY_PROTECT_VOLTAGE	3350*1000
+#define CAPACITY_CALIBRATE_TIME_60_PERCENT	45  //45s
+
+static int get_current_time(unsigned long *now_tm_sec)
+{
+	struct rtc_time tm;
+	struct rtc_device *rtc;
+	int rc;
+
+	rtc = rtc_class_open(CONFIG_RTC_HCTOSYS_DEVICE);
+	if (rtc == NULL) {
+		pr_err("%s: unable to open rtc device (%s)\n",
+				__FILE__, CONFIG_RTC_HCTOSYS_DEVICE);
+		return -EINVAL;
+	}
+
+	rc = rtc_read_time(rtc, &tm);
+	if (rc) {
+		pr_err("Error reading rtc device (%s) : %d\n",
+				CONFIG_RTC_HCTOSYS_DEVICE, rc);
+		goto close_time;
+	}
+
+	rc = rtc_valid_tm(&tm);
+	if (rc) {
+		pr_err("Invalid RTC time (%s): %d\n",
+				CONFIG_RTC_HCTOSYS_DEVICE, rc);
+		goto close_time;
+	}
+	rtc_tm_to_time(&tm, now_tm_sec);
+
+close_time:
+	rtc_class_close(rtc);
+	return rc;
+}
+int get_prop_pre_shutdown_soc(void)
+{
+	 int soc_load;
+	 soc_load = load_soc();	   //get the soc before reboot
+	 if (soc_load == -1)
+	 {
+         return 50;
+	 }
+	 else
+	 {
+         return soc_load;
+	 }
+
+}
 #endif
 /* OPPO 2013-08-24 wangjc Add end */
 /* If the system has several batteries we need a different name for each
@@ -221,8 +274,12 @@ struct bq27541_device_info {
 	unsigned long rtc_resume_time;
 	unsigned long rtc_suspend_time;
 	atomic_t suspended;
-#endif
 	bool fast_chg_ing;
+	int lcd_off_delt_soc;
+	bool lcd_is_off;
+	unsigned long	lcd_off_time;
+	unsigned long	soc_pre_time;
+#endif
 /* OPPO 2013-08-24 wangjc Add end */
 };
 
@@ -341,6 +398,7 @@ static int bq27541_remaining_capacity(struct bq27541_device_info *di)
 }
 
 static int bq27541_battery_voltage(struct bq27541_device_info *di);
+static int bq27541_average_current(struct bq27541_device_info *di);
 extern int get_charging_status(void);
 extern int fuelgauge_battery_temp_region_get(void);
 static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
@@ -350,45 +408,68 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	int counter_temp = 0;
 	static int charging_status = 0;//sjc1121
 	static int charging_status_pre = 0; /* yangfangbiao@oneplus.cn, 2015/01/06  Modify for  sync with KK charge standard  */
-	int soc_load;//sjc1121
+	static bool first_enter=false;
+	int soc_load;
 	int soc_temp;
-	
-	if(!di->batt_psy){
+	unsigned long	  soc_current_time,time_last;
+	if(false == first_enter)
+	{
 		di->batt_psy = power_supply_get_by_name("battery");
+		if(di->batt_psy)
+                {
+                  first_enter = true;
+                  soc_load = load_soc();		//get the soc before reboot
+                  pr_err("soc=%d,soc_load:%d\n", soc,soc_load);
+                  if (soc_load == -1) {
+                          //get last soc error
+                          di->soc_pre = soc;
+                  }
+                  else if(soc_load > 0 && soc_load < 100 )
+                  {
+                     //compare the soc and the last soc
+                    if(soc_load > soc)
+                    {
+                      di->soc_pre = soc_load -1;
+                    }
+                    else
+                    {
+                      di->soc_pre = soc_load;
+                    }
+                  }
+                  else if( (soc_load == 100)&& ( abs(soc_load-soc) > TEN_PERCENT ))
+                  {
+                          di->soc_pre = soc_load-1;//when soc_load is 100% and real  soc is less than 90% ,let  showed soc decrease 1%
+                  }
+                  else
+                  {
+                          di->soc_pre = soc_load;
+                  }
 
-		//get the soc before reboot
-		soc_load = load_soc();
-		if (soc_load == -1) {
-			//get last soc error
-			di->soc_pre = soc;
-		} else if(abs(soc - soc_load) > SOC_SHUTDOWN_VALID_LIMITS) {
-			//the battery maybe changed
-				pr_info("soc:%d, soc_load:%d\n", soc, soc_load);
-				di->soc_pre = soc;
-
-			} else {
-			//compare the soc and the last soc
-			if(soc_load > soc) {
-				di->soc_pre = soc_load -1;
-			} else {
-				di->soc_pre = soc_load;
-			}
-		}
-#ifdef CONFIG_MACH_OPPO
-/* yangfangbiao@oneplus.cn, 2015/02/3  Modify for V2.4 charge standard */
-		if (!di->batt_psy) {
-			return di->soc_pre;
-		}
-#endif /*CONFIG_MACH_OPPO*/
-		//store the soc when boot first time
-		backup_soc_ex(di->soc_pre);
+                  if (!di->batt_psy) {
+//                      pr_info(": %d di->soc_pre %d\n",__LINE__,di->soc_pre);
+                          return di->soc_pre;
+                  }
+                  //store the soc when boot first time
+                  backup_soc_ex(di->soc_pre);
+                  get_current_time(&di->soc_pre_time);
+                }else{
+			return soc;
+                }
 	}
 
 	soc_temp  = di->soc_pre;
 
 	if(di->batt_psy){
-		ret.intval = get_charging_status();//sjc20150104
-	
+		ret.intval = get_charging_status() ;
+		di->batt_vol_pre= bq27541_battery_voltage(di);
+		if((fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__LITTLE_COOL
+								|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__COOL
+								|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL)&&(get_oem_charge_done_status( )==true))
+		{
+			ret.intval = POWER_SUPPLY_STATUS_FULL; /* when battery temperature is cool or normal,we disable charge after charge done,in this case battery status must deal with FULL*/
+
+		}
+
 		if(ret.intval == POWER_SUPPLY_STATUS_CHARGING || ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
 			charging_status = 1;
 		} else {
@@ -397,14 +478,19 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 		if (charging_status ^ charging_status_pre) {
 			charging_status_pre = charging_status;
 			di->saltate_counter = 0;
+			get_current_time(&di->soc_pre_time);
 		}
+		//pr_err("%s:get_charging_status() =%d,charging_status=%d,di->soc_pre=%d,soc=%d,bq27541_di->fastchg_started=%d\n",__func__,get_charging_status() ,charging_status,di->soc_pre,soc,bq27541_di->fastchg_started);
+		get_current_time(&soc_current_time);
+		time_last= soc_current_time - di->soc_pre_time;
 		if (charging_status) { // is charging
-/* yangfangbiao@oneplus.cn, 2015/01/06  Modify begin  for  sync with KK charge standard  */
 			if (ret.intval == POWER_SUPPLY_STATUS_FULL) {
 				soc_calib = di->soc_pre;
 				if (di->soc_pre < 100
 						&& (fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__LITTLE_COOL
-						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL)) {//sjc20150104
+						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL
+						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__COOL
+						)) {
 					if (di->saltate_counter < CAPACITY_SALTATE_COUNTER_CHARGING_TERM) {
 						di->saltate_counter++;
 					} else {
@@ -413,53 +499,100 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 					}
 				}
 			} else {
-/* yangfangbiao@oneplus.cn, 2015/01/06  Modify end for  sync with KK charge standard  */
-				if(abs(soc - di->soc_pre) > 0) {
-				di->saltate_counter++;
-				if(di->saltate_counter < CAPACITY_SALTATE_COUNTER)
-					return di->soc_pre;
-				else
-					di->saltate_counter = 0;
-			}
-			else
-				di->saltate_counter = 0;
-		
-			if(soc > di->soc_pre) {
-				soc_calib = di->soc_pre + 1;
-			} else if(soc < (di->soc_pre - 2)) {
-				/* jingchun.wang@Onlinerd.Driver, 2013/04/14  Add for allow soc fail when charging. */
-				soc_calib = di->soc_pre - 1;
-			} else {
-				soc_calib = di->soc_pre;
-			}
-			
-			/* jingchun.wang@Onlinerd.Driver, 2013/12/12  Add for set capacity to 100 when full in normal temp */
-			if(ret.intval == POWER_SUPPLY_STATUS_FULL) {
-				if(soc > 94) {
-					soc_calib = 100;
+				if(soc - di->soc_pre > 0) {
+					di->saltate_counter++;
+					if(time_last < 30)
+						return di->soc_pre;
+					else
+						di->saltate_counter = 0;
+					soc_calib = di->soc_pre + 1;
 				}
+				else if(soc < (di->soc_pre - 1)){
+					di->saltate_counter++;
+
+					if (di->soc_pre == 100) {
+						counter_temp = CAPACITY_SALTATE_COUNTER_FULL;//t>=5min
+					} else if (di->soc_pre > 95) {
+						counter_temp = CAPACITY_SALTATE_COUNTER_95;///t>=2.5min
+					} else if (di->soc_pre > 60) {
+						counter_temp = CAPACITY_SALTATE_COUNTER_60;//t>=1min
+					}else {
+						if(time_last > CAPACITY_CALIBRATE_TIME_60_PERCENT && (soc - di->soc_pre)<0)
+							counter_temp = 0;
+						else
+							counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING;//t>=40sec
+					}
+					/* when batt_vol is too low(and soc is jumping), decrease faster to avoid dead battery shutdown */
+					if(di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre <= 10) {
+						if (bq27541_battery_voltage(di) <= LOW_BATTERY_PROTECT_VOLTAGE && bq27541_battery_voltage(di) > 2500 * 1000) {//check again
+							counter_temp = CAPACITY_SALTATE_COUNTER - 1;//about 9s
+						}
+					}
+
+					if(di->saltate_counter < counter_temp||(bq27541_average_current(di) < -200))//if charge current > 200ma,do not allow  soc down
+						return di->soc_pre;
+					else
+						di->saltate_counter = 0;
+
+					soc_calib = di->soc_pre - 1;
+
+				}
+				else if((soc ==0 && soc < di->soc_pre )&&(di->soc_pre <=2 )){
+					di->saltate_counter++;
+					if(time_last > CAPACITY_CALIBRATE_TIME_60_PERCENT && (soc - di->soc_pre)<0)
+						counter_temp = 0;
+					else
+						counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING;//t>=40sec
+					if(di->saltate_counter < counter_temp)
+						return di->soc_pre;
+					else
+						di->saltate_counter = 0;
+					soc_calib = di->soc_pre - 1;
+				}
+				else {
+					soc_calib = di->soc_pre;
+				}
+
+
 			}
-		}
 		} else { // not charging
-			if ((abs(soc - di->soc_pre) >  0) 
-					|| (di->batt_vol_pre <= 3300 * 1000 && di->batt_vol_pre > 2500 * 1000)) {//sjc1118 add for batt_vol is too low but soc is not jumping
+			if ((abs(soc - di->soc_pre) >  0)
+					|| (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000)) {// add for batt_vol is too low but soc is not jumping
 				di->saltate_counter++;
+				counter_temp = CAPACITY_SALTATE_COUNTER_FULL;
 				if(di->soc_pre == 100) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_FULL;//t>=5min
+					if((time_last >= FIVE_MINUTES) && (soc - di->soc_pre)<0)//t>=5min
+					{
+						counter_temp = 0;
+					}
 				} else if (di->soc_pre > 95) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_95;///t>=2.5min
+					if((time_last >= TWO_POINT_FIVE_MINUTES) && (soc - di->soc_pre)<0)//t>=2.5min
+					{
+						counter_temp = 0;
+					}
 				} else if (di->soc_pre > 60) {
-					counter_temp = CAPACITY_SALTATE_COUNTER_60;//t>=1min
+					if((time_last >= ONE_MINUTE) && (soc - di->soc_pre)<0)//t>=1min
+					{
+						counter_temp = 0;
+					}
 				} else {
-					counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING;//t>=40sec
+					if(time_last >= CAPACITY_CALIBRATE_TIME_60_PERCENT && (soc - di->soc_pre)<0)
+					{
+						counter_temp = 0;
+					}
+					else
+						counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING+ 20;//t>=40sec
 				}
-				/* sjc1020, when batt_vol is too low(and soc is jumping), decrease faster to avoid dead battery shutdown */
-				if (di->batt_vol_pre <= 3300 * 1000 && di->batt_vol_pre > 2500 * 1000 && di->soc_pre <= 10) {
-					if (bq27541_battery_voltage(di) <= 3300 * 1000 && bq27541_battery_voltage(di) > 2500 * 1000) {//check again
-						counter_temp = CAPACITY_SALTATE_COUNTER;//about 12s
+				/* when batt_vol is too low(and soc is jumping), decrease faster to avoid dead battery shutdown */
+				if (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre <= 10) {
+					if (bq27541_battery_voltage(di) <= LOW_BATTERY_PROTECT_VOLTAGE && bq27541_battery_voltage(di) > 2500 * 1000) {//check again
+						if(time_last > 9 )//about 9s
+						{
+							counter_temp = 0;
+						}
 					}
 				}
-				
+
 				if(di->saltate_counter < counter_temp)
 					return di->soc_pre;
 				else
@@ -467,33 +600,47 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 			}
 			else
 				di->saltate_counter = 0;
-			
+
 			if(soc < di->soc_pre)
 				soc_calib = di->soc_pre - 1;
-			else if (di->batt_vol_pre <= 3300 * 1000 && di->batt_vol_pre > 2500 * 1000 && di->soc_pre > 0)//sjc1118 add for batt_vol is too low but soc is not jumping
+			else if (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre > 0)// add for batt_vol is too low but soc is not jumping
+				{
+				if(time_last > 9 )
+				{
 				soc_calib = di->soc_pre - 1;
+				}
+				}
 			else
 				soc_calib = di->soc_pre;
+
 		}
 	} else {
+
 		soc_calib = soc;
 	}
 	if(soc_calib > 100)
 		soc_calib = 100;
+	if(soc_calib < 0)
+		soc_calib = 0;
 	di->soc_pre = soc_calib;
 
 	if(soc_temp  !=  soc_calib) {
+		get_current_time(&di->soc_pre_time);
 		//store when soc changed
 		backup_soc_ex(soc_calib);
-		pr_info("soc:%d, soc_calib:%d\n", soc, soc_calib);
+		pr_info("soc:%d, soc_calib:%d,VOLT:%d,current:%d\n", soc, soc_calib,bq27541_battery_voltage(di),bq27541_average_current(di));
 	}
+
 	return soc_calib;
 }
 
-static int bq27541_battery_soc(struct bq27541_device_info *di, bool raw)
+static int bq27541_battery_soc(struct bq27541_device_info *di, int suspend_time_ms)
 {
 	int ret;
 	int soc = 0;
+	int soc_delt = 0;
+	static int soc_pre;
+	bool fg_soc_changed=false;
 
 #ifdef CONFIG_MACH_OPPO
 /* jingchun.wang@Onlinerd.Driver, 2014/02/27  Add for get right soc when sleep long time */
@@ -508,6 +655,11 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, bool raw)
 			dev_err(di->dev, "error reading soc.ret:%d\n",ret);
 			goto read_soc_err;
 		}
+		if(soc_pre != soc)
+		{
+//		pr_err("bq27541_battery_soc =%d\n",soc);
+		}
+		soc_pre = soc;
 	} else {
 		dev_warn(di->dev, "di->alow_reading false\n");
 		if(di->soc_pre)
@@ -516,13 +668,30 @@ static int bq27541_battery_soc(struct bq27541_device_info *di, bool raw)
 			return 0;
 	}
 
-	if (raw == true) {
-		if(soc > 90) {
-			soc += 2;
+	/* Add for get right soc when sleep long time */
+	if((suspend_time_ms != 0 && di->lcd_is_off)) {
+		if(soc < di->soc_pre) {
+			soc_delt  =  di->soc_pre - soc;
+			fg_soc_changed = (soc < TWENTY_PERCENT || (soc_delt > di->lcd_off_delt_soc)|| suspend_time_ms > TEN_MINUTES);
+			//allow capacity decrease 1% ,when capacity of FG really changed
+			dev_err(di->dev, "suspend_time_ms=%d,soc_delt=%d,di->lcd_off_delt_soc=%d\n",suspend_time_ms,soc_delt,di->lcd_off_delt_soc);
+			if(fg_soc_changed == true)
+			{
+			if(suspend_time_ms/TEN_MINUTES)
+			{
+			di->soc_pre -= (suspend_time_ms/TEN_MINUTES < soc_delt ? suspend_time_ms/TEN_MINUTES : soc_delt);
+			}
+			else
+			{
+			di->soc_pre -= 1;
+			}
+			//store when soc changed
+			backup_soc_ex(di->soc_pre);
+			get_current_time(&di->soc_pre_time);
+//			pr_err("system resume,soc:%d, soc_calib:%d,VOLT:%d,current:%d\n", soc, di->soc_pre,bq27541_battery_voltage(di),bq27541_average_current(di));
+			}
 		}
-		if(soc <= di->soc_pre) {
-			di->soc_pre = soc;
-		}
+		goto read_soc_err;
 	}
 
 	soc = bq27541_soc_calibrate(di,soc);
@@ -741,7 +910,7 @@ static int bq27541_get_batt_remaining_capacity(void)
 
 static int bq27541_get_battery_soc(void)
 {
-	return bq27541_battery_soc(bq27541_di, false);
+	return bq27541_battery_soc(bq27541_di, 0);
 }
 
 
@@ -846,8 +1015,45 @@ static int bq27541_get_fast_chg_ing(void)
 		}
 	return 0;
 }
-
 /* OPPO 2013-12-12 liaofuchun add for set/get fastchg allow end */
+
+static int bq27541_set_alow_reading(int enable)
+{
+	if(bq27541_di) {
+		bq27541_di->alow_reading = enable;
+	}
+	return 0;
+}
+
+static int bq27541_set_lcd_off_status(int off)
+{
+	int soc,ret;
+//	pr_info("%s:%d\n",__func__,off);
+	if(bq27541_di) {
+		if(off)
+		{
+		ret = bq27541_read(BQ27541_REG_SOC, &soc, 0, bq27541_di);
+		if (ret)
+		{
+			bq27541_di->lcd_off_delt_soc=0;
+			dev_err(bq27541_di->dev, "soc error reading ret=%d,soc%d\n",ret,soc);
+		}
+		else
+		{
+		bq27541_di->lcd_off_delt_soc=bq27541_di->soc_pre-soc;
+//		pr_info("%s:lcd_off_delt_soc:%d,soc=%d,soc_pre=%d\n",__func__,bq27541_di->lcd_off_delt_soc,soc,bq27541_di->soc_pre);
+		}
+		get_current_time(&bq27541_di->lcd_off_time);
+		bq27541_di->lcd_is_off=true;
+		}
+		else
+		{
+		bq27541_di->lcd_is_off=false;
+		bq27541_di->lcd_off_delt_soc=0;
+		}
+	}
+	return 0;
+}
 
 static struct qpnp_battery_gauge bq27541_batt_gauge = {
 	.get_battery_mvolts		= bq27541_get_battery_mvolts,
@@ -874,6 +1080,8 @@ static struct qpnp_battery_gauge bq27541_batt_gauge = {
 	.get_fast_chg_ing			= bq27541_get_fast_chg_ing,
 	.get_fast_low_temp_full		= bq27541_get_fast_low_temp_full,
 	.set_low_temp_full_false	= bq27541_set_fast_low_temp_full_false,
+	.set_alow_reading	= bq27541_set_alow_reading,
+	.set_lcd_off_status	= bq27541_set_lcd_off_status,
 #endif
 /* OPPO 2013-09-30 wangjc Add end */
 };
@@ -1684,6 +1892,7 @@ static int bq27541_battery_probe(struct i2c_client *client,
 	spin_lock_init(&lock);
 
 	bq27541_di = di;
+	di->lcd_is_off=false;
 	INIT_WORK(&di->counter, bq27541_coulomb_counter_work);
 	INIT_DELAYED_WORK(&di->hw_config, bq27541_hw_config);
 	schedule_delayed_work(&di->hw_config, 0);
@@ -1751,9 +1960,14 @@ static int bq27541_battery_remove(struct i2c_client *client)
 static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t message)
 {
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
+	int ret = 0;
 	
 	atomic_set(&di->suspended, 1);
-	
+	ret = get_current_time(&di->rtc_suspend_time);
+	if (ret ) {
+		pr_err("%s: Failed to read RTC time\n", __func__);
+		return 0;
+	}
 	return 0;
 }
 
@@ -1761,18 +1975,22 @@ static int bq27541_battery_suspend(struct i2c_client *client, pm_message_t messa
 #define RESUME_TIME  1*60 
 static int bq27541_battery_resume(struct i2c_client *client)
 {
+	int ret=0;
+	int suspend_time;
 	struct bq27541_device_info *di = i2c_get_clientdata(client);
-			
 	atomic_set(&di->suspended, 0);
-	
-	bq27541_battery_soc(bq27541_di, true); 
+	ret = get_current_time(&di->rtc_resume_time);
+	if (ret ) {
+		pr_err("%s: Failed to read RTC time\n", __func__);
+		return 0;
+	}
+	suspend_time =  di->rtc_resume_time - di->rtc_suspend_time;
+	pr_err("%s: suspend_time=%d\n", __func__,suspend_time);
 
+	/*update pre capacity when sleep time more than 1minutes*/
+	bq27541_battery_soc(bq27541_di, suspend_time);
 	return 0;
 }
-
-
-
-
 
 static const struct of_device_id bq27541_match[] = {
 	{ .compatible = "ti,bq27541-battery" },

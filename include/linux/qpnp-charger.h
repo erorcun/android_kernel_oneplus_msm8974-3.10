@@ -61,6 +61,8 @@ struct qpnp_battery_gauge {
 	int	(*get_fast_low_temp_full)	(void);
 	int	(*set_low_temp_full_false)	(void);
 	//lfc add for fastchg end
+	int (*set_alow_reading) (int enable);
+	int (*set_lcd_off_status) (int status);
 };
 
 struct qpnp_external_charger {
