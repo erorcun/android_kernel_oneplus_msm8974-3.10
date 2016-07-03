@@ -20,7 +20,6 @@
 #include <linux/hrtimer.h>
 #include <linux/module.h>
 
-
 #include "cpuidle.h"
 
 DEFINE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
@@ -542,14 +541,7 @@ static void smp_callback(void *v)
 static int cpuidle_latency_notify(struct notifier_block *b,
 		unsigned long l, void *v)
 {
-	const struct cpumask *cpus;
-
-	cpus = v ?: cpu_online_mask;
-
-	preempt_disable();
-	smp_call_function_many(cpus, smp_callback, NULL, 1);
-	preempt_enable();
-
+	smp_call_function(smp_callback, NULL, 1);
 	return NOTIFY_OK;
 }
 
