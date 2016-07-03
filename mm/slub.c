@@ -2546,7 +2546,7 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 		new.inuse--;
 		if ((!new.inuse || !prior) && !was_frozen) {
 
-			if (!kmem_cache_debug(s) && !prior) [
+			if (!kmem_cache_debug(s) && !prior) {
 
 				/*
 				 * Slab was on no list before and will be partially empty
