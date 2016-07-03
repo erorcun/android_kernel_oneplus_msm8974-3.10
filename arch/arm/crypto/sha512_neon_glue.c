@@ -24,7 +24,7 @@
 #include <linux/string.h>
 #include <crypto/sha.h>
 #include <asm/byteorder.h>
-#include <asm/simd.h>
+#include <asm-generic/simd.h>
 #include <asm/neon.h>
 
 
