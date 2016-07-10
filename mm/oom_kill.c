@@ -704,7 +704,7 @@ void pagefault_out_of_memory(void)
 {
 	struct zonelist *zonelist;
 
-	if (mem_cgroup_oom_synchronize(true))
+	if (mem_cgroup_oom_synchronize())
 		return;
 
 	zonelist = node_zonelist(first_online_node, GFP_KERNEL);

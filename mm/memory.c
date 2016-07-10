@@ -3890,21 +3890,15 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * space.  Kernel faults are handled more gracefully.
 	 */
 	if (flags & FAULT_FLAG_USER)
-		mem_cgroup_oom_enable();
+		mem_cgroup_enable_oom();
 
 	ret = __handle_mm_fault(mm, vma, address, flags);
 
-	if (flags & FAULT_FLAG_USER) {
-		mem_cgroup_oom_disable();
-                /*
-                 * The task may have entered a memcg OOM situation but
-                 * if the allocation error was handled gracefully (no
-                 * VM_FAULT_OOM), there is no need to kill anything.
-                 * Just clean up the OOM state peacefully.
-                 */
-                if (task_in_memcg_oom(current) && !(ret & VM_FAULT_OOM))
-                        mem_cgroup_oom_synchronize(false);
-	}
+	if (flags & FAULT_FLAG_USER)
+		mem_cgroup_disable_oom();
+
+	if (WARN_ON(task_in_memcg_oom(current) && !(ret & VM_FAULT_OOM)))
+		mem_cgroup_oom_synchronize();
 
 	return ret;
 }
