@@ -802,13 +802,20 @@ EXPORT_SYMBOL_GPL(__online_page_set_limits);
 
 void __online_page_increment_counters(struct page *page)
 {
-	adjust_managed_page_count(page, 1);
+	totalram_pages++;
+
+#ifdef CONFIG_HIGHMEM
+	if (PageHighMem(page))
+		totalhigh_pages++;
+#endif
 }
 EXPORT_SYMBOL_GPL(__online_page_increment_counters);
 
 void __online_page_free(struct page *page)
 {
-	__free_reserved_page(page);
+	ClearPageReserved(page);
+	init_page_count(page);
+	__free_page(page);
 }
 EXPORT_SYMBOL_GPL(__online_page_free);
 
@@ -1005,6 +1012,7 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages, int online_typ
 		return ret;
 	}
 
+	zone->managed_pages += onlined_pages;
 	zone->present_pages += onlined_pages;
 	zone->zone_pgdat->node_present_pages += onlined_pages;
 	if (onlined_pages) {
@@ -1637,12 +1645,13 @@ repeat:
 	/* reset pagetype flags and makes migrate type to be MOVABLE */
 	undo_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
 	/* removal success */
-	adjust_managed_page_count(pfn_to_page(start_pfn), -offlined_pages);
+	zone->managed_pages -= offlined_pages;
 	if (offlined_pages > zone->present_pages)
 		zone->present_pages = 0;
 	else
 		zone->present_pages -= offlined_pages;
 	zone->zone_pgdat->node_present_pages -= offlined_pages;
+	totalram_pages -= offlined_pages;
 
 #ifdef CONFIG_FIX_MOVABLE_ZONE
 	if (zone_idx(zone) != ZONE_MOVABLE)
