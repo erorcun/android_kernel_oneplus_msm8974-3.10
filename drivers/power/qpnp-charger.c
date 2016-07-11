@@ -6755,7 +6755,7 @@ static int set_prop_batt_health(struct qpnp_chg_chip *chip, int batt_health)
 	return 0;
 }
 
-#define MAX_COUNT	50
+#define MAX_COUNT	500
 #ifdef CONFIG_VENDOR_EDIT
 /* jingchun.wang@Onlinerd.Driver, 2014/01/02  Add for set soft aicl voltage to 4.4v */
 #define SOFT_AICL_VOL	4465 // 4555
@@ -6794,7 +6794,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	}
 
 	qpnp_chg_iusbmax_set(chip, 900);
-	for (i = 0; i < MAX_COUNT; i++) {
+	for (i = 0; i < MAX_COUNT / 5; i++) {
 		if (!chip->usb_present) {
 			qpnp_chg_iusbmax_set(chip, 500);
 			chip->aicl_current = 500;
@@ -6802,7 +6802,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL) {
+		if (chg_vol < SOFT_AICL_VOL - 50) {
 			qpnp_chg_iusbmax_set(chip, 500);
 			qpnp_chg_iusbmax_set(chip, 500);//set 2 times
 			chip->aicl_current = 500;
@@ -6814,7 +6814,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	}
 
 	qpnp_chg_iusbmax_set(chip, 1200);
-	for (i = 0; i < MAX_COUNT; i++) {
+	for (i = 0; i < MAX_COUNT / 5; i++) {
 		if (!chip->usb_present) {
 			qpnp_chg_iusbmax_set(chip, 900);
 			chip->aicl_current = 900;
@@ -6822,7 +6822,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL + 50) {
+		if (chg_vol < SOFT_AICL_VOL - 50) {
 			qpnp_chg_iusbmax_set(chip, 900);
 			qpnp_chg_iusbmax_set(chip, 900);//set 2 times
 			chip->aicl_current = 900;
@@ -6836,25 +6836,25 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	
 	qpnp_chg_ibatmax_set(chip, 1216);
 	qpnp_chg_iusbmax_set(chip, 1500);
-	for (i = 0; i < MAX_COUNT + 30; i++) {
+	for (i = 0; i < MAX_COUNT + 300; i++) {
 		if (!chip->usb_present) {
 			//goto aicl_err;
-			qpnp_chg_iusbmax_set(chip, 900);
-			chip->aicl_current = 900;
+			qpnp_chg_iusbmax_set(chip, 1200);
+			chip->aicl_current = 1200;
 			chip->aicl_interrupt = true;
 			goto end;
 		}
-		if (i == 20)
+		if (i == 200)
 			qpnp_chg_ibatmax_set(chip, 1344);
-		else if (i == 40)
+		else if (i == 400)
 			qpnp_chg_ibatmax_set(chip, 1536);
-		else if (i == 60)
+		else if (i == 600)
 			qpnp_chg_ibatmax_set(chip, 1728);
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL) {
-			qpnp_chg_iusbmax_set(chip, 900);
-			qpnp_chg_iusbmax_set(chip, 900);
-			chip->aicl_current = 900;
+			qpnp_chg_iusbmax_set(chip, 1200);
+			qpnp_chg_iusbmax_set(chip, 1200);
+			chip->aicl_current = 1200;
 			qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);///4.68V sjc0401 add for improving current noise (bq24196 hardware bug)
 			if (!chip->usb_present) {
 				chip->aicl_interrupt = true;
@@ -6865,7 +6865,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	
 	qpnp_chg_ibatmax_set(chip, 1536);
 	qpnp_chg_iusbmax_set(chip, 2000);
-	for (i = 0; i < MAX_COUNT + 30; i++) {
+	for (i = 0; i < MAX_COUNT + 300; i++) {
 		if (!chip->usb_present) {
 			//goto aicl_err;
 			qpnp_chg_iusbmax_set(chip, 1500);
@@ -6873,11 +6873,11 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			chip->aicl_interrupt = true;
 			goto end;
 		}
-		if (i == 20)
+		if (i == 200)
 			qpnp_chg_ibatmax_set(chip, 1728);
-		else if (i == 40)
+		else if (i == 400)
 			qpnp_chg_ibatmax_set(chip, 1920);
-		else if (i == 60)
+		else if (i == 600)
 			qpnp_chg_ibatmax_set(chip, 2112);
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL - 30) {
@@ -7969,45 +7969,41 @@ static void update_heartbeat(struct work_struct *work)
 	struct qpnp_chg_chip *chip = container_of(dwork,
 				struct qpnp_chg_chip, update_heartbeat_work);
 	bool is_there_charger = qpnp_chg_is_usb_chg_plugged_in(chip);
-	
+	int charge_type = qpnp_charger_type_get(chip);
+
 	oneplus_set_allow_read_iic(true);	
-	if (is_there_charger) {
 
 /* OPPO 2013-12-22 liaofuchun add for fastchg */
 #ifdef CONFIG_PIC1503_FASTCG	
-		int charge_type = qpnp_charger_type_get(chip);
+	if(get_prop_fast_chg_started(chip) == true) {
+		switch_fast_chg(chip);
+		pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
+		//lfc move it to fastcg_work_func in bq27541.c
+		//power_supply_changed(&chip->batt_psy);
+		//lfc add for disable normal charge begin
+		if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
+			qpnp_chg_charge_en(chip,false);
+			chip->normal_chg_stopped_by_fastchg = true;
+		}
+		//lfc add for disable normal charge end
+		/*update time 6s*/
+		schedule_delayed_work(&chip->update_heartbeat_work,
+				      round_jiffies_relative(msecs_to_jiffies
+							     (BATT_HEARTBEAT_INTERVAL)));
+		return;
+	} else {
+		if(true == chip->normal_chg_stopped_by_fastchg) {
+			qpnp_chg_charge_en(chip, 1);
+			chip->normal_chg_stopped_by_fastchg = false;
+		}
+	}
 
-		if(get_prop_fast_chg_started(chip) == true) {
-			switch_fast_chg(chip);
-			pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
-			//lfc move it to fastcg_work_func in bq27541.c
-			//power_supply_changed(&chip->batt_psy);
-			//lfc add for disable normal charge begin
-			if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
-				qpnp_chg_charge_en(chip,false);
-				chip->normal_chg_stopped_by_fastchg = true;
-			}
-			//lfc add for disable normal charge end
-			/*update time 6s*/
-			schedule_delayed_work(&chip->update_heartbeat_work,
-					      round_jiffies_relative(msecs_to_jiffies
-								     (BATT_HEARTBEAT_INTERVAL)));
-			return;
-		} else {
-			if(true == chip->normal_chg_stopped_by_fastchg) {
-				qpnp_chg_charge_en(chip, 1);
-				chip->normal_chg_stopped_by_fastchg = false;
-			}
-		}
-	
-		if(charge_type == POWER_SUPPLY_TYPE_USB_DCP) {
-			switch_fast_chg(chip);
-			//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
-		}
+	if(charge_type == POWER_SUPPLY_TYPE_USB_DCP) {
+		switch_fast_chg(chip);
+		//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
+	}
 #endif
 /* OPPO 2013-12-22 liaofuchun add end*/
-
-	}
 
 	qpnp_check_charger_uovp(chip);
 	qpnp_check_charge_timeout(chip);
