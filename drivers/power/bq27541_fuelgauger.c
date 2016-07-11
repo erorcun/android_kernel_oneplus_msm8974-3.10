@@ -462,13 +462,6 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	if(di->batt_psy){
 		ret.intval = get_charging_status() ;
 		di->batt_vol_pre= bq27541_battery_voltage(di);
-		if((fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__LITTLE_COOL
-								|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__COOL
-								|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL)&&(get_oem_charge_done_status( )==true))
-		{
-			ret.intval = POWER_SUPPLY_STATUS_FULL; /* when battery temperature is cool or normal,we disable charge after charge done,in this case battery status must deal with FULL*/
-
-		}
 
 		if(ret.intval == POWER_SUPPLY_STATUS_CHARGING || ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
 			charging_status = 1;
