@@ -702,12 +702,9 @@ out:
  */
 void pagefault_out_of_memory(void)
 {
-	struct zonelist *zonelist;
+	struct zonelist *zonelist = node_zonelist(first_online_node,
+						  GFP_KERNEL);
 
-	if (mem_cgroup_oom_synchronize())
-		return;
-
-	zonelist = node_zonelist(first_online_node, GFP_KERNEL);
 	if (try_set_zonelist_oom(zonelist, GFP_KERNEL)) {
 		out_of_memory(NULL, 0, 0, NULL, false);
 		clear_zonelist_oom(zonelist, GFP_KERNEL);
