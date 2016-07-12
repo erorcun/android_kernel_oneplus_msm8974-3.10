@@ -171,7 +171,7 @@ extern int pic16f_fw_update(bool pull96);
 #define CAPACITY_SALTATE_COUNTER_CHARGING_TERM	30//30	1min
 #define CAPACITY_SALTATE_COUNTER 4
 #define CAPACITY_SALTATE_COUNTER_NOT_CHARGING	24// >=40sec
-#define LOW_BATTERY_PROTECT_VOLTAGE	3350*1000
+#define LOW_BATTERY_PROTECT_VOLTAGE	3300*1000
 #define CAPACITY_CALIBRATE_TIME_60_PERCENT	45  //45s
 
 static int get_current_time(unsigned long *now_tm_sec)
@@ -481,9 +481,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 				soc_calib = di->soc_pre;
 				if (di->soc_pre < 100
 						&& (fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__LITTLE_COOL
-						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL
-						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__COOL
-						)) {
+						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL)) {
 					if (di->saltate_counter < CAPACITY_SALTATE_COUNTER_CHARGING_TERM) {
 						di->saltate_counter++;
 					} else {

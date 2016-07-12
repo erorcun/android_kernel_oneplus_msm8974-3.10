@@ -182,9 +182,7 @@ enum power_supply_property {
 	#ifdef CONFIG_VENDOR_EDIT
 	POWER_SUPPLY_PROP_CHARGE_TIMEOUT,
 	#endif /*CONFIG_VENDOR_EDIT*/
-	#ifdef CONFIG_PIC1503_FASTCG
 	POWER_SUPPLY_PROP_FASTCHARGER,
-	#endif	//CONFIG_PIC1503_FASTCG
 };
 
 enum power_supply_type {

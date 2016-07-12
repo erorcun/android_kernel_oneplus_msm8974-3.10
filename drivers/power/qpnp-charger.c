@@ -3040,9 +3040,7 @@ static enum power_supply_property pm_power_props_mains[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
-#ifdef CONFIG_PIC1503_FASTCG
 	POWER_SUPPLY_PROP_FASTCHARGER,//wangjc add for fast charger
-#endif
 };
 
 static enum power_supply_property msm_batt_power_props[] = {
@@ -3124,9 +3122,6 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 #ifndef CONFIG_VENDOR_EDIT
 		val->intval = qpnp_chg_is_dc_chg_plugged_in(chip);
 #else
-               if (!qpnp_chg_is_usb_chg_plugged_in(chip))
-                       /* Return offline if USB is not present */
-                       return 0;
 #ifndef CONFIG_BATTERY_BQ27541
 /* jingchun.wang@Onlinerd.Driver, 2014/02/11  Modify for when no battery gauge present */
 		if(qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP)
@@ -3152,9 +3147,9 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 		val->intval = chip->maxinput_dc_ma * 1000;
 		break;
 /* OPPO 2013-12-22 wangjc add for fastchg*/
-#ifdef CONFIG_PIC1503_FASTCG
+// #ifdef CONFIG_PIC1503_FASTCG
 	case POWER_SUPPLY_PROP_FASTCHARGER://wangjc add for fast charger
-		val->intval = get_prop_fast_chg_started(chip);
+		val->intval = 0; // get_prop_fast_chg_started(chip);
 #if 0
 //Fuchun.Liao@EXP.driver,delete for mistakenly show fastchg mode "YES" 
 		if(val->intval == 0) {
@@ -3164,7 +3159,7 @@ qpnp_power_get_property_mains(struct power_supply *psy,
 		}
 #endif
 		break;
-#endif
+// #endif
 /* OPPO 2013-12-22 wangjc add end*/
 	default:
 		return -EINVAL;
@@ -6556,7 +6551,7 @@ do {									\
 					"qcom," qpnp_dt_property,	\
 					&chip->prop);			\
 									\
-	if ((retval == -EINVAL) && optional)				\
+	if (retval && optional)				\
 		retval = 0;						\
 	else if (retval)						\
 		pr_err("Error reading " #qpnp_dt_property		\
@@ -7776,7 +7771,7 @@ static int qpnp_check_battery_temp(struct qpnp_chg_chip *chip)
 /* yangfangbiao@oneplus.cn, 2015/01/06  Modify end for  sync with KK charge standard  */
 #define BATT_RECHARGING_VOLTAGE__NORMAL 		4220 * 1000
 #define BATT_RECHARGING_VOLTAGE__WARM  		4000 * 1000
-#define BATT_RECHARGING_CHECK_COUNT				50
+#define BATT_RECHARGING_CHECK_COUNT				5
 
 static void qpnp_check_recharging(struct qpnp_chg_chip *chip)
 {
@@ -7939,7 +7934,7 @@ static void switch_fast_chg(struct qpnp_chg_chip *chip)
 	if(gpio_get_value(96))
 		return;
 
-#ifdef CONFIG_VENDOR_EDIT
+#if 0 // We're doing this check on everywhere
 /* jingchun.wang@Onlinerd.Driver, 2014/03/11  Add for can't turn gpio 96 */
 	if(!qpnp_chg_is_usb_chg_plugged_in(chip))
 		return;
@@ -7969,38 +7964,44 @@ static void update_heartbeat(struct work_struct *work)
 	struct qpnp_chg_chip *chip = container_of(dwork,
 				struct qpnp_chg_chip, update_heartbeat_work);
 	bool is_there_charger = qpnp_chg_is_usb_chg_plugged_in(chip);
-	int charge_type = qpnp_charger_type_get(chip);
 
 	oneplus_set_allow_read_iic(true);	
 
 /* OPPO 2013-12-22 liaofuchun add for fastchg */
-#ifdef CONFIG_PIC1503_FASTCG	
-	if(get_prop_fast_chg_started(chip) == true) {
-		switch_fast_chg(chip);
-		pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
-		//lfc move it to fastcg_work_func in bq27541.c
-		//power_supply_changed(&chip->batt_psy);
-		//lfc add for disable normal charge begin
-		if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
-			qpnp_chg_charge_en(chip,false);
-			chip->normal_chg_stopped_by_fastchg = true;
-		}
-		//lfc add for disable normal charge end
-		/*update time 6s*/
-		schedule_delayed_work(&chip->update_heartbeat_work,
-				      round_jiffies_relative(msecs_to_jiffies
-							     (BATT_HEARTBEAT_INTERVAL)));
-		return;
-	} else {
-		if(true == chip->normal_chg_stopped_by_fastchg) {
-			qpnp_chg_charge_en(chip, 1);
-			chip->normal_chg_stopped_by_fastchg = false;
-		}
-	}
+#ifdef CONFIG_PIC1503_FASTCG
+	if(is_there_charger) {
+		if(get_prop_fast_chg_started(chip) == true) {
+			switch_fast_chg(chip);
+			pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
+			//lfc move it to fastcg_work_func in bq27541.c
+			//power_supply_changed(&chip->batt_psy);
+			//lfc add for disable normal charge begin
+			if(qpnp_chg_get_charge_en() == 1 && qpnp_get_fast_chg_ing(chip) == 1){
+				qpnp_chg_charge_en(chip,false);
+				chip->normal_chg_stopped_by_fastchg = true;
+			}
+			//lfc add for disable normal charge end
+			/*update time 6s*/
+			schedule_delayed_work(&chip->update_heartbeat_work,
+					      round_jiffies_relative(msecs_to_jiffies
+								     (BATT_HEARTBEAT_INTERVAL)));
 
-	if(charge_type == POWER_SUPPLY_TYPE_USB_DCP) {
-		switch_fast_chg(chip);
-		//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
+			get_prop_battery_voltage_now(chip);
+			get_prop_batt_temp(chip);
+			get_prop_capacity(chip);
+			get_prop_current_now(chip);
+			return;
+		} else {
+			if(true == chip->normal_chg_stopped_by_fastchg) {
+				qpnp_chg_charge_en(chip, 1);
+				chip->normal_chg_stopped_by_fastchg = false;
+			}
+		}
+
+		if(qpnp_charger_type_get(chip) == POWER_SUPPLY_TYPE_USB_DCP) {
+			switch_fast_chg(chip);
+			//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
+		}
 	}
 #endif
 /* OPPO 2013-12-22 liaofuchun add end*/
@@ -8008,8 +8009,8 @@ static void update_heartbeat(struct work_struct *work)
 	qpnp_check_charger_uovp(chip);
 	qpnp_check_charge_timeout(chip);
 	qpnp_check_battery_uovp(chip);
-	get_prop_capacity(chip);
 	qpnp_check_battery_temp(chip);
+	get_prop_capacity(chip);
 
 	pr_debug("%s current:%d\n", __func__, get_prop_current_now(chip));
 	
