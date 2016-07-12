@@ -1996,7 +1996,9 @@ hw_shutdown:
 
 #ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
 extern int prevent_bl;
+extern void disable_bttn_bl(void);
 extern void enable_bttn_bl(void);
+int vsync_suspend = 0;
 #endif
 
 static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
@@ -2281,7 +2283,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	}
 
 #ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-	if(!prevent_bl)
+	if(!prevent_bl && !vsync_suspend && !rmi4_data->old_status)
 		enable_bttn_bl();
 #endif
 
@@ -4418,6 +4420,7 @@ static int fb_notifier_callback(struct notifier_block *p,
 	switch (event) {
 		case FB_EVENT_BLANK :
 			ev = (*(int *)evdata->data);
+			vsync_suspend = 0;
 
 			/*
 			 * Normal Screen Wakeup
@@ -4433,18 +4436,23 @@ static int fb_notifier_callback(struct notifier_block *p,
 			 */
 			switch (ev) {
 				/* Screen On */
-				case FB_BLANK_UNBLANK:
-				case FB_BLANK_NORMAL:
-				case FB_BLANK_VSYNC_SUSPEND:
-				case FB_BLANK_HSYNC_SUSPEND:
+				case FB_BLANK_UNBLANK: // 0
+				case FB_BLANK_NORMAL: // 1
+				case FB_BLANK_HSYNC_SUSPEND: // 3
 					new_status = 0;
+					break;
+				case FB_BLANK_VSYNC_SUSPEND: // 2
+					new_status = 0;
+					vsync_suspend = 1;
+					disable_bttn_bl();
 					break;
 				default:
 					/* Default to screen off to match previous
 					   behaviour */
 					print_ts(TS_INFO, KERN_INFO "[syna] Unhandled event %i\n", ev);
 					/* Fall through */
-				case FB_BLANK_POWERDOWN:
+				case FB_BLANK_POWERDOWN: // 4
+					disable_bttn_bl();
 					new_status = 1;
 					break;
 			}
