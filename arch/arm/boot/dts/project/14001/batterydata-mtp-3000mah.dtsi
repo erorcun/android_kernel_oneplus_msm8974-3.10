@@ -16,7 +16,7 @@ qcom,mtp-3000mah {
 	qcom,max-voltage-uv = <4350000>; 
 	qcom,rbatt-capacitive-mohm = <50>;
 	qcom,v-cutoff-uv = <3400000>;
-	qcom,chg-term-ua = <150000>;
+	qcom,chg-term-ua = <200000>;
 	qcom,batt-id-kohm = <300>;
 	qcom,battery-type = "mtp_3000mah";
 
