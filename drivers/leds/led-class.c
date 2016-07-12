@@ -35,6 +35,16 @@ void enable_bttn_bl(void)
 	if(bttn_bl)
 		__led_set_brightness(bttn_bl, bl_br);
 }
+
+void disable_bttn_bl(void)
+{
+	if(bttn_bl) {
+		led_trigger_remove(bttn_bl);
+		__led_set_brightness(bttn_bl, 0);
+	}
+
+	prevent_bl = 0;
+}
 #endif
 
 static void led_update_brightness(struct led_classdev *led_cdev)
