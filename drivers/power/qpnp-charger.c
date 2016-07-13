@@ -6750,7 +6750,7 @@ static int set_prop_batt_health(struct qpnp_chg_chip *chip, int batt_health)
 	return 0;
 }
 
-#define MAX_COUNT	500
+#define MAX_COUNT	50
 #ifdef CONFIG_VENDOR_EDIT
 /* jingchun.wang@Onlinerd.Driver, 2014/01/02  Add for set soft aicl voltage to 4.4v */
 #define SOFT_AICL_VOL	4555
@@ -6789,7 +6789,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	}
 
 	qpnp_chg_iusbmax_set(chip, 900);
-	for (i = 0; i < MAX_COUNT / 5; i++) {
+	for (i = 0; i < MAX_COUNT; i++) {
 		if (!chip->usb_present) {
 			qpnp_chg_iusbmax_set(chip, 500);
 			chip->aicl_current = 500;
@@ -6797,7 +6797,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL - 50) {
+		if (chg_vol < SOFT_AICL_VOL) {
 			qpnp_chg_iusbmax_set(chip, 500);
 			qpnp_chg_iusbmax_set(chip, 500);//set 2 times
 			chip->aicl_current = 500;
@@ -6809,7 +6809,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	}
 
 	qpnp_chg_iusbmax_set(chip, 1200);
-	for (i = 0; i < MAX_COUNT / 5; i++) {
+	for (i = 0; i < MAX_COUNT; i++) {
 		if (!chip->usb_present) {
 			qpnp_chg_iusbmax_set(chip, 900);
 			chip->aicl_current = 900;
@@ -6817,7 +6817,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL - 50) {
+		if (chg_vol < SOFT_AICL_VOL + 50) {
 			qpnp_chg_iusbmax_set(chip, 900);
 			qpnp_chg_iusbmax_set(chip, 900);//set 2 times
 			chip->aicl_current = 900;
@@ -6831,7 +6831,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	
 	qpnp_chg_ibatmax_set(chip, 1216);
 	qpnp_chg_iusbmax_set(chip, 1500);
-	for (i = 0; i < MAX_COUNT + 300; i++) {
+	for (i = 0; i < MAX_COUNT + 30; i++) {
 		if (!chip->usb_present) {
 			//goto aicl_err;
 			qpnp_chg_iusbmax_set(chip, 1200);
@@ -6839,11 +6839,11 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			chip->aicl_interrupt = true;
 			goto end;
 		}
-		if (i == 200)
+		if (i == 20)
 			qpnp_chg_ibatmax_set(chip, 1344);
-		else if (i == 400)
+		else if (i == 40)
 			qpnp_chg_ibatmax_set(chip, 1536);
-		else if (i == 600)
+		else if (i == 60)
 			qpnp_chg_ibatmax_set(chip, 1728);
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL) {
@@ -6860,7 +6860,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	
 	qpnp_chg_ibatmax_set(chip, 1536);
 	qpnp_chg_iusbmax_set(chip, 2000);
-	for (i = 0; i < MAX_COUNT + 300; i++) {
+	for (i = 0; i < MAX_COUNT + 30; i++) {
 		if (!chip->usb_present) {
 			//goto aicl_err;
 			qpnp_chg_iusbmax_set(chip, 1500);
@@ -6868,11 +6868,11 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			chip->aicl_interrupt = true;
 			goto end;
 		}
-		if (i == 200)
+		if (i == 20)
 			qpnp_chg_ibatmax_set(chip, 1728);
-		else if (i == 400)
+		else if (i == 40)
 			qpnp_chg_ibatmax_set(chip, 1920);
-		else if (i == 600)
+		else if (i == 60)
 			qpnp_chg_ibatmax_set(chip, 2112);
 		chg_vol = get_prop_charger_voltage_now(chip);
 		if (chg_vol < SOFT_AICL_VOL - 30) {
@@ -8743,12 +8743,7 @@ qpnp_charger_probe(struct spmi_device *spmi)
 		chip->adc_param.low_temp = chip->cool_bat_decidegc;
 		chip->adc_param.high_temp = chip->warm_bat_decidegc;
 		chip->adc_param.timer_interval = ADC_MEAS2_INTERVAL_1S;
-#ifndef CONFIG_VENDOR_EDIT
-// Jingchun.Wang@Phone.Bsp.Driver, 2015/03/04  Modify for mask pmic batt therm 
 		chip->adc_param.state_request = ADC_TM_HIGH_LOW_THR_ENABLE;
-#else /*CONFIG_VENDOR_EDIT*/
-		chip->adc_param.state_request = ADC_TM_HIGH_LOW_THR_DISABLE;
-#endif /*CONFIG_VENDOR_EDIT*/
 		chip->adc_param.btm_ctx = chip;
 		chip->adc_param.threshold_notification =
 						qpnp_chg_adc_notification;
@@ -8769,7 +8764,6 @@ qpnp_charger_probe(struct spmi_device *spmi)
 		goto unregister_dc_psy;
 	}
 
-	chip->usb_trim_default = qpnp_chg_iusb_trim_get(chip);
 /* OPPO 2013-11-21 wangjc Delete begin for use bq charger */
 #ifndef CONFIG_BQ24196_CHARGER
 	qpnp_chg_charge_en(chip, !chip->charging_disabled);
