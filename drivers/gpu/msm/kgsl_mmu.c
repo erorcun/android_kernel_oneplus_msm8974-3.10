@@ -506,6 +506,7 @@ int kgsl_mmu_init(struct kgsl_device *device)
 	/* Add the setstate memory to the global PT entry list */
 	status = kgsl_add_global_pt_entry(device, &mmu->setstate_memory);
 
+done:
 	if (status)
 		kgsl_sharedmem_free(&mmu->setstate_memory);
 

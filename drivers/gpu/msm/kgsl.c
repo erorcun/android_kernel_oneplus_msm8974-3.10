@@ -4405,7 +4405,7 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	}
 
 	/* Check to see if our device can perform DMA correctly */
-	status = dma_set_coherent_mask(&pdev->dev, KGSL_DMA_BIT_MASK);
+	status = dma_set_coherent_mask(&device->pdev->dev, KGSL_DMA_BIT_MASK);
 	if (status)
 		goto error_close_mmu;
 
