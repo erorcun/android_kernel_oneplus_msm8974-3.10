@@ -212,6 +212,8 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 		else if (mlc->cabc_level == CABC_VIDEO)
 			cabc_value |= mlc->cabc_video_value;
 
+		lm3630_cabc_changed(cabc_value == 0 ? 0 : 1);
+
 		if (mlc->sre_level == SRE_WEAK)
 			cabc_value |= mlc->sre_weak_value;
 		else if (mlc->sre_level == SRE_MEDIUM)
@@ -227,6 +229,7 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 		pr_info("%s cabc=%d sre=%d aco=%d cmd=%d\n", __func__,
 				mlc->cabc_level, mlc->sre_level, mlc->aco_enabled,
 				cabc_value);
+		
 	}
 
 	len += mlc->post_cmds_len;
@@ -317,7 +320,6 @@ static ssize_t mdss_livedisplay_set_cabc(struct device *dev,
 		mutex_lock(&mlc->lock);
 		mlc->cabc_level = level;
 		mutex_unlock(&mlc->lock);
-		lm3630_cabc_changed(level == CABC_OFF ? 0 : 1);
 		mdss_livedisplay_update(mlc, MODE_CABC);
 	}
 
