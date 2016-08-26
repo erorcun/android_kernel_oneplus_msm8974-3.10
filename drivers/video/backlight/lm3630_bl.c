@@ -59,7 +59,6 @@
 #ifdef CONFIG_MACH_OPPO
 /* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/03/10  Add for flicker in low backlight */
 static bool pwm_flag = true;
-static int backlight_level;
 int cabc = 0;
 static int pre_brightness=0;
 #endif /*CONFIG_MACH_OPPO*/
@@ -216,18 +215,16 @@ int set_backlight_pwm(int state)
     int rc = 0;
 	//if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
         if (get_boot_mode() == MSM_BOOT_MODE__NORMAL) {
-			if( state == 1 && backlight_level <= 0x14 ) return rc;
-        	if(state == 1)
-    		{
-    	
+			if(state == 1 && pre_brightness <= 0x14 && pre_brightness != 0) return rc;
+        		if(state == 1)
+    			{
        			 rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x01);
 				 pwm_flag = true;
-   		    }
+   		    	}
    			else
    			{
-   			
-    		     rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x00);
-				 pwm_flag = false;
+				rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x00);
+				pwm_flag = false;
   			}
 			pr_err("Backlight PWM is %d.\n", state);
         }
@@ -251,27 +248,30 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 	pr_debug("%s: bl=%d\n", __func__,bl_level);
 #ifdef CONFIG_MACH_OPPO
 /* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/04/28  Add for add log for 14001 black screen */
-		if(pre_brightness == 0)
-			{pr_err("%s set brightness :  %d \n",__func__,bl_level);}
-		pre_brightness=bl_level;
+	if(pre_brightness == 0) {
+		set_backlight_pwm(1);
+		pr_err("%s set brightness :  %d \n",__func__,bl_level);
+	}
+
 #endif /*CONFIG_MACH_OPPO*/
 	
 	if(!pchip){
 		dev_err(pchip->dev, "lm3630_bank_a_update_status pchip is null\n");
 		return -ENOMEM;
-		}
+	}
 
-    if (!pchip->regmap || !lm3630_pchip->regmap) {
-        pr_err("%s YXQ pchip->regmap is NULL.\n", __func__);
-        return bl_level;
-    }
+	if (!pchip->regmap || !lm3630_pchip->regmap) {
+		pr_err("%s YXQ pchip->regmap is NULL.\n", __func__);
+		return bl_level;
+	}
 	
 	/* brightness 0 means disable */
 	if (!bl_level) {
-        ret = regmap_write(lm3630_pchip->regmap, REG_BRT_A, 0);
+		ret = regmap_write(lm3630_pchip->regmap, REG_BRT_A, 0);
 		ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x80);
 		if (ret < 0)
 			goto out;
+		pre_brightness=bl_level;
 		return bl_level;
 	}
 
@@ -299,7 +299,7 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 	if (ret < 0)
 		goto out;
 
-	backlight_level = bl_level;
+	pre_brightness=bl_level;
 
 	return bl_level;
 out:
