@@ -8373,6 +8373,20 @@ int load_soc(void)
 		return -1;
 	return soc;
 }
+static void clear_backup_soc(struct qpnp_chg_chip *chip)
+{
+	int rc = 0;
+	u8 soc_temp = 0;
+	rc = qpnp_chg_masked_write(chip, SOC_DATA_REG_0, SOC_STORAGE_MASK, soc_temp, 1);
+	if (rc) {
+		printk(KERN_ERR "%s: failed to clean addr[0x%x], rc=%d\n", __func__, SOC_DATA_REG_0, rc);
+	}
+}
+void clean_backup_soc_ex(void)
+{
+	if(g_chip != NULL)
+		clear_backup_soc(g_chip);
+}
 
 static void backup_soc(struct qpnp_chg_chip *chip, int soc)
 {
