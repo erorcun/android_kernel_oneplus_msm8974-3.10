@@ -215,7 +215,7 @@ int set_backlight_pwm(int state)
     int rc = 0;
 	//if (get_pcb_version() < HW_VERSION__20) { /* For Find7 */
         if (get_boot_mode() == MSM_BOOT_MODE__NORMAL) {
-			if(state == 1 && pre_brightness <= 0x14 && pre_brightness != 0) return rc;
+			if(state == 1 && pre_brightness <= 0x14) return rc;
         		if(state == 1)
     			{
        			 rc = regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x01, 0x01);
@@ -246,14 +246,6 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 	int ret;
 	struct lm3630_chip_data *pchip = lm3630_pchip;
 	pr_debug("%s: bl=%d\n", __func__,bl_level);
-#ifdef CONFIG_MACH_OPPO
-/* Xiaori.Yuan@Mobile Phone Software Dept.Driver, 2014/04/28  Add for add log for 14001 black screen */
-	if(pre_brightness == 0) {
-		set_backlight_pwm(1);
-		pr_err("%s set brightness :  %d \n",__func__,bl_level);
-	}
-
-#endif /*CONFIG_MACH_OPPO*/
 	
 	if(!pchip){
 		dev_err(pchip->dev, "lm3630_bank_a_update_status pchip is null\n");
@@ -286,7 +278,13 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 
 		ret = regmap_write(pchip->regmap,
 				   REG_BRT_A, bl_level);
+
 #ifdef CONFIG_MACH_OPPO
+		if(pre_brightness == 0) {
+			set_backlight_pwm(1);
+			pr_err("%s set brightness :  %d \n",__func__,bl_level);
+		}
+
 		if(bl_level <= 0x14) {
 			if(pwm_flag == true)
 				set_backlight_pwm(0);
@@ -596,7 +594,7 @@ static int lm3630_resume(struct device *dev)
 
 	pr_debug("%s: backlight resume.\n", __func__);
     rc = regmap_write(lm3630_pchip->regmap, REG_BRT_A, 0);
-	regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x04, 0x00);
+	regmap_update_bits(lm3630_pchip->regmap, REG_CONFIG, 0x40, 0x00);
 	rc  = regmap_update_bits(lm3630_pchip->regmap, REG_CTRL, 0x80, 0x00);
 	if (rc  < 0)
 	{
