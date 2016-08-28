@@ -186,14 +186,14 @@ void fib_rules_unregister(struct fib_rules_ops *ops)
 }
 EXPORT_SYMBOL_GPL(fib_rules_unregister);
 
-static inline uid_t fib_nl_uid(struct nlattr *nla)
+static inline kuid_t fib_nl_uid(struct nlattr *nla)
 {
-	return nla_get_u32(nla);
+	return make_kuid(current_user_ns(), nla_get_u32(nla));
 }
 
-static int nla_put_uid(struct sk_buff *skb, int idx, uid_t uid)
+static int nla_put_uid(struct sk_buff *skb, int idx, kuid_t uid)
 {
-	return nla_put_u32(skb, idx, uid);
+	return nla_put_u32(skb, idx, from_kuid_munged(current_user_ns(), uid));
 }
 
 static int fib_uid_range_match(struct flowi *fl, struct fib_rule *rule)
@@ -629,15 +629,12 @@ static int fib_nl_fill_rule(struct sk_buff *skb, struct fib_rule *rule,
 	    ((rule->mark_mask || rule->mark) &&
 	     nla_put_u32(skb, FRA_FWMASK, rule->mark_mask)) ||
 	    (rule->target &&
-	     nla_put_u32(skb, FRA_GOTO, rule->target)))
+	     nla_put_u32(skb, FRA_GOTO, rule->target)) ||
+	    (uid_valid(rule->uid_start) &&
+	     nla_put_uid(skb, FRA_UID_START, rule->uid_start)) ||
+	    (uid_valid(rule->uid_end) &&
+	     nla_put_uid(skb, FRA_UID_END, rule->uid_end)))
 		goto nla_put_failure;
-
-	if (uid_valid(rule->uid_start))
-	     nla_put_uid(skb, FRA_UID_START, rule->uid_start);
-
-	if (uid_valid(rule->uid_end))
-	     nla_put_uid(skb, FRA_UID_END, rule->uid_end);
-
 	if (ops->fill(rule, skb, frh) < 0)
 		goto nla_put_failure;
 
