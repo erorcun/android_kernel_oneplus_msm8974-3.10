@@ -61,7 +61,6 @@ static int ecryptfs_d_revalidate(struct dentry *dentry, unsigned int flags)
 		if (!inode->i_nlink)
 			return 0;
 	}
-out:
 	return rc;
 }
 

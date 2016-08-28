@@ -630,9 +630,7 @@ void wcnss_pronto_is_a2xb_bus_stall(void *tst_addr, u32 fifo_mask, char *type)
 void wcnss_pronto_log_debug_regs(void)
 {
 	void __iomem *reg_addr, *tst_addr, *tst_ctrl_addr;
-	u32 reg = 0, reg2 = 0, reg3 = 0, reg4 = 0, offset_addr = 0;
-	int i;
-
+	u32 reg = 0, reg2 = 0, reg3 = 0, reg4 = 0;
 
 	reg_addr = penv->msm_wcnss_base + PRONTO_PMU_SPARE_OFFSET;
 	reg = readl_relaxed(reg_addr);
