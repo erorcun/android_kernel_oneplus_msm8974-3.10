@@ -39,7 +39,7 @@ void __init init_random_pool(void)
 
 	data.out_buf = (uint8_t *) virt_to_phys(random_buffer);
 	data.out_buf_sz = SZ_512;
-	dmac_flush_range(random_buffer, random_buffer + RANDOM_BUFFER_SIZ
+	dmac_flush_range(random_buffer, random_buffer + RANDOM_BUFFER_SIZE);
 
 	ret = scm_call_noalloc(TZ_SVC_CRYPTO, PRNG_CMD_ID, &data,
 			sizeof(data), &resp, sizeof(resp),
