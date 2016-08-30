@@ -691,6 +691,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		},
 	},
 #else
+#if 0
 	{
 		.gpio      = 2,		/* BLSP1 QUP I2C_DATA */
 		.settings = {
@@ -706,6 +707,8 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		},
 	},
 #endif
+#endif
+#if 0
 	{
 		.gpio      = 6,		/* BLSP1 QUP2 I2C_DAT */
 		.settings = {
@@ -732,6 +735,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
+#endif
 	{
 		.gpio      = 4,			/* BLSP2 UART TX */
 		.settings = {
@@ -744,6 +748,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_uart_config,
 		},
 	},
+#if 0
 	{                           /* NFC */
 		.gpio      = 29,		/* BLSP1 QUP5 I2C_DAT */
 		.settings = {
@@ -758,6 +763,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
+#endif
 #ifdef CONFIG_MACH_FIND7OP
 	{                           /* NFC */
 		.gpio      = 49,		/* BLSP1 QUP5 (BLSP6) MOSI */
