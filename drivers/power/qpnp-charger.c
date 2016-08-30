@@ -2116,12 +2116,13 @@ get_prop_fast_normal_to_warm(struct qpnp_chg_chip *chip)
 {
 	return false;
 }
-
+#if 0
 static int
 qpnp_get_fast_chg_ing(struct qpnp_chg_chip *chip)
 {
 	return false;
 }
+#endif
 #endif
 /* OPPO 2013-12-12 liaofuchun add end*/
 
