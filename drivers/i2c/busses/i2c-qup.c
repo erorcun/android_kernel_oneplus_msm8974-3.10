@@ -32,12 +32,9 @@
 #include <linux/slab.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
-#include <linux/gpio.h>
 #include <linux/of.h>
 #include <linux/of_i2c.h>
-#include <linux/of_gpio.h>
 #include <mach/board.h>
-#include <mach/gpiomux.h>
 #include <mach/msm_bus_board.h>
 
 MODULE_LICENSE("GPL v2");
@@ -141,7 +138,8 @@ enum msm_i2c_state {
 #define DEFAULT_CLK_RATE		(19200000)
 #define I2C_STATUS_CLK_STATE		13
 #define QUP_OUT_FIFO_NOT_EMPTY		0x10
-#define I2C_GPIOS_DT_CNT		(2)		/* sda and scl */
+#define I2C_MSM_PINCTRL_ACTIVE       "i2c_active"
+#define I2C_MSM_PINCTRL_SUSPEND        "i2c_sleep"
 #define I2C_QUP_MAX_BUS_RECOVERY_RETRY	10
 
 /* Register:QUP_I2C_MASTER_CLK_CTL field setters */
@@ -196,8 +194,10 @@ struct qup_i2c_dev {
 	atomic_t		     xfer_progress;
 	struct mutex                 mlock;
 	void                         *complete;
-	int                          i2c_gpios[ARRAY_SIZE(i2c_rsrcs)];
 	struct qup_i2c_clk_path_vote clk_path_vote;
+	struct pinctrl			*pinctrl;
+	struct pinctrl_state		*gpio_state_active;
+	struct pinctrl_state		*gpio_state_suspend;
 };
 
 #ifdef CONFIG_PM
@@ -489,39 +489,59 @@ static void i2c_qup_clk_path_postponed_register(struct qup_i2c_dev *dev)
 	}
 }
 
-static int i2c_qup_gpio_request(struct qup_i2c_dev *dev)
+static struct pinctrl_state *
+i2c_gpio_get_state(struct qup_i2c_dev *dev, const char *name)
 {
-	int i;
-	int result = 0;
+	struct pinctrl_state *pin_state
+			= pinctrl_lookup_state(dev->pinctrl, name);
 
-	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
-		if (dev->i2c_gpios[i] >= 0) {
-			result = gpio_request(dev->i2c_gpios[i], i2c_rsrcs[i]);
-			if (result) {
-				dev_err(dev->dev,
-					"gpio_request for pin %d failed with error %d\n",
-					dev->i2c_gpios[i], result);
-				goto error;
-			}
-		}
-	}
-	return 0;
-
-error:
-	for (; --i >= 0;) {
-		if (dev->i2c_gpios[i] >= 0)
-			gpio_free(dev->i2c_gpios[i]);
-	}
-	return result;
+	if (IS_ERR_OR_NULL(pin_state))
+		dev_info(dev->dev, "note pinctrl_lookup_state(%s) err:%ld\n",
+						name, PTR_ERR(pin_state));
+	return pin_state;
 }
 
-static void i2c_qup_gpio_free(struct qup_i2c_dev *dev)
+static int i2c_gpio_pinctrl_init(struct qup_i2c_dev *dev)
 {
-	int i;
+	dev->pinctrl = devm_pinctrl_get(dev->dev);
+	if (IS_ERR_OR_NULL(dev->pinctrl)) {
+		dev_err(dev->dev, "error devm_pinctrl_get() failed err:%ld\n",
+				PTR_ERR(dev->pinctrl));
+		return PTR_ERR(dev->pinctrl);
+ 	}
 
-	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
-		if (dev->i2c_gpios[i] >= 0)
-			gpio_free(dev->i2c_gpios[i]);
+	dev->gpio_state_active =
+		i2c_gpio_get_state(dev, I2C_MSM_PINCTRL_ACTIVE);
+
+	dev->gpio_state_suspend =
+		i2c_gpio_get_state(dev, I2C_MSM_PINCTRL_SUSPEND);
+	return 0;
+}
+
+static void i2c_pinctrl_state(struct qup_i2c_dev *dev,
+				bool runtime_active)
+{
+ 	struct pinctrl_state *pins_state;
+	const char           *pins_state_name;
+
+	if (runtime_active) {
+		pins_state      = dev->gpio_state_active;
+		pins_state_name = I2C_MSM_PINCTRL_ACTIVE;
+	} else {
+		pins_state      = dev->gpio_state_suspend;
+		pins_state_name = I2C_MSM_PINCTRL_SUSPEND;
+	}
+
+	if (!IS_ERR_OR_NULL(pins_state)) {
+		int ret = pinctrl_select_state(dev->pinctrl, pins_state);
+		if (ret)
+			dev_err(dev->dev,
+			"error pinctrl_select_state(%s) err:%d\n",
+			pins_state_name, ret);
+	} else {
+		dev_err(dev->dev,
+			"error pinctrl state-name:'%s' is not configured\n",
+			pins_state_name);
 	}
 }
 
@@ -570,7 +590,7 @@ static void i2c_qup_suspend(struct qup_i2c_dev *dev)
 
 	i2c_qup_clk_path_unvote(dev);
 
-	i2c_qup_gpio_free(dev);
+	i2c_pinctrl_state(dev, false);
 }
 
 static void i2c_qup_sys_suspend(struct qup_i2c_dev *dev)
@@ -599,7 +619,7 @@ static void i2c_qup_sys_suspend(struct qup_i2c_dev *dev)
 
 static void i2c_qup_resume(struct qup_i2c_dev *dev)
 {
-	i2c_qup_gpio_request(dev);
+	i2c_pinctrl_state(dev, true);
 
 	i2c_qup_clk_path_postponed_register(dev);
 	i2c_qup_clk_path_vote(dev);
@@ -1340,7 +1360,6 @@ enum msm_i2c_dt_entry_status {
 
 enum msm_i2c_dt_entry_type {
 	DT_U32,
-	DT_GPIO,
 	DT_BOOL,
 };
 
@@ -1353,7 +1372,7 @@ struct msm_i2c_dt_to_pdata_map {
 };
 
 int msm_i2c_rsrcs_dt_to_pdata_map(struct platform_device *pdev,
-				struct msm_i2c_platform_data *pdata, int *gpios)
+				struct msm_i2c_platform_data *pdata)
 {
 	int  ret, err = 0;
 	struct device_node *node = pdev->dev.of_node;
@@ -1363,8 +1382,6 @@ int msm_i2c_rsrcs_dt_to_pdata_map(struct platform_device *pdev,
 	{"cell-index",        &pdev->id,            DT_REQUIRED,  DT_U32,  -1},
 	{"qcom,i2c-src-freq", &pdata->src_clk_rate, DT_SUGGESTED, DT_U32,   0},
 	{"qcom,master-id",    &pdata->master_id,    DT_SUGGESTED, DT_U32,   0},
-	{"qcom,scl-gpio",      gpios,               DT_OPTIONAL,  DT_GPIO, -1},
-	{"qcom,sda-gpio",      gpios + 1,           DT_OPTIONAL,  DT_GPIO, -1},
 	{"qcom,clk-ctl-xfer", &pdata->clk_ctl_xfer, DT_OPTIONAL,  DT_BOOL, -1},
 	{"qcom,noise-rjct-scl", &pdata->noise_rjct_scl, DT_OPTIONAL, DT_U32, 0},
 	{"qcom,noise-rjct-sda", &pdata->noise_rjct_sda, DT_OPTIONAL, DT_U32, 0},
@@ -1373,13 +1390,6 @@ int msm_i2c_rsrcs_dt_to_pdata_map(struct platform_device *pdev,
 
 	for (itr = map; itr->dt_name ; ++itr) {
 		switch (itr->type) {
-		case DT_GPIO:
-			ret = of_get_named_gpio(node, itr->dt_name, 0);
-			if (ret >= 0) {
-				*((int *) itr->ptr_data) = ret;
-				ret = 0;
-			}
-			break;
 		case DT_U32:
 			ret = of_property_read_u32(node, itr->dt_name,
 							 (u32 *) itr->ptr_data);
@@ -1430,12 +1440,10 @@ static int
 qup_i2c_probe(struct platform_device *pdev)
 {
 	struct qup_i2c_dev	*dev;
-	struct resource         *qup_mem, *gsbi_mem, *qup_io, *gsbi_io, *res;
+	struct resource         *qup_mem, *gsbi_mem, *qup_io, *gsbi_io;
 	struct resource		*in_irq, *out_irq, *err_irq;
 	struct clk         *clk, *pclk;
 	int  ret = 0;
-	int  i;
-	int  dt_gpios[I2C_GPIOS_DT_CNT];
 	bool use_device_tree = pdev->dev.of_node;
 	struct msm_i2c_platform_data *pdata;
 
@@ -1447,7 +1455,7 @@ qup_i2c_probe(struct platform_device *pdev)
 		if (!pdata)
 			return -ENOMEM;
 
-		ret = msm_i2c_rsrcs_dt_to_pdata_map(pdev, pdata, dt_gpios);
+		ret = msm_i2c_rsrcs_dt_to_pdata_map(pdev, pdata);
 		if (ret)
 			goto get_res_failed;
 	} else
@@ -1569,15 +1577,9 @@ blsp_core_init:
 		}
 	}
 
-	for (i = 0; i < ARRAY_SIZE(i2c_rsrcs); ++i) {
-		if (use_device_tree && i < I2C_GPIOS_DT_CNT) {
-			dev->i2c_gpios[i] = dt_gpios[i];
-		} else {
-			res = platform_get_resource_byname(pdev, IORESOURCE_IO,
-							   i2c_rsrcs[i]);
-			dev->i2c_gpios[i] = res ? res->start : -1;
-		}
-	}
+	ret = i2c_gpio_pinctrl_init(dev);
+	if (ret)
+		goto err_no_pinctrl;
 
 	platform_set_drvdata(pdev, dev);
 
@@ -1710,6 +1712,7 @@ err_request_irq_failed:
 	if (dev->gsbi)
 		iounmap(dev->gsbi);
 err_reset_failed:
+err_no_pinctrl:
 	clk_disable_unprepare(dev->clk);
 	clk_disable_unprepare(dev->pclk);
 	i2c_qup_clk_path_teardown(dev);

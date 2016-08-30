@@ -840,7 +840,7 @@
 	i2c_0: i2c@f9967000 { /* BLSP#11 */
 		cell-index = <0>;
 		compatible = "qcom,i2c-qup";
-		reg = <0Xf9967000 0x1000>;
+		reg = <0xf9967000 0x1000>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg-names = "qup_phys_addr";
@@ -848,8 +848,13 @@
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <100000>;
 		qcom,i2c-src-freq = <19200000>;
-		qcom,scl-gpio = <&msmgpio 84 0>;
-		qcom,sda-gpio = <&msmgpio 83 0>;
+		clock-names = "iface_clk", "core_clk";
+		clocks = <&clock_gcc clk_gcc_blsp2_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp2_qup5_i2c_apps_clk>;
+
+		pinctrl-names = "i2c_active", "i2c_sleep";
+		pinctrl-0 = <&i2c_5_active>;
+		pinctrl-1 = <&i2c_5_sleep>;
 		qcom,master-id = <84>;
 	};
 
@@ -864,8 +869,13 @@
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <100000>;
 		qcom,i2c-src-freq = <19200000>;
-		qcom,scl-gpio = <&msmgpio 3 0>;
-		qcom,sda-gpio = <&msmgpio 2 0>;
+		clock-names = "iface_clk", "core_clk";
+		clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp1_qup1_i2c_apps_clk>;
+
+		pinctrl-names = "i2c_active", "i2c_sleep";
+		pinctrl-0 = <&i2c_1_active>;
+		pinctrl-1 = <&i2c_1_sleep>;
 		qcom,master-id = <86>;
 		status = "disabled";
 	};
@@ -882,8 +892,13 @@
 		qcom,i2c-bus-freq = <384000>;
 		qcom,i2c-src-freq = <19200000>;
 		qcom,master-id = <86>;
-		qcom,scl-gpio = <&msmgpio 7 0>;
-		qcom,sda-gpio = <&msmgpio 6 0>;
+		clock-names = "iface_clk", "core_clk";
+		clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
+			 <&clock_gcc clk_gcc_blsp1_qup2_i2c_apps_clk>;
+
+		pinctrl-names = "i2c_active", "i2c_sleep";
+		pinctrl-0 = <&i2c_2_active>;
+		pinctrl-1 = <&i2c_2_sleep>;
 	};
 
 	spi_0: spi@f9923000 { /* BLSP1 QUP1 */
