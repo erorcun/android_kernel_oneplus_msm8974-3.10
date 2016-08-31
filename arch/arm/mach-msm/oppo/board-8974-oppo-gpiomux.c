@@ -252,7 +252,7 @@ static struct gpiomux_setting gpio_i2c_config = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
-
+#if 0
 static struct gpiomux_setting gpio_i2c_act_config = {
 	.func = GPIOMUX_FUNC_3,
 	/*
@@ -263,7 +263,7 @@ static struct gpiomux_setting gpio_i2c_act_config = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_UP,
 };
-
+#endif
 static struct gpiomux_setting lcd_en_act_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
@@ -276,7 +276,7 @@ static struct gpiomux_setting lcd_en_sus_cfg = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
-
+#if 0
 static struct gpiomux_setting lcd_te_act_cfg = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_2MA,
@@ -290,7 +290,7 @@ static struct gpiomux_setting lcd_te_sus_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 	.dir = GPIOMUX_IN,
 };
-
+#endif
 static struct gpiomux_setting atmel_resout_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
@@ -435,7 +435,7 @@ static struct msm_gpiomux_config msm_hsic_hub_configs[] = {
 	},
 };
 #endif
-
+#if 0
 static struct gpiomux_setting mhl_suspend_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -448,7 +448,7 @@ static struct gpiomux_setting mhl_active_1_cfg = {
 	.pull = GPIOMUX_PULL_UP,
 	.dir = GPIOMUX_OUT_HIGH,
 };
-
+#endif
 static struct gpiomux_setting hdmi_suspend_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -467,6 +467,7 @@ static struct gpiomux_setting hdmi_active_2_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+#if 0
 static struct msm_gpiomux_config msm_mhl_configs[] __initdata = {
 	{
 		/* mhl-sii8334 pwr */
@@ -485,7 +486,7 @@ static struct msm_gpiomux_config msm_mhl_configs[] __initdata = {
 		},
 	},
 };
-
+#endif
 
 static struct msm_gpiomux_config msm_hdmi_configs[] __initdata = {
 	{
@@ -517,7 +518,7 @@ static struct msm_gpiomux_config msm_hdmi_configs[] __initdata = {
 		},
 	},
 };
-
+#if 0
 static struct gpiomux_setting gpio_uart7_active_cfg = {
 	.func = GPIOMUX_FUNC_3,
 	.drv = GPIOMUX_DRV_8MA,
@@ -560,7 +561,7 @@ static struct msm_gpiomux_config msm_blsp2_uart7_configs[] __initdata = {
 		},
 	},
 };
-
+#endif
 static struct msm_gpiomux_config msm_rumi_blsp_configs[] __initdata = {
 	{
 		.gpio      = 45,	/* BLSP2 UART8 TX */
@@ -577,6 +578,7 @@ static struct msm_gpiomux_config msm_rumi_blsp_configs[] __initdata = {
 };
 
 static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
+#if 0
 	{
 		.gpio = 58,
 		.settings = {
@@ -584,6 +586,7 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &lcd_en_sus_cfg,
 		},
 	},
+#endif
 	{
 		.gpio = 91,
 		.settings = {
@@ -592,7 +595,7 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 		},
 	},
 };
-
+#if 0
 static struct msm_gpiomux_config msm_lcd_te_configs[] __initdata = {
 	{
 		.gpio = 12,
@@ -602,7 +605,7 @@ static struct msm_gpiomux_config msm_lcd_te_configs[] __initdata = {
 		},
 	},
 };
-
+#endif
 static struct gpiomux_setting sdc4_suspend_cfg;
 static struct msm_gpiomux_config msm_epm_configs[] __initdata = {
 	{
@@ -735,7 +738,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
 		},
 	},
-#endif
 	{
 		.gpio      = 4,			/* BLSP2 UART TX */
 		.settings = {
@@ -748,7 +750,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_uart_config,
 		},
 	},
-#if 0
 	{                           /* NFC */
 		.gpio      = 29,		/* BLSP1 QUP5 I2C_DAT */
 		.settings = {
@@ -1402,7 +1403,7 @@ static struct msm_gpiomux_config msm_taiko_config[] __initdata = {
 		},
 	},
 };
-
+#if 0
 static struct gpiomux_setting sdc3_clk_actv_cfg = {
 	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_8MA,
@@ -1483,7 +1484,7 @@ static void msm_gpiomux_sdc3_install(void)
 	msm_gpiomux_install(msm8974_sdc3_configs,
 			    ARRAY_SIZE(msm8974_sdc3_configs));
 }
-
+#endif
 #ifdef CONFIG_MMC_MSM_SDC4_SUPPORT
 static struct gpiomux_setting sdc4_clk_actv_cfg = {
 	.func = GPIOMUX_FUNC_2,
@@ -1599,9 +1600,10 @@ void __init msm_8974_init_gpiomux(void)
 			ARRAY_SIZE(msm_eth_configs));
 #endif
 	msm_gpiomux_install(msm_blsp_configs, ARRAY_SIZE(msm_blsp_configs));
+#if 0
 	msm_gpiomux_install(msm_blsp2_uart7_configs,
 			 ARRAY_SIZE(msm_blsp2_uart7_configs));
-#if 0
+
 	msm_gpiomux_install(wcnss_5wire_interface,
 				ARRAY_SIZE(wcnss_5wire_interface));
 #endif
@@ -1623,10 +1625,11 @@ void __init msm_8974_init_gpiomux(void)
 				ARRAY_SIZE(msm_sensor_configs));
 
 	msm_gpiomux_install(external_pa_configs, ARRAY_SIZE(external_pa_configs));
-
+#if 0
 	if (machine_is_apq8074() && (of_board_is_liquid() || \
 	    of_board_is_dragonboard()))
 		msm_gpiomux_sdc3_install();
+#endif
 
 	if (!(of_board_is_dragonboard() && machine_is_apq8074()))
 		msm_gpiomux_sdc4_install();
@@ -1640,12 +1643,14 @@ void __init msm_8974_init_gpiomux(void)
 #endif
 
 	msm_gpiomux_install(msm_hdmi_configs, ARRAY_SIZE(msm_hdmi_configs));
+#if 0
 	if (of_board_is_fluid())
 		msm_gpiomux_install(msm_mhl_configs,
 				    ARRAY_SIZE(msm_mhl_configs));
 	else
 		msm_gpiomux_install(msm_lcd_te_configs,
 				    ARRAY_SIZE(msm_lcd_te_configs));
+#endif
 
 	if (of_board_is_liquid() ||
 	    (of_board_is_dragonboard() && machine_is_apq8074()))

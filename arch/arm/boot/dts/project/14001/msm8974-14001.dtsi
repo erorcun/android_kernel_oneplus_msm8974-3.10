@@ -39,10 +39,11 @@
 };
 
 &soc {
+/*
 	serial@f991e000 {
 		status = "ok";
 	};
-
+*/
 	oem_data_sharedmem {
 		compatible = "qcom,sharedmem-uio";
 		reg = <0x5900000 0x100000>;
@@ -193,9 +194,13 @@
 	pinctrl-0 = <&sdc2_clk_on_16 &sdc2_cmd_on &sdc2_data_on>;
 };
 
+/*
 &uart7 {
 	status = "ok";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart_console_sleep>;
 };
+*/
 
 &usb3 {
 	qcom,otg-capability;
