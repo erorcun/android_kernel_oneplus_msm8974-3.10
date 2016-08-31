@@ -1433,9 +1433,6 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 		/* Enable charging */
 		if (power_supply_set_online(psy, true))
 			goto psy_error;
-		if (motg->chg_type != USB_SDP_CHARGER) {
-			power_supply_set_online(psy, false);
-		}
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
 	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2) && (motg->chg_type == USB_INVALID_CHARGER)){
