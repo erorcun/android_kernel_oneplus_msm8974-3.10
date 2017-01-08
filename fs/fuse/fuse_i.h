@@ -484,6 +484,9 @@ struct fuse_conn {
 	/** Set if bdi is valid */
 	unsigned bdi_initialized:1;
 
+	/** write-back cache policy (default is write-through) */
+	unsigned writeback_cache:1;
+
 	/** Shortcircuited IO. */
 	unsigned shortcircuit_io:1;
 
