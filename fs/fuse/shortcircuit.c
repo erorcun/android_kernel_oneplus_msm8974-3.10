@@ -68,7 +68,7 @@ static ssize_t fuse_shortcircuit_aio_read_write(struct kiocb *iocb,
 	get_file(lower_file);
 	iocb->ki_filp = lower_file;
 	fuse_inode = fuse_file->f_path.dentry->d_inode;
-	lower_inode = lower_file->f_path.dentry->d_inode;
+	lower_inode = file_inode(lower_file);
 
 	if (do_write) {
 		if (!lower_file->f_op->aio_write)
