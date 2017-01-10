@@ -330,7 +330,7 @@ static int data_fifo_config(u8 dep_num, phys_addr_t addr,
 
 static void set_speed(bool speed)
 {
-	msm_dbm_write_reg(dbm_data->base, DBM_GEN_CFG, speed);
+	msm_dbm_write_reg(dbm_data->base, DBM_GEN_CFG, speed >> 2);
 }
 
 static void enable(void)
