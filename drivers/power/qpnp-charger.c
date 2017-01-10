@@ -323,6 +323,10 @@ static bool use_fake_temp = false;
 static int fake_temp = 300;
 static bool use_fake_chgvol = false;
 static int fake_chgvol = 0;
+
+static bool threea_charge = false;
+static bool disable_aicl = false;
+static int charge_limit = 100;
 #endif
 /* OPPO 2013-06-08 wangjc Add end */
 
@@ -536,6 +540,7 @@ struct qpnp_chg_chip {
 	bool dont_print_changes;
 	int last_iusbmax;
 	int last_ibatmax;
+	bool limited;
 #endif
 /* OPPO 2013-06-08 wangjc Add end */
 /* OPPO 2013-10-24 liaofuchun add begin for enable/disable charge*/
@@ -2293,7 +2298,25 @@ qpnp_chg_regulator_batfet_set(struct qpnp_chg_chip *chip, bool enable)
 /* OPPO 2013-09-30 wangjc Add begin for get charger type */
 #ifdef CONFIG_VENDOR_EDIT
 static int qpnp_charger_type_get(struct qpnp_chg_chip *chip);
+static int get_prop_batt_temp(struct qpnp_chg_chip *chip);
+static int get_prop_capacity(struct qpnp_chg_chip *chip);
 static void oneplus_set_allow_read_iic(bool status);
+
+static int get_max_input_current(void)
+{
+	int temp;
+
+	if(!threea_charge)
+		return 2000;
+
+	temp = get_prop_batt_temp(g_chip);
+
+	if(temp > 420)
+		return 2000;
+
+	return 3000;
+}
+
 #endif
 
 
@@ -2301,7 +2324,7 @@ static void oneplus_set_allow_read_iic(bool status);
 #ifndef CONFIG_VENDOR_EDIT
 #define USB_WALL_THRESHOLD_MA	500
 #else
-#define USB_WALL_THRESHOLD_MA	2000
+#define USB_WALL_THRESHOLD_MA	3000
 #endif
 /* OPPO 2013-09-30 wangjc Modify end */
 #define ENUM_T_STOP_BIT		BIT(0)
@@ -5718,6 +5741,7 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 	struct qpnp_chg_chip *chip = container_of(psy, struct qpnp_chg_chip,
 								dc_psy);
 	int rc = 0;
+	int realvalue;
 
 	switch (psp) {
         case POWER_SUPPLY_PROP_PRESENT:
@@ -5727,12 +5751,18 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 		if (!val->intval)
 			break;
 
-		rc = qpnp_chg_idcmax_set(chip, val->intval / 1000);
+		if(threea_charge) {
+			if(val->intval == 2000 * 1000)
+				realvalue = 2500;
+		} else
+			realvalue = val->intval / 1000;
+
+		rc = qpnp_chg_idcmax_set(chip, realvalue);
 		if (rc) {
 			pr_err("Error setting idcmax property %d\n", rc);
 			return rc;
 		}
-		chip->maxinput_dc_ma = (val->intval / 1000);
+		chip->maxinput_dc_ma = realvalue;
 
 		break;
 	default:
@@ -6762,6 +6792,10 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	int i, chg_vol;
 	chip->dont_print_changes = true;
 	chip->aicl_interrupt = false;
+	if(disable_aicl) {
+		qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);
+		goto semiend;
+	}
 	qpnp_chg_vinmin_set(chip, 4440);
 	qpnp_chg_iusbmax_set(chip, 150);
 	qpnp_chg_ibatmax_set(chip, chip->max_bat_chg_current);
@@ -6892,10 +6926,11 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 	}
-
+semiend:
 	if(!chip->lcd_is_on) {
-	qpnp_chg_iusbmax_set(chip, 2000);
-	qpnp_chg_iusbmax_set(chip, 2000);
+	i = get_max_input_current();
+	qpnp_chg_iusbmax_set(chip, i);
+	qpnp_chg_iusbmax_set(chip, i);
 	} else {
 	qpnp_chg_iusbmax_set(chip, 1200);
 	qpnp_chg_iusbmax_set(chip, 1200);
@@ -7100,6 +7135,7 @@ static int qpnp_start_charging(struct qpnp_chg_chip *chip)
 	chip->chg_done = false;
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/16  Add for charge timeout */
 	chip->time_out = false;
+	chip->limited = false;
 	#endif
 	/*OPPO 2013-10-24 liaofuchun add end*/
 	if (rc){
@@ -7791,6 +7827,9 @@ static void qpnp_check_recharging(struct qpnp_chg_chip *chip)
 	if (chip->time_out)//sjc1125
 		return;
 
+	if (chip->limited)
+		return;
+
 	batt_temp_region = qpnp_battery_temp_region_get(chip);
 	batt_volt = get_prop_battery_voltage_now(chip);
 	switch (batt_temp_region){
@@ -7965,12 +8004,28 @@ static void update_heartbeat(struct work_struct *work)
 	struct qpnp_chg_chip *chip = container_of(dwork,
 				struct qpnp_chg_chip, update_heartbeat_work);
 	bool is_there_charger = qpnp_chg_is_usb_chg_plugged_in(chip);
+	int cap, pbh;
 
 	oneplus_set_allow_read_iic(true);	
+	cap = get_prop_capacity(chip);
 
-/* OPPO 2013-12-22 liaofuchun add for fastchg */
-#ifdef CONFIG_PIC1503_FASTCG
 	if(is_there_charger) {
+		if(cap >= charge_limit) {
+			if(cap != 100 && !chip->chg_done) {
+				chip->limited = true;
+				qpnp_chg_charge_en(chip, 0);
+			}
+		} else if(chip->limited) {
+			pbh = get_prop_batt_health(chip);
+			if(!chip->time_out && pbh != POWER_SUPPLY_HEALTH_OVERHEAT
+					&& pbh != POWER_SUPPLY_HEALTH_OVERVOLTAGE && pbh != POWER_SUPPLY_HEALTH_DEAD) {
+				chip->limited = false;
+				qpnp_chg_charge_en(chip, 1);
+			}
+		}
+
+		/* OPPO 2013-12-22 liaofuchun add for fastchg */
+		#ifdef CONFIG_PIC1503_FASTCG
 		if(get_prop_fast_chg_started(chip) == true) {
 			switch_fast_chg(chip);
 			pr_info("%s fast chg started,GPIO96:%d\n", __func__,gpio_get_value(96));
@@ -7989,7 +8044,6 @@ static void update_heartbeat(struct work_struct *work)
 
 			get_prop_battery_voltage_now(chip);
 			get_prop_batt_temp(chip);
-			get_prop_capacity(chip);
 			get_prop_current_now(chip);
 			return;
 		} else {
@@ -8003,15 +8057,14 @@ static void update_heartbeat(struct work_struct *work)
 			switch_fast_chg(chip);
 			//pr_info("%s fast chg not started,GPIO96:%d\n",__func__,gpio_get_value(96));
 		}
+		#endif
+		/* OPPO 2013-12-22 liaofuchun add end*/
 	}
-#endif
-/* OPPO 2013-12-22 liaofuchun add end*/
 
 	qpnp_check_charger_uovp(chip);
 	qpnp_check_charge_timeout(chip);
 	qpnp_check_battery_uovp(chip);
 	qpnp_check_battery_temp(chip);
-	get_prop_capacity(chip);
 
 	pr_debug("%s current:%d\n", __func__, get_prop_current_now(chip));
 	
@@ -8084,6 +8137,7 @@ static void qpnp_stop_charge(struct work_struct *work)
 	chip->chg_done = false;
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/16  Add for charge timeout */
 	chip->time_out = false;
+	chip->limited = false;
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 	chip->aicl_current = 0;
 	chip->chg_display_full = false;//wangjc add for charge full
@@ -8146,6 +8200,66 @@ static ssize_t test_chg_vol_store(struct device *dev,
 	return size;
 }
 static DEVICE_ATTR(test_chg_vol, 0200, NULL, test_chg_vol_store);
+
+static ssize_t threea_charge_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size) {
+
+	int val = simple_strtol(buf, NULL, 10), rc;
+
+	if(val) {
+		if(g_chip->maxinput_dc_ma == 2000) {
+			rc = qpnp_chg_idcmax_set(g_chip, 2500);
+			if (rc) {
+				pr_err("Error setting idcmax property %d\n", rc);
+				return 0;
+			}
+			g_chip->maxinput_dc_ma = 2500;
+		}
+		threea_charge = true;
+	} else {
+		if(g_chip->maxinput_dc_ma == 2500) {
+			rc = qpnp_chg_idcmax_set(g_chip, 2000);
+			if (rc) {
+				pr_err("Error setting idcmax property %d\n", rc);
+				return 0;
+			}
+			g_chip->maxinput_dc_ma = 2000;
+		}
+		threea_charge = false;
+	}
+		
+	return size;
+}
+static DEVICE_ATTR(threea_charge, 0222, NULL, threea_charge_store);
+
+static ssize_t charge_limit_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size) {
+
+	int val = simple_strtol(buf, NULL, 10);
+
+	if(val < 0 || val > 100)
+		return 0;
+
+	charge_limit = val;
+		
+	return size;
+}
+static DEVICE_ATTR(charge_limit, 0222, NULL, charge_limit_store);
+
+static ssize_t disable_aicl_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size) {
+
+	int val = simple_strtol(buf, NULL, 10);
+
+	if(val < 0 || val > 1)
+		return 0;
+
+	disable_aicl = val;
+		
+	return size;
+}
+static DEVICE_ATTR(disable_aicl, 0222, NULL, disable_aicl_store);
+
 void qpnp_battery_gauge_register(struct qpnp_battery_gauge *batt_gauge)
 {
 	if (qpnp_batt_gauge) {
@@ -8207,7 +8321,7 @@ static int fb_notifier_callback(struct notifier_block *self,
 			chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 			/* jingchun.wang@Onlinerd.Driver, 2013/12/30  Add for recognize dcp use 2000mA */
-			if(ret.intval / 1000 != 2000) {
+			if(ret.intval / 1000 < 2000) {
 				//not DCP charger, don't care
 				return 0;
 			}
@@ -8232,7 +8346,10 @@ static int fb_notifier_callback(struct notifier_block *self,
 					atomic_set(&chip->suspended, 1);//sjc0522 for Find7s temp rising problem
 					/* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 					if(chip->aicl_current != 0) {
-						qpnp_chg_iusbmax_set(chip, chip->aicl_current);
+						if(chip->aicl_current == 2000 && get_max_input_current() == 3000)
+							qpnp_chg_iusbmax_set(chip, 3000);
+						else
+							qpnp_chg_iusbmax_set(chip, chip->aicl_current);
 					}
 					if (chip->aicl_current != 0 && chip->aicl_current <= 1500)
 						qpnp_chg_ibatmax_set(chip, chip->aicl_current);
@@ -8878,6 +8995,18 @@ qpnp_charger_probe(struct spmi_device *spmi)
 		pr_err("%s: creat test charger voltage file failed ret = %d\n", 
 					__func__, rc);
 		device_remove_file(chip->dev, &dev_attr_test_chg_vol);
+	}
+	rc = device_create_file(chip->dev, &dev_attr_threea_charge);
+	if (rc < 0) {
+		device_remove_file(chip->dev, &dev_attr_threea_charge);
+	}
+	rc = device_create_file(chip->dev, &dev_attr_charge_limit);
+	if (rc < 0) {
+		device_remove_file(chip->dev, &dev_attr_charge_limit);
+	}
+	rc = device_create_file(chip->dev, &dev_attr_disable_aicl);
+	if (rc < 0) {
+		device_remove_file(chip->dev, &dev_attr_disable_aicl);
 	}
 
 #if 0
