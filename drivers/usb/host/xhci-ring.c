@@ -335,7 +335,7 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci)
 		xhci_write_64(xhci, temp_64 | CMD_RING_ABORT,
 			      &xhci->op_regs->cmd_ring);
 		udelay(1000);
-		ret = handshake(xhci, &xhci->op_regs->cmd_ring,
+		ret = xhci_handshake(xhci, &xhci->op_regs->cmd_ring,
 				CMD_RING_RUNNING, 0, 3 * 1000 * 1000);
 		if (ret == 0)
 			return 0;
