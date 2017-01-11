@@ -47,7 +47,6 @@
 #include <linux/io.h>
 #include <linux/list.h>
 #include <linux/dma-mapping.h>
-#include <linux/vmalloc.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/composite.h>
@@ -62,13 +61,6 @@
 static void dwc3_gadget_usb2_phy_suspend(struct dwc3 *dwc, int suspend);
 static void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend);
 static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc);
-static void _dwc3_gadget_wakeup(struct dwc3 *dwc);
-
-
-struct dwc3_usb_gadget {
-	struct work_struct wakeup_work;
-	struct dwc3 *dwc;
-};
 
 /**
  * dwc3_gadget_set_test_mode - Enables USB2 Test Modes
@@ -1446,33 +1438,6 @@ static inline enum dwc3_link_state dwc3_get_link_state(struct dwc3 *dwc)
 	return DWC3_DSTS_USBLNKST(reg);
 }
 
-static int dwc3_gadget_wakeup(struct usb_gadget *g)
-{
-	struct dwc3_usb_gadget *dwc3_gadget = g->private;
-	struct dwc3 *dwc = dwc3_gadget->dwc;
-	unsigned long		flags;
-	spin_lock_irqsave(&dwc->lock, flags);
-
-	if (atomic_read(&dwc->in_lpm)) {
-		spin_unlock_irqrestore(&dwc->lock, flags);
-		schedule_work(&dwc3_gadget->wakeup_work);
-		return -EBUSY;
-	} else {
-		_dwc3_gadget_wakeup(dwc);
-	}
-
-	spin_unlock_irqrestore(&dwc->lock, flags);
-
-	return 0;
-}
-
-static inline enum dwc3_link_state dwc3_get_link_state(struct dwc3 *dwc)
-{
-	u32 reg;
-	reg = dwc3_readl(dwc->regs, DWC3_DSTS);
-	return DWC3_DSTS_USBLNKST(reg);
-}
-
 static int dwc3_gadget_ep_queue(struct usb_ep *ep, struct usb_request *request,
 	gfp_t gfp_flags)
 {
@@ -1664,37 +1629,21 @@ static int dwc3_gadget_get_frame(struct usb_gadget *g)
 	reg = dwc3_readl(dwc->regs, DWC3_DSTS);
 	return DWC3_DSTS_SOFFN(reg);
 }
-static void dwc3_gadget_wakeup_work(struct work_struct *w)
+
+static int dwc3_gadget_wakeup(struct usb_gadget *g)
 {
-	struct dwc3_usb_gadget *dwc3_gadget;
-	struct dwc3		*dwc;
+	struct dwc3		*dwc = gadget_to_dwc(g);
+
+	unsigned long		timeout;
 	unsigned long		flags;
 
-	dwc3_gadget = container_of(w, struct dwc3_usb_gadget, wakeup_work);
-	dwc = dwc3_gadget->dwc;
+	u32			reg;
 
+	int			ret = 0;
+
+	u8			link_state;
 
 	spin_lock_irqsave(&dwc->lock, flags);
-
-	if (atomic_read(&dwc->in_lpm)) {
-		spin_unlock_irqrestore(&dwc->lock, flags);
-		pm_runtime_get_sync(dwc->dev);
-		spin_lock_irqsave(&dwc->lock, flags);
-	}
-
-	_dwc3_gadget_wakeup(dwc);
-	spin_unlock_irqrestore(&dwc->lock, flags);
-}
-
-
-static void _dwc3_gadget_wakeup(struct dwc3 *dwc)
-{
-	u32			timeout = 0;
-
-
-	u32			reg;
-	int			ret = 0;
-	u8			link_state;
 
 	/*
 	 * According to the Databook Remote wakeup request should
@@ -1702,7 +1651,9 @@ static void _dwc3_gadget_wakeup(struct dwc3 *dwc)
 	 *
 	 * We can check that via USB Link State bits in DSTS register.
 	 */
-	link_state = dwc3_get_link_state(dwc);
+	reg = dwc3_readl(dwc->regs, DWC3_DSTS);
+
+	link_state = DWC3_DSTS_USBLNKST(reg);
 
 	switch (link_state) {
 	case DWC3_LINK_STATE_RX_DET:	/* in HS, means Early Suspend */
@@ -1730,16 +1681,17 @@ static void _dwc3_gadget_wakeup(struct dwc3 *dwc)
 	}
 
 	/* poll until Link State changes to ON */
+	timeout = jiffies + msecs_to_jiffies(100);
 
-	do {
+	spin_unlock_irqrestore(&dwc->lock, flags);
+	while (!time_after(jiffies, timeout)) {
 		reg = dwc3_readl(dwc->regs, DWC3_DSTS);
 
 		/* in HS, means ON */
 		if (DWC3_DSTS_USBLNKST(reg) == DWC3_LINK_STATE_U0)
 			break;
-		udelay(10);
-		timeout++;
-	} while (timeout < 10000);
+	}
+	spin_lock_irqsave(&dwc->lock, flags);
 
 	if (DWC3_DSTS_USBLNKST(reg) != DWC3_LINK_STATE_U0) {
 		dev_err(dwc->dev, "failed to send remote wakeup\n");
@@ -1755,8 +1707,9 @@ static void _dwc3_gadget_wakeup(struct dwc3 *dwc)
 	 */
 	dwc3_gadget_wakeup_interrupt(dwc);
 out:
+	spin_unlock_irqrestore(&dwc->lock, flags);
 
-	return;
+	return ret;
 }
 
 static int dwc3_gadget_set_selfpowered(struct usb_gadget *g,
@@ -3324,15 +3277,6 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 {
 	u32					reg;
 	int					ret;
-	struct dwc3_usb_gadget *dwc3_gadget;
-
-	dwc3_gadget = vzalloc(sizeof(*dwc3_gadget));
-	if (!dwc3_gadget) {
-		dev_err(dwc->dev, "failed to allocate dwc3_gadget\n");
-		return -ENOMEM;
-	}
-	dwc3_gadget->dwc = dwc;
-	INIT_WORK(&dwc3_gadget->wakeup_work, dwc3_gadget_wakeup_work);
 
 	dwc->ctrl_req = dma_alloc_coherent(dwc->dev, sizeof(*dwc->ctrl_req),
 			&dwc->ctrl_req_addr, GFP_KERNEL);
@@ -3378,7 +3322,6 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.sg_supported	= true;
 	dwc->gadget.name		= "dwc3-gadget";
-	dwc->gadget.private		= dwc3_gadget;
 
 	/*
 	 * REVISIT: Here we should clear all pending IRQs to be
@@ -3444,7 +3387,6 @@ err1:
 			dwc->ctrl_req, dwc->ctrl_req_addr);
 
 err0:
-	vfree(dwc3_gadget);
 	return ret;
 }
 
