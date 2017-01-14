@@ -568,6 +568,14 @@ static int dwc3_ep0_set_config(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 			usb_gadget_set_state(&dwc->gadget,
 					USB_STATE_CONFIGURED);
 
+			if (dwc->ssphy_clear_auto_suspend_on_disconnect) {
+				reg = dwc3_readl(dwc->regs,
+							DWC3_GUSB3PIPECTL(0));
+				reg |= DWC3_GUSB3PIPECTL_SUSPHY;
+				dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0),
+									reg);
+			}
+
 			if (!dwc->usb3_u1u2_disable || enable_dwc3_u1u2) {
 				/*
 				 * Enable transition to U1/U2 state when

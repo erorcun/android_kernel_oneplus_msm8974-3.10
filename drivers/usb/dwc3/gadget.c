@@ -58,8 +58,6 @@
 #include "debug.h"
 #include "io.h"
 
-static void dwc3_gadget_usb2_phy_suspend(struct dwc3 *dwc, int suspend);
-static void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend);
 static void dwc3_gadget_wakeup_interrupt(struct dwc3 *dwc);
 
 /**
@@ -358,16 +356,7 @@ int dwc3_send_gadget_generic_command(struct dwc3 *dwc, int cmd, u32 param)
 {
 	u32		timeout = 500;
 	u32		reg;
-	bool hsphy_suspend_enabled;
 	int ret;
-
-	/* Commands to controller will work only if PHY is not suspended */
-	hsphy_suspend_enabled = (dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0)) &
-						DWC3_GUSB2PHYCFG_SUSPHY);
-
-	/* Disable suspend of the USB2 PHY */
-	if (hsphy_suspend_enabled)
-		dwc3_gadget_usb2_phy_suspend(dwc, false);
 
 	dwc3_writel(dwc->regs, DWC3_DGCMDPAR, param);
 	dwc3_writel(dwc->regs, DWC3_DGCMD, cmd | DWC3_DGCMD_CMDACT);
@@ -393,10 +382,6 @@ int dwc3_send_gadget_generic_command(struct dwc3 *dwc, int cmd, u32 param)
 		udelay(1);
 	} while (1);
 
-	/* Enable suspend of the USB2 PHY */
-	if (hsphy_suspend_enabled)
-		dwc3_gadget_usb2_phy_suspend(dwc, true);
-
 	return ret;
 }
 
@@ -406,21 +391,12 @@ int dwc3_send_gadget_ep_cmd(struct dwc3 *dwc, unsigned ep,
 	struct dwc3_ep		*dep = dwc->eps[ep];
 	u32			timeout = 1500;
 	u32			reg;
-	bool hsphy_suspend_enabled;
 	int ret;
 
 	dev_vdbg(dwc->dev, "%s: cmd '%s' params %08x %08x %08x\n",
 			dep->name,
 			dwc3_gadget_ep_cmd_string(cmd), params->param0,
 			params->param1, params->param2);
-
-	/* Commands to controller will work only if PHY is not suspended */
-	hsphy_suspend_enabled = (dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0)) &
-						DWC3_GUSB2PHYCFG_SUSPHY);
-
-	/* Disable suspend of the USB2 PHY */
-	if (hsphy_suspend_enabled)
-		dwc3_gadget_usb2_phy_suspend(dwc, false);
 
 	dwc3_writel(dwc->regs, DWC3_DEPCMDPAR0(ep), params->param0);
 	dwc3_writel(dwc->regs, DWC3_DEPCMDPAR1(ep), params->param1);
@@ -457,10 +433,6 @@ int dwc3_send_gadget_ep_cmd(struct dwc3 *dwc, unsigned ep,
 
 		udelay(1);
 	} while (1);
-
-	/* Enable suspend of the USB2 PHY */
-	if (hsphy_suspend_enabled)
-		dwc3_gadget_usb2_phy_suspend(dwc, true);
 
 	return ret;
 }
@@ -2033,10 +2005,9 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 void dwc3_gadget_restart(struct dwc3 *dwc)
 {
 	/* automatic phy suspend only on recent versions */
-	if (dwc->revision >= DWC3_REVISION_194A) {
-		dwc3_gadget_usb2_phy_suspend(dwc, true);
+	if (dwc->revision >= DWC3_REVISION_194A &&
+			!dwc->ssphy_clear_auto_suspend_on_disconnect)
 		dwc3_gadget_usb3_phy_suspend(dwc, true);
-	}
 
 	__dwc3_gadget_start(dwc);
 }
@@ -2675,7 +2646,7 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 	dwc->link_state = DWC3_LINK_STATE_SS_DIS;
 }
 
-static void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend)
+void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend)
 {
 	u32			reg;
 
@@ -2687,20 +2658,6 @@ static void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend)
 		reg &= ~DWC3_GUSB3PIPECTL_SUSPHY;
 
 	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
-}
-
-static void dwc3_gadget_usb2_phy_suspend(struct dwc3 *dwc, int suspend)
-{
-	u32			reg;
-
-	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
-
-	if (suspend)
-		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
-	else
-		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
-
-	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
 }
 
 static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
@@ -2745,12 +2702,9 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	/* after reset -> Default State */
 	usb_gadget_set_state(&dwc->gadget, USB_STATE_DEFAULT);
 
-	/* Recent versions support automatic phy suspend and don't need this */
-	if (dwc->revision < DWC3_REVISION_194A) {
-		/* Resume PHYs */
-		dwc3_gadget_usb2_phy_suspend(dwc, false);
-		dwc3_gadget_usb3_phy_suspend(dwc, false);
-	}
+	if (dwc->revision < DWC3_REVISION_194A ||
+			dwc->ssphy_clear_auto_suspend_on_disconnect)
+ 		dwc3_gadget_usb3_phy_suspend(dwc, false);
 
 	if (dotg && dotg->otg.phy)
 		usb_phy_set_power(dotg->otg.phy, 0);
@@ -2796,20 +2750,6 @@ static void dwc3_update_ram_clk_sel(struct dwc3 *dwc, u32 speed)
 	reg = dwc3_readl(dwc->regs, DWC3_GCTL);
 	reg |= DWC3_GCTL_RAMCLKSEL(usb30_clock);
 	dwc3_writel(dwc->regs, DWC3_GCTL, reg);
-}
-
-static void dwc3_gadget_phy_suspend(struct dwc3 *dwc, u8 speed)
-{
-	switch (speed) {
-	case USB_SPEED_SUPER:
-		dwc3_gadget_usb2_phy_suspend(dwc, true);
-		break;
-	case USB_SPEED_HIGH:
-	case USB_SPEED_FULL:
-	case USB_SPEED_LOW:
-		dwc3_gadget_usb3_phy_suspend(dwc, true);
-		break;
-	}
 }
 
 static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
@@ -2888,10 +2828,10 @@ static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 	}
 
 	/* Recent versions support automatic phy suspend and don't need this */
-	if (dwc->revision < DWC3_REVISION_194A) {
+	if (dwc->revision < DWC3_REVISION_194A &&
+			dwc->gadget.speed != USB_SPEED_SUPER)
 		/* Suspend unneeded PHY */
-		dwc3_gadget_phy_suspend(dwc, dwc->gadget.speed);
-	}
+		dwc3_gadget_usb3_phy_suspend(dwc, true);
 
 	dep = dwc->eps[0];
 	ret = __dwc3_gadget_ep_enable(dep, &dwc3_gadget_ep0_desc, NULL, true);
@@ -3390,15 +3330,10 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	reg |= DWC3_DCFG_LPM_CAP;
 	dwc3_writel(dwc->regs, DWC3_DCFG, reg);
 
-	/* Enable USB2 LPM and automatic phy suspend only on recent versions */
-	if (dwc->revision >= DWC3_REVISION_194A) {
-		/*
-		 * Clear autosuspend bit in dwc3 register for USB2. It will be
-		 * enabled before setting run/stop bit.
-		 */
-		dwc3_gadget_usb2_phy_suspend(dwc, false);
+	/* Enable automatic phy suspend only on recent versions */
+	if (dwc->revision >= DWC3_REVISION_194A &&
+			!dwc->ssphy_clear_auto_suspend_on_disconnect)
 		dwc3_gadget_usb3_phy_suspend(dwc, true);
-	}
 
 	ret = usb_add_gadget_udc(dwc->dev, &dwc->gadget);
 	if (ret) {

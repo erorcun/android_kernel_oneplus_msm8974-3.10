@@ -427,6 +427,7 @@ static void dwc3_ext_event_notify(struct usb_otg *otg,
 	if (event == DWC3_EVENT_PHY_RESUME) {
 		if (!pm_runtime_status_suspended(phy->dev))
 			dev_warn(phy->dev, "PHY_RESUME event out of LPM!!!!\n");
+
 		dev_dbg(phy->dev, "ext PHY_RESUME event received\n");
 		/* ext_xceiver would have taken h/w out of LPM by now */
 		ret = pm_runtime_get(phy->dev);

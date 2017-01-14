@@ -760,6 +760,9 @@ struct dwc3_scratchpad_array {
  * @root: debugfs root folder pointer
  * @tx_fifo_size: Available RAM size for TX fifo allocation
  * @err_evt_seen: previous event in queue was erratic error
+ * @ssphy_clear_auto_suspend_on_disconnect: if true, clear ssphy autosuspend bit
+ *	during disconnect and set it after device is configured.
+ * @usb3_u1u2_disable: if true, disable U1U2 low power modes in Superspeed mode.
  * @irq: irq number
  * @irq_cnt: total irq count
  * @bh: tasklet which handles the interrupt
@@ -873,8 +876,9 @@ struct dwc3 {
 	bool			nominal_elastic_buffer;
 	bool			core_reset_after_phy_init;
 	bool			err_evt_seen;
-	bool			enable_suspend_event;
+	bool			ssphy_clear_auto_suspend_on_disconnect;
 	bool			usb3_u1u2_disable;
+	bool			enable_suspend_event;
 	struct dwc3_gadget_events	dbg_gadget_events;
 
 	/* offload IRQ handling to tasklet */
@@ -1051,6 +1055,7 @@ int dwc3_gadget_prepare(struct dwc3 *dwc);
 void dwc3_gadget_complete(struct dwc3 *dwc);
 int dwc3_gadget_suspend(struct dwc3 *dwc);
 int dwc3_gadget_resume(struct dwc3 *dwc);
+void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend);
 #else
 static inline int dwc3_gadget_prepare(struct dwc3 *dwc)
 {
@@ -1070,6 +1075,8 @@ static inline int dwc3_gadget_resume(struct dwc3 *dwc)
 {
 	return 0;
 }
+
+static void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend) { }
 #endif /* !IS_ENABLED(CONFIG_USB_DWC3_HOST) */
 
 void dwc3_gadget_restart(struct dwc3 *dwc);

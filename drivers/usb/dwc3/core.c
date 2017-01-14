@@ -101,12 +101,11 @@ void dwc3_set_mode(struct dwc3 *dwc, u32 mode)
 		}
 	}
 
-	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(0));
-	reg |= DWC3_GUSB3PIPECTL_SUSPHY;
-	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
-	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
-	reg |= DWC3_GUSB2PHYCFG_SUSPHY;
-	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
+	if (!dwc->ssphy_clear_auto_suspend_on_disconnect) {
+		reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(0));
+		reg |= DWC3_GUSB3PIPECTL_SUSPHY;
+		dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
+	}
 }
 
 /**
@@ -596,11 +595,14 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	dwc->core_reset_after_phy_init =
 		of_property_read_bool(node, "core_reset_after_phy_init");
-	dwc->usb3_u1u2_disable = of_property_read_bool(node,
-		"snps,usb3-u1u2-disable");
 
 	dwc->needs_fifo_resize = of_property_read_bool(node, "tx-fifo-resize");
 	host_only_mode = of_property_read_bool(node, "host-only-mode");
+	dwc->ssphy_clear_auto_suspend_on_disconnect =
+						of_property_read_bool(node,
+						"snps,ssphy-clear-auto-suspend-on-disconnect");
+	dwc->usb3_u1u2_disable = of_property_read_bool(node,
+						"snps,usb3-u1u2-disable");
 	dwc->maximum_speed = of_usb_get_maximum_speed(node);
 
 	if (node) {
