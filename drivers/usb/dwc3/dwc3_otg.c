@@ -75,19 +75,6 @@ static void dwc3_otg_set_host_regs(struct dwc3_otg *dotg)
 	}
 }
 
-static void dwc3_otg_set_hsphy_auto_suspend(struct dwc3_otg *dotg, bool susp)
-{
-	struct dwc3 *dwc = dotg->dwc;
-	u32 reg;
-
-	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
-	if (susp)
-		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
-	else
-		reg &= ~(DWC3_GUSB2PHYCFG_SUSPHY);
-	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
-}
-
 /**
  * dwc3_otg_set_host_power - Enable port power control for host operation
  *
@@ -192,6 +179,9 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 			return ret;
 		}
 
+		if (dwc->ssphy_clear_auto_suspend_on_disconnect)
+			dwc3_gadget_usb3_phy_suspend(dwc, true);
+
 		/*
 		 * This should be revisited for more testing post-silicon.
 		 * In worst case we may need to disconnect the root hub
@@ -202,7 +192,6 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 		 * remove_hcd, But we may not use standard set_host method
 		 * anymore.
 		 */
-		dwc3_otg_set_hsphy_auto_suspend(dotg, true);
 		dwc3_otg_set_host_regs(dotg);
 		/*
 		 * FIXME If micro A cable is disconnected during system suspend,
@@ -258,7 +247,8 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 						ext_xceiv->ext_block_reset)
 			ext_xceiv->ext_block_reset(ext_xceiv, true);
 
-		dwc3_otg_set_hsphy_auto_suspend(dotg, false);
+		if (dwc->ssphy_clear_auto_suspend_on_disconnect)
+			dwc3_gadget_usb3_phy_suspend(dwc, false);
 		dwc3_otg_set_peripheral_regs(dotg);
 
 		/* re-init core and OTG registers as block reset clears these */
@@ -330,7 +320,6 @@ static int dwc3_otg_start_peripheral(struct usb_otg *otg, int on)
 						ext_xceiv->ext_block_reset)
 			ext_xceiv->ext_block_reset(ext_xceiv, false);
 
-		dwc3_otg_set_hsphy_auto_suspend(dotg, true);
 		dwc3_otg_set_peripheral_regs(dotg);
 		usb_gadget_vbus_connect(otg->gadget);
 	} else {
@@ -339,7 +328,8 @@ static int dwc3_otg_start_peripheral(struct usb_otg *otg, int on)
 		usb_gadget_vbus_disconnect(otg->gadget);
 		usb_phy_notify_disconnect(dotg->dwc->usb2_phy, USB_SPEED_HIGH);
 		usb_phy_notify_disconnect(dotg->dwc->usb3_phy, USB_SPEED_SUPER);
-		dwc3_otg_set_hsphy_auto_suspend(dotg, false);
+		if (dotg->dwc->ssphy_clear_auto_suspend_on_disconnect)
+			dwc3_gadget_usb3_phy_suspend(dotg->dwc, false);
 	}
 
 	return 0;
@@ -551,7 +541,7 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 #endif
 		power_supply_type = POWER_SUPPLY_TYPE_USB_DCP;
 	else
-		power_supply_type = POWER_SUPPLY_TYPE_UNKNOWN;
+		power_supply_type = POWER_SUPPLY_TYPE_USB;
 
 	power_supply_set_supply_type(dotg->psy, power_supply_type);
 
@@ -567,28 +557,27 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 	if (dotg->charger->max_power == mA)
 		return 0;
 
-	dev_info(phy->dev, "Avail curr from USB = %u , is USB = %u\n", mA, power_supply_type == POWER_SUPPLY_TYPE_USB);
+	dev_info(phy->dev, "Avail curr from USB = %u\n", mA);
 
-	if (dotg->charger->max_power <= 2 && mA > 2) {
+	if (dotg->charger->max_power > 0 && (mA == 0 || mA == 2)) {
+#if 0 //def CONFIG_MACH_OPPO
+		if(dotg->charger->chg_type == DWC3_INVALID_CHARGER) {
+#endif
+			/* Disable charging */
+			if (power_supply_set_online(dotg->psy, false))
+				goto psy_error;
+#if 0 //def CONFIG_MACH_OPPO
+		}
+#endif
+	} else {
 		/* Enable charging */
 		if (power_supply_set_online(dotg->psy, true))
 			goto psy_error;
-		if (power_supply_set_current_limit(dotg->psy, 1000*mA))
-			goto psy_error;
-	} else if (dotg->charger->max_power > 0 && (mA == 0 || mA == 2)) {
-#ifdef CONFIG_MACH_OPPO
-		if (power_supply_type != POWER_SUPPLY_TYPE_USB &&
-				power_supply_set_online(dotg->psy, false))
-			goto psy_error;
-#else
-		/* Disable charging */
-		if (power_supply_set_online(dotg->psy, false))
-			goto psy_error;
-#endif
-		/* Set max current limit */
-		if (power_supply_set_current_limit(dotg->psy, 0))
-			goto psy_error;
 	}
+
+	/* Set max current limit in uA */
+	if (power_supply_set_current_limit(dotg->psy, 1000*mA))
+		goto psy_error;
 
 	power_supply_changed(dotg->psy);
 	dotg->charger->max_power = mA;
@@ -808,7 +797,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 									1);
 					phy->state = OTG_STATE_B_PERIPHERAL;
 					work = 1;
-#ifdef CONFIG_MACH_OPPO
+#if 0 //def CONFIG_MACH_OPPO
 					power_supply_set_online(dotg->psy, true);
 					power_supply_changed(dotg->psy);
 #endif
@@ -859,7 +848,7 @@ static void dwc3_otg_sm_work(struct work_struct *w)
 						charger->start_detection(dotg->charger, false);
 
 					dotg->charger_retry_count = 0;
-					dwc3_otg_set_power(phy, 0);
+//					dwc3_otg_set_power(phy, 0);
 					queue_delayed_work(system_nrt_wq, &dotg->detect_work, msecs_to_jiffies(600));
 #endif
 /* OPPO 2013-11-18 wangjc Modify end */

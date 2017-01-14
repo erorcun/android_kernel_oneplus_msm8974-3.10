@@ -1397,7 +1397,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	bool host_bus_suspend;
 	bool host_ss_active;
 	bool can_suspend_ssphy;
-	bool device_bus_suspend;
+	bool device_bus_suspend = false;
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 
 	dev_dbg(mdwc->dev, "%s: entering lpm\n", __func__);
@@ -1413,9 +1413,13 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 		return 0;
 	}
 
-	/* pending device events need to be handled by dwc3_thread_interrupt */
-	if (mdwc->dwc3) {
-		struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	if (mdwc->otg_xceiv && mdwc->otg_xceiv->state == OTG_STATE_B_PERIPHERAL)
+		device_bus_suspend = true;
+
+	host_bus_suspend = (mdwc->scope == POWER_SUPPLY_SCOPE_SYSTEM);
+
+	if (!host_bus_suspend) {
+		/* pending device events unprocessed */
 		for (i = 0; i < dwc->num_event_buffers; i++) {
 			struct dwc3_event_buffer *evt = dwc->ev_buffs[i];
 			if ((evt->flags & DWC3_EVENT_PENDING)) {
@@ -1450,10 +1454,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	else
 		mdwc->hs_phy->flags &= ~PHY_CHARGER_CONNECTED;
 
-	host_bus_suspend = (mdwc->scope == POWER_SUPPLY_SCOPE_SYSTEM);
 	can_suspend_ssphy = !(host_bus_suspend && host_ss_active);
-	device_bus_suspend = ((mdwc->charger.chg_type == DWC3_SDP_CHARGER) ||
-				 (mdwc->charger.chg_type == DWC3_CDP_CHARGER));
 
 	/* Disable core irq */
 	if (dwc->irq)
@@ -2388,23 +2389,6 @@ unreg_chrdev:
 	return ret;
 }
 
-static int msm_dwc3_hsphy_autosuspend(struct usb_phy *x, struct device *dev,
-				int enable_autosuspend)
-{
-	struct dwc3_msm *mdwc = dev_get_drvdata(dev->parent->parent);
-	u32 reg;
-
-	reg = dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0));
-	if (enable_autosuspend)
-		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
-	else
-		reg &= ~(DWC3_GUSB2PHYCFG_SUSPHY);
-
-	dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0), reg);
-
-	return 0;
-}
-
 static int dwc3_msm_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node, *dwc3_node;
@@ -2733,7 +2717,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		ret = PTR_ERR(mdwc->hs_phy);
 		goto put_dwc3;
 	}
-	mdwc->hs_phy->set_phy_autosuspend = msm_dwc3_hsphy_autosuspend;
 
 	mdwc->ss_phy = devm_usb_get_phy_by_phandle(&mdwc->dwc3->dev,
 							"usb-phy", 1);
