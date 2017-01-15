@@ -1433,8 +1433,6 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	}
 
 	host_ss_active = dwc3_msm_read_reg(mdwc->base, USB3_PORTSC) & PORT_PE;
-	if (mdwc->hs_phy_irq)
-		disable_irq(mdwc->hs_phy_irq);
 
 	if (cancel_delayed_work_sync(&mdwc->chg_work))
 		dev_dbg(mdwc->dev, "%s: chg_work was pending\n", __func__);
@@ -1460,11 +1458,6 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	if (dwc->irq)
 		disable_irq(dwc->irq);
 
-	if (!dcp && !host_bus_suspend)
-		dwc3_msm_write_reg(mdwc->base, QSCRATCH_CTRL_REG,
-			mdwc->qscratch_ctl_val);
-
-
 	if (can_suspend_ssphy) {
 		usb_phy_set_suspend(mdwc->ss_phy, 1);
 		usleep_range(1000, 1200);
@@ -1477,6 +1470,13 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 			dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0)) |
 								0x00000140);
 	}
+
+	if (mdwc->hs_phy_irq)
+		disable_irq(mdwc->hs_phy_irq);
+
+	if (!dcp && !host_bus_suspend)
+		dwc3_msm_write_reg(mdwc->base, QSCRATCH_CTRL_REG,
+			mdwc->qscratch_ctl_val);
 
 	usb_phy_set_suspend(mdwc->hs_phy, 1);
 
