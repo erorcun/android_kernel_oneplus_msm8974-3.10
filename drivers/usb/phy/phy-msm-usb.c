@@ -91,7 +91,7 @@ module_param(lpm_disconnect_thresh , uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(lpm_disconnect_thresh,
 	"Delay before entering LPM on USB disconnect");
 
-static bool floated_charger_enable = 1;
+static bool floated_charger_enable;
 module_param(floated_charger_enable , bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(floated_charger_enable,
 	"Whether to enable floated charger");
@@ -1429,26 +1429,27 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 		goto psy_error;
 	}
 
-	if (motg->cur_power <= 2 && mA > 2) {
+	if (motg->cur_power == 0 && mA > 2) {
 		/* Enable charging */
 		if (power_supply_set_online(psy, true))
 			goto psy_error;
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
-	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2) && (motg->chg_type == USB_INVALID_CHARGER)){
+	} else if (motg->cur_power > 0 && (mA == 0 || mA == 2)) {
 		/* Disable charging */
-		if(power_supply_set_online(psy, false))
+		if (power_supply_set_online(psy, false))
 			goto psy_error;
 		/* Set max current limit */
 		if (power_supply_set_current_limit(psy, 0))
 			goto psy_error;
-	} /* else {
+	} else {
 		if (power_supply_set_online(psy, true))
 			goto psy_error;
+		/* Current has changed (100/2 --> 500) */
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
 	}
-*/
+
 	power_supply_changed(psy);
 	return 0;
 
@@ -2795,16 +2796,11 @@ static void msm_otg_sm_work(struct work_struct *w)
 						OTG_STATE_B_PERIPHERAL;
 					break;
 				case USB_SDP_CHARGER:
-					// hack to always power from SDP charger  - this file is new in 3.10 - stability concerns
-/*					msm_otg_notify_charger(motg,
-							CONFIG_USB_GADGET_VBUS_DRAW); */
 					msm_otg_start_peripheral(otg, 1);
 					otg->phy->state =
 						OTG_STATE_B_PERIPHERAL;
 					mod_timer(&motg->chg_check_timer,
 							CHG_RECHECK_DELAY);
-					power_supply_set_online(&motg->usb_psy, true);
-					power_supply_changed(&motg->usb_psy);
 					break;
 				default:
 					break;
@@ -3855,8 +3851,8 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 		val->intval = motg->current_max;
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
-		val->intval = !!test_bit(B_SESS_VLD, &motg->inputs);
-		break;
+/*		val->intval = !!test_bit(B_SESS_VLD, &motg->inputs);
+		break; */
 	/* Reflect USB enumeration */
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = motg->online;
