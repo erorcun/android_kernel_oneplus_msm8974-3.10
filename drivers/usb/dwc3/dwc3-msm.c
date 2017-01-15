@@ -141,6 +141,7 @@ struct dwc3_msm {
 	struct clk		*hsphy_sleep_clk;
 	struct clk		*utmi_clk;
 	unsigned long		ref_clk_rate;
+	struct clk		*utmi_clk_src;
 	struct regulator	*dwc3_gdsc;
 
 	struct usb_phy		*hs_phy, *ss_phy;
@@ -1454,22 +1455,16 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 
 	can_suspend_ssphy = !(host_bus_suspend && host_ss_active);
 
-	/* Disable core irq */
-	if (dwc->irq)
-		disable_irq(dwc->irq);
-
-	if (can_suspend_ssphy) {
-		usb_phy_set_suspend(mdwc->ss_phy, 1);
-		usleep_range(1000, 1200);
-		clk_disable_unprepare(mdwc->ref_clk);
-	}
-
 	/* Prepare HSPHY for suspend */
-	if (host_bus_suspend) {
+	if (host_bus_suspend || device_bus_suspend) {
 		dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0),
 			dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0)) |
 								0x00000140);
 	}
+
+	/* Disable core irq */
+	if (dwc->irq)
+		disable_irq(dwc->irq);
 
 	if (mdwc->hs_phy_irq)
 		disable_irq(mdwc->hs_phy_irq);
@@ -1479,6 +1474,12 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 			mdwc->qscratch_ctl_val);
 
 	usb_phy_set_suspend(mdwc->hs_phy, 1);
+
+	if (can_suspend_ssphy) {
+		usb_phy_set_suspend(mdwc->ss_phy, 1);
+		usleep_range(1000, 1200);
+		clk_disable_unprepare(mdwc->ref_clk);
+	}
 
 	/* make sure above writes are completed before turning off clocks */
 	wmb();
