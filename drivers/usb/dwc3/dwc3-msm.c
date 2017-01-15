@@ -2489,13 +2489,36 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	}
 	clk_prepare_enable(mdwc->hsphy_sleep_clk);
 
+	ret = of_property_read_u32(node, "qcom,ref-clk-rate",
+				   (u32 *)&mdwc->ref_clk_rate);
+	if (ret)
+		mdwc->ref_clk_rate = 24000000; // for 3.10 bacon - because I didn't want to change device tree
+
 	mdwc->utmi_clk = devm_clk_get(&pdev->dev, "utmi_clk");
 	if (IS_ERR(mdwc->utmi_clk)) {
 		dev_err(&pdev->dev, "failed to get utmi_clk\n");
 		ret = PTR_ERR(mdwc->utmi_clk);
 		goto disable_hsphy_sleep_clk;
 	}
-	clk_set_rate(mdwc->utmi_clk, 19200000);
+
+	if (mdwc->ref_clk_rate == 24000000) {
+		/*
+		 * For setting utmi clock to 24MHz, first set 48MHz on parent
+		 * clock "utmi_clk_src" and then set divider 2 on child branch
+		 * "utmi_clk".
+		 */
+		mdwc->utmi_clk_src = devm_clk_get(&pdev->dev, "utmi_clk_src");
+		if (IS_ERR(mdwc->utmi_clk_src)) {
+			dev_err(&pdev->dev, "failed to get utmi_clk_src\n");
+			ret = PTR_ERR(mdwc->utmi_clk_src);
+			goto disable_hsphy_sleep_clk;
+		}
+		clk_set_rate(mdwc->utmi_clk_src, 48000000);
+		/* 1 means divide utmi_clk_src by 2 */
+		clk_set_rate(mdwc->utmi_clk, 1);
+	} else {
+		clk_set_rate(mdwc->utmi_clk, mdwc->ref_clk_rate);
+	}
 	clk_prepare_enable(mdwc->utmi_clk);
 
 	mdwc->ref_clk = devm_clk_get(&pdev->dev, "ref_clk");
@@ -2504,11 +2527,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		ret = PTR_ERR(mdwc->ref_clk);
 		goto disable_utmi_clk;
 	}
-	ret = of_property_read_u32(node, "qcom,ref-clk-rate",
-				   (u32 *)&mdwc->ref_clk_rate);
-	if (ret)
-		mdwc->ref_clk_rate = 19200000;
-	clk_set_rate(mdwc->ref_clk, mdwc->ref_clk_rate);
 	clk_prepare_enable(mdwc->ref_clk);
 
 	mdwc->id_state = mdwc->ext_xceiv.id = DWC3_ID_FLOAT;
