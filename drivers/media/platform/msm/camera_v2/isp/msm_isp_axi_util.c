@@ -502,13 +502,9 @@ void msm_isp_calculate_bandwidth(
 			stream_info->format_factor / ISP_Q2;
 	} else {
 		int rdi = SRC_TO_INTF(stream_info->stream_src);
-#ifndef CONFIG_CAF_CAMERA_DRIVER
-		stream_info->bandwidth = axi_data->src_info[rdi].pixel_clock;
-#else
 		if (rdi < VFE_SRC_MAX)
 			stream_info->bandwidth =
 				axi_data->src_info[rdi].pixel_clock;
-#endif
 	}
 }
 
@@ -907,16 +903,11 @@ static void msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 	struct msm_isp_event_data buf_event;
 	struct timeval *time_stamp;
 	uint32_t stream_idx = HANDLE_TO_IDX(stream_info->stream_handle);
-#ifndef CONFIG_CAF_CAMERA_DRIVER
-	uint32_t frame_id = vfe_dev->axi_data.
-		src_info[SRC_TO_INTF(stream_info->stream_src)].frame_id;
-#else
 	uint32_t src_intf = SRC_TO_INTF(stream_info->stream_src);
 	uint32_t frame_id = 0;
 	if (src_intf < VFE_SRC_MAX) {
 		frame_id = vfe_dev->axi_data.src_info[src_intf].frame_id;
 	}
-#endif
 	memset(&buf_event, 0, sizeof(buf_event) );
 
 	if(stream_idx >= MAX_NUM_STREAM) {
@@ -1282,14 +1273,9 @@ static int msm_isp_start_axi_stream(struct vfe_device *vfe_dev,
 		stream_info = &axi_data->stream_info[
 			HANDLE_TO_IDX(stream_cfg_cmd->stream_handle[i])];
 		stream_info->frame_id = 0;
-#ifndef CONFIG_CAF_CAMERA_DRIVER
-		src_state = axi_data->src_info[
-			SRC_TO_INTF(stream_info->stream_src)].active;
-#else
 		if (SRC_TO_INTF(stream_info->stream_src) < VFE_SRC_MAX)
 			src_state = axi_data->src_info[
 				SRC_TO_INTF(stream_info->stream_src)].active;
-#endif
 		msm_isp_calculate_bandwidth(axi_data, stream_info);
 		msm_isp_reset_framedrop(vfe_dev, stream_info);
 		msm_isp_get_stream_wm_mask(stream_info, &wm_reload_mask);
