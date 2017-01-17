@@ -276,7 +276,7 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 
 	ret = 0;
 	virt_dev = xhci->devs[slot_id];
-	cmd = xhci_alloc_command(xhci, false, true, GFP_NOIO);
+	cmd = xhci_alloc_command(xhci, false, true, GFP_NOWAIT);
 	if (!cmd) {
 		xhci_dbg(xhci, "Couldn't allocate command structure.\n");
 		return -ENOMEM;
