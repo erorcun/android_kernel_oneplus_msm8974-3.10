@@ -2150,8 +2150,8 @@
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps =
-				<88 618 0 0>,
-				<88 618 0 800>;
+				<54 618 0 0>,
+				<54 618 0 800>;
         };
 
 	qseecom: qcom,qseecom@7b00000 {

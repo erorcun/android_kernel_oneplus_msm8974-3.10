@@ -159,8 +159,8 @@
 		cam_vaf-supply = <&pm8941_l23>;
 		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana", "cam_vaf";
 		qcom,cam-vreg-type = <0 1 0 0>;
-		qcom,cam-vreg-min-voltage = <1050000 0 2800000 2800000>;
-		qcom,cam-vreg-max-voltage = <1050000 0 2800000 2800000>;
+		qcom,cam-vreg-min-voltage = <1050000 0 2700000 2800000>;
+		qcom,cam-vreg-max-voltage = <1050000 0 2700000 2800000>;
 		qcom,cam-vreg-op-mode = <105000 0 80000 100000>;
 		qcom,gpio-no-mux = <0>;
 		gpios = <&msmgpio 15 0>,
@@ -232,7 +232,7 @@
 	};
 
 	qcom,camera@0 {
-		cell-index = <2>;
+		cell-index = <0>;
 		compatible = "qcom,camera";
 		reg = <0x0>;
 		qcom,csiphy-sd-index = <0>;
@@ -247,8 +247,8 @@
 		qcom,cam-vreg-name = "cam_vdig", "cam_vio", "cam_vana",
 				     "cam_vaf";
 		qcom,cam-vreg-type = <0 1 0 0>;
-		qcom,cam-vreg-min-voltage = <1000000 0 2800000 2800000>;
-		qcom,cam-vreg-max-voltage = <1000000 0 2800000 2800000>;
+		qcom,cam-vreg-min-voltage = <1000000 0 2700000 2800000>;
+		qcom,cam-vreg-max-voltage = <1000000 0 2700000 2800000>;
 		qcom,cam-vreg-op-mode = <105000 0 80000 100000>;
 		qcom,gpio-no-mux = <0>;
 		gpios = <&msmgpio 15 0>,
@@ -266,7 +266,7 @@
 
 
 	qcom,camera@1 {
-		cell-index = <3>;
+		cell-index = <1>;
 		compatible = "qcom,camera";
 		reg = <0x1>;
 		qcom,csiphy-sd-index = <2>;
