@@ -66,8 +66,10 @@ static ssize_t led_brightness_store(struct device *dev,
 		return ret;
 
 #ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
-	if(!bttn_bl && !strcmp(led_cdev->name,"button-backlight"))
+	if(!bttn_bl && !strcmp(led_cdev->name,"button-backlight")) {
 		bttn_bl = led_cdev;
+		if(state > 1) bl_br = state;
+	}
 
 	if(prevent_bl > 0 && !strcmp(led_cdev->name,"button-backlight")) {
 		if(!state) {
