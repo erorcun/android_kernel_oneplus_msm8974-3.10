@@ -235,7 +235,7 @@ int set_backlight_pwm(int state)
 void lm3630_cabc_changed(int state)
 {
 	cabc = state;
-	set_backlight_pwm(state);
+	if(state == 0 || pre_brightness > 0) set_backlight_pwm(state);
 }
 EXPORT_SYMBOL(lm3630_cabc_changed);
 #endif /*VENDOR_EDIT*/
@@ -270,18 +270,8 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 	/* pwm control */
 	//bl_level=255;
 
-	/* i2c control */
-	ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x00);
-	if (ret < 0)
-		goto out;
-	mdelay(1);
-
-		ret = regmap_write(pchip->regmap,
-				   REG_BRT_A, bl_level);
-
 #ifdef CONFIG_MACH_OPPO
 		if(pre_brightness == 0) {
-			set_backlight_pwm(1);
 			pr_err("%s set brightness :  %d \n",__func__,bl_level);
 		}
 
@@ -293,6 +283,15 @@ EXPORT_SYMBOL(lm3630_cabc_changed);
 				set_backlight_pwm(cabc);
 		}
 #endif
+
+	/* i2c control */
+	ret = regmap_update_bits(pchip->regmap, REG_CTRL, 0x80, 0x00);
+	if (ret < 0)
+		goto out;
+	mdelay(1);
+
+		ret = regmap_write(pchip->regmap,
+				   REG_BRT_A, bl_level);
 
 	if (ret < 0)
 		goto out;
@@ -420,7 +419,7 @@ static ssize_t ftmbacklight_store(struct device *dev,
 
     return count;
 }
-    DEVICE_ATTR(ftmbacklight, 0200, NULL, ftmbacklight_store);
+    DEVICE_ATTR(ftmbacklight, 0644, NULL, ftmbacklight_store);
 /* OPPO zhanglong add 2013-08-30 for ftm test LCD backlight end */
 #endif //CONFIG_MACH_OPPO
 
