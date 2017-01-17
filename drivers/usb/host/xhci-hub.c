@@ -878,12 +878,15 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 
 
 		if ((temp & PORT_PLS_MASK) == XDEV_U0
-			&& (temp & PORT_POWER)
-			&& ((bus_state->suspended_ports & (1 << wIndex))
-			|| (xhci->quirks & XHCI_NO_SELECTIVE_SUSPEND))) {
-			bus_state->suspended_ports &= ~(1 << wIndex);
-			if (hcd->speed != HCD_USB3)
-				bus_state->port_c_suspend |= 1 << wIndex;
+		    && (temp & PORT_POWER)) {
+			if((bus_state->suspended_ports & (1 << wIndex)) ||
+			    (xhci->quirks & XHCI_NO_SELECTIVE_SUSPEND)) {
+				bus_state->suspended_ports &= ~(1 << wIndex);
+				if (hcd->speed != HCD_USB3)
+					bus_state->port_c_suspend |= 1 << wIndex;
+			}
+			bus_state->resume_done[wIndex] = 0;
+			clear_bit(wIndex, &bus_state->resuming_ports);
 		}
 		if (temp & PORT_CONNECT) {
 			status |= USB_PORT_STAT_CONNECTION;
