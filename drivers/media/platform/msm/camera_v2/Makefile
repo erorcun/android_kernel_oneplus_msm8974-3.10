@@ -1,7 +1,9 @@
 ccflags-y += -Idrivers/media/platform/msm/camera_v2
-ccflags-y += -Idrivers/media/platform/msm/camera_v2/sensor
 ifeq ($(CONFIG_CAF_CAMERA_DRIVER),y)
 ccflags-y += -Idrivers/media/platform/msm/camera_v2/sensor_caf
+ccflags-y += -Idrivers/media/platform/msm/camera_v2/sensor/io
+else
+ccflags-y += -Idrivers/media/platform/msm/camera_v2/sensor
 endif
 ccflags-y += -Idrivers/media/platform/msm/camera_v2/codecs
 ccflags-y += -Idrivers/media/platform/msm/camera_v2/isps
@@ -13,9 +15,11 @@ ccflags-y += -Idrivers/media/platform/msm/camera_v2/jpeg_10
 obj-$(CONFIG_MSMB_CAMERA) += msm.o
 obj-$(CONFIG_MSMB_CAMERA) += camera/
 obj-$(CONFIG_MSMB_CAMERA) += msm_vb2/
-obj-$(CONFIG_MSMB_CAMERA) += sensor/
 ifeq ($(CONFIG_CAF_CAMERA_DRIVER),y)
 obj-$(CONFIG_MSMB_CAMERA) += sensor_caf/
+obj-$(CONFIG_MSMB_CAMERA) += sensor/io/
+else
+obj-$(CONFIG_MSMB_CAMERA) += sensor/
 endif
 obj-$(CONFIG_MSMB_CAMERA) += isp/
 obj-$(CONFIG_MSMB_CAMERA) += ispif/

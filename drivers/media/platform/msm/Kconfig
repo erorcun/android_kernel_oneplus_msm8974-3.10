@@ -31,6 +31,10 @@ config CAF_CAMERA_DRIVER
 	bool "for find7 series"
 	depends on MSMB_CAMERA && MACH_OPPO
 
+config UPSIDE_DOWN_CAMERA
+	bool "for unofficial camera blobs"
+	depends on MSMB_CAMERA
+
 config MSMB_CAMERA_DEBUG
 	bool "Qualcomm MSM camera 2.0 debugging with printk"
 	depends on MSMB_CAMERA

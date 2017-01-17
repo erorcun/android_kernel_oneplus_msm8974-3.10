@@ -270,9 +270,22 @@ static int32_t msm_sensor_fill_slave_info_init_params(
 			sensor_init_params->position;
 
 	if (SENSOR_MAX_MOUNTANGLE > sensor_init_params->sensor_mount_angle) {
+#ifdef CONFIG_UPSIDE_DOWN_CAMERA
+		if(sensor_info->position == BACK_CAMERA_B) {
+			if(sensor_init_params->sensor_mount_angle == 90)
+			{
+				sensor_init_params->sensor_mount_angle = 270;
+			}
+			else if(sensor_init_params->sensor_mount_angle == 270)
+			{
+				sensor_init_params->sensor_mount_angle = 90;
+			}
+		}
+#endif
 		sensor_info->sensor_mount_angle =
 			sensor_init_params->sensor_mount_angle;
 		sensor_info->is_mount_angle_valid = 1;
+
 	}
 
 	if (CAMERA_MODE_INVALID != sensor_init_params->modes_supported)
@@ -728,7 +741,6 @@ static int32_t msm_sensor_driver_get_dt_data(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("failed: cell-index rc %d", rc);
 		goto FREE_SENSOR_DATA;
 	}
-	cell_id = cell_id - 2; // because there are cm camera nodes before caf ones
 	s_ctrl->id = cell_id;
 
 	/* Validate cell_id */
@@ -782,6 +794,10 @@ static int32_t msm_sensor_driver_get_dt_data(struct msm_sensor_ctrl_t *s_ctrl)
 
 	rc = of_property_read_u32(of_node, "qcom,mount-angle",
 		&sensordata->sensor_info->sensor_mount_angle);
+#ifdef CONFIG_UPSIDE_DOWN_CAMERA
+	if(sensordata->sensor_info->sensor_mount_angle == 90)
+		sensordata->sensor_info->sensor_mount_angle = 270;
+#endif
 	CDBG("%s qcom,mount-angle %d, rc %d\n", __func__,
 		sensordata->sensor_info->sensor_mount_angle, rc);
 	if (rc < 0) {

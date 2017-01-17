@@ -772,6 +772,10 @@ static int32_t msm_sensor_get_dt_data(struct device_node *of_node,
 
 	rc = of_property_read_u32(of_node, "qcom,mount-angle",
 		&sensordata->sensor_init_params->sensor_mount_angle);
+#ifdef CONFIG_UPSIDE_DOWN_CAMERA
+	if(sensordata->sensor_init_params->sensor_mount_angle == 90)
+		sensordata->sensor_init_params->sensor_mount_angle = 270;
+#endif
 	CDBG("%s qcom,mount-angle %d, rc %d\n", __func__,
 		sensordata->sensor_init_params->sensor_mount_angle, rc);
 	if (rc < 0) {

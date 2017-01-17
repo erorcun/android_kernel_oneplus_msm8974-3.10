@@ -904,63 +904,6 @@ static int msm_eeprom_spi_remove(struct spi_device *sdev)
 	return 0;
 }
 
-static int msm_eeprom_platform_remove(struct platform_device *pdev)
-{
-	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
-	struct msm_eeprom_ctrl_t  *e_ctrl;
-	if (!sd) {
-		pr_err("%s: Subdevice is NULL\n", __func__);
-		return 0;
-	}
-
-	e_ctrl = (struct msm_eeprom_ctrl_t *)v4l2_get_subdevdata(sd);
-	if (!e_ctrl) {
-		pr_err("%s: eeprom device is NULL\n", __func__);
-		return 0;
-	}
-
-	kfree(e_ctrl->i2c_client.cci_client);
-	kfree(e_ctrl->cal_data.mapdata);
-	kfree(e_ctrl->cal_data.map);
-	if (e_ctrl->eboard_info) {
-		kfree(e_ctrl->eboard_info->power_info.gpio_conf);
-		kfree(e_ctrl->eboard_info);
-	}
-	kfree(e_ctrl);
-	return 0;
-}
-
-static const struct of_device_id msm_eeprom_dt_match[] = {
-	{ .compatible = "qcom,eeprom" },
-	{ }
-};
-
-MODULE_DEVICE_TABLE(of, msm_eeprom_dt_match);
-
-static const struct i2c_device_id msm_eeprom_i2c_id[] = {
-	{ "msm_eeprom", (kernel_ulong_t)NULL},
-	{ }
-};
-
-struct i2c_driver msm_eeprom2_i2c_driver = {
-	.id_table = msm_eeprom_i2c_id,
-	.probe  = msm_eeprom_i2c_probe,
-	.remove = msm_eeprom_i2c_remove,
-	.driver = {
-		.name = "msm_eeprom",
-	},
-};
-
-struct spi_driver msm_eeprom2_spi_driver = {
-	.driver = {
-		.name = "qcom_eeprom",
-		.owner = THIS_MODULE,
-		.of_match_table = msm_eeprom_dt_match,
-	},
-	.probe = msm_eeprom_spi_probe,
-	.remove = msm_eeprom_spi_remove,
-};
-
 static int msm_eeprom_platform_probe(struct platform_device *pdev)
 {
 	int rc = 0;
@@ -1135,8 +1078,40 @@ cciclient_free:
 	return rc;
 }
 
+static int msm_eeprom_platform_remove(struct platform_device *pdev)
+{
+	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
+	struct msm_eeprom_ctrl_t  *e_ctrl;
+	if (!sd) {
+		pr_err("%s: Subdevice is NULL\n", __func__);
+		return 0;
+	}
+
+	e_ctrl = (struct msm_eeprom_ctrl_t *)v4l2_get_subdevdata(sd);
+	if (!e_ctrl) {
+		pr_err("%s: eeprom device is NULL\n", __func__);
+		return 0;
+	}
+
+	kfree(e_ctrl->i2c_client.cci_client);
+	kfree(e_ctrl->cal_data.mapdata);
+	kfree(e_ctrl->cal_data.map);
+	if (e_ctrl->eboard_info) {
+		kfree(e_ctrl->eboard_info->power_info.gpio_conf);
+		kfree(e_ctrl->eboard_info);
+	}
+	kfree(e_ctrl);
+	return 0;
+}
+
+static const struct of_device_id msm_eeprom_dt_match[] = {
+	{ .compatible = "qcom,eeprom" },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, msm_eeprom_dt_match);
+
 struct platform_driver msm_eeprom2_platform_driver = {
-	.probe = msm_eeprom_platform_probe,
 	.driver = {
 		.name = "qcom,eeprom",
 		.owner = THIS_MODULE,
@@ -1145,16 +1120,40 @@ struct platform_driver msm_eeprom2_platform_driver = {
 	.remove = msm_eeprom_platform_remove,
 };
 
+static const struct i2c_device_id msm_eeprom_i2c_id[] = {
+	{ "msm_eeprom", (kernel_ulong_t)NULL},
+	{ }
+};
+
+struct i2c_driver msm_eeprom2_i2c_driver = {
+	.id_table = msm_eeprom_i2c_id,
+	.probe  = msm_eeprom_i2c_probe,
+	.remove = msm_eeprom_i2c_remove,
+	.driver = {
+		.name = "msm_eeprom",
+	},
+};
+
+struct spi_driver msm_eeprom2_spi_driver = {
+	.driver = {
+		.name = "qcom_eeprom",
+		.owner = THIS_MODULE,
+		.of_match_table = msm_eeprom_dt_match,
+	},
+	.probe = msm_eeprom_spi_probe,
+	.remove = msm_eeprom_spi_remove,
+};
+
 static int __init msm_eeprom_init_module(void)
 {
 	int rc = 0;
 	CDBG("%s E\n", __func__);
-	rc = platform_driver_probe(&msm_eeprom2_platform_driver,
+/*	rc = platform_driver_probe(&msm_eeprom2_platform_driver,
 		msm_eeprom_platform_probe);
 	CDBG("%s:%d platform rc %d\n", __func__, __LINE__, rc);
 	rc = spi_register_driver(&msm_eeprom2_spi_driver);
 	CDBG("%s:%d spi rc %d\n", __func__, __LINE__, rc);
-	return i2c_add_driver(&msm_eeprom2_i2c_driver);
+*/	return i2c_add_driver(&msm_eeprom2_i2c_driver);
 }
 
 static void __exit msm_eeprom_exit_module(void)
