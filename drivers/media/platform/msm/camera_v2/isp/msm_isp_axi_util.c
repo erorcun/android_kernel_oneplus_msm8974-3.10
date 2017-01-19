@@ -72,9 +72,17 @@ int msm_isp_validate_axi_request(struct msm_vfe_axi_shared_data *axi_data,
 	struct msm_vfe_axi_stream_request_cmd *stream_cfg_cmd)
 {
 	int rc = -1, i;
-	struct msm_vfe_axi_stream *stream_info =
-		&axi_data->stream_info[
-			HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle)];
+	struct msm_vfe_axi_stream *stream_info = NULL;
+	uint32_t idx = 0;
+
+	if (NULL == stream_cfg_cmd || NULL == axi_data)
+		return rc;
+
+	idx = HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle);
+	if (idx < MAX_NUM_STREAM)
+		stream_info = &axi_data->stream_info[idx];
+	else
+		return rc;
 
 	switch (stream_cfg_cmd->output_format) {
 	case V4L2_PIX_FMT_SBGGR8:
@@ -451,10 +459,21 @@ void msm_isp_calculate_framedrop(
 	struct msm_vfe_axi_shared_data *axi_data,
 	struct msm_vfe_axi_stream_request_cmd *stream_cfg_cmd)
 {
-	struct msm_vfe_axi_stream *stream_info =
-		&axi_data->stream_info[
-		HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle)];
-	uint32_t framedrop_period = msm_isp_get_framedrop_period(
+	struct msm_vfe_axi_stream *stream_info = NULL;
+	uint32_t framedrop_period = 0;
+	uint8_t idx = 0;
+
+	if (NULL == axi_data || NULL == stream_cfg_cmd)
+		return;
+
+	idx = HANDLE_TO_IDX(stream_cfg_cmd->axi_stream_handle);
+
+	if (idx < MAX_NUM_STREAM)
+		stream_info = &axi_data->stream_info[idx];
+	else
+		return;
+
+	framedrop_period = msm_isp_get_framedrop_period(
 	   stream_cfg_cmd->frame_skip_pattern);
 	stream_info->frame_skip_pattern =
 			stream_cfg_cmd->frame_skip_pattern;
@@ -611,14 +630,14 @@ int msm_isp_request_axi_stream(struct vfe_device *vfe_dev, void *arg)
 	}
 
 	msm_isp_calculate_framedrop(&vfe_dev->axi_data, stream_cfg_cmd);
-	#ifdef CONFIG_CAF_CAMERA_DRIVER
-	axi_data->burst_len = stream_cfg_cmd->burst_len;
-	#endif
 
 	if (stream_cfg_cmd->vt_enable && !vfe_dev->vt_enable) {
 		vfe_dev->vt_enable = stream_cfg_cmd->vt_enable;
 		msm_isp_start_avtimer();
 	}
+	#ifdef CONFIG_CAF_CAMERA_DRIVER
+	axi_data->burst_len = stream_cfg_cmd->burst_len;
+	#endif
 
 	if (stream_info->num_planes > 1) {
 		msm_isp_axi_reserve_comp_mask(
@@ -1157,16 +1176,14 @@ static int msm_isp_update_stream_bandwidth(struct vfe_device *vfe_dev)
 			pixel_clock) * ISP_DEFAULT_FORMAT_FACTOR / ISP_Q2;
 	total_bandwidth = total_pix_bandwidth + total_rdi_bandwidth;
 	total_streams = num_pix_streams + num_rdi_streams;
-	if (total_streams == 1) {
-         rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
-		(total_bandwidth - MSM_ISP_MIN_AB) , (total_bandwidth *
-		ISP_BUS_UTILIZATION_FACTOR / ISP_Q2 - MSM_ISP_MIN_IB));
-	}
-	else {
-	rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
-		total_bandwidth, total_bandwidth *
-		ISP_BUS_UTILIZATION_FACTOR / ISP_Q2);
-	}
+	if (total_streams == 1)
+		rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
+			total_bandwidth,
+			(total_bandwidth * ISP_BUS_UTILIZATION_FACTOR / ISP_Q2));
+	else
+		rc = msm_isp_update_bandwidth(ISP_VFE0 + vfe_dev->pdev->id,
+			(total_bandwidth + MSM_ISP_MIN_AB), (total_bandwidth *
+			ISP_BUS_UTILIZATION_FACTOR / ISP_Q2 + MSM_ISP_MIN_IB));
 	if (rc < 0)
 		pr_err("%s: update failed\n", __func__);
 
