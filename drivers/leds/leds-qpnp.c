@@ -111,7 +111,7 @@
 #define FLASH_ENABLE_CONTROL(base)	(base + 0x46)
 #define FLASH_LED_STROBE_CTRL(base)	(base + 0x47)
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_ARCH_MSM8974
 #define FLASH_LED_UNLOCK_SECURE(base)	(base + 0xD0)
 #define FLASH_LED_TORCH(base)		(base + 0xE4)
 #endif
@@ -168,7 +168,7 @@
 #define TORCH_DURATION_12s		0x0A
 #define FLASH_CLAMP_200mA		0x0F
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_ARCH_MSM8974
 #define FLASH_TORCH_MASK		0x03
 #define FLASH_LED_TORCH_ENABLE		0x00
 #define FLASH_LED_TORCH_DISABLE		0x03
@@ -576,7 +576,7 @@ static u32 kpdbl_master_period_us;
 DECLARE_BITMAP(kpdbl_leds_in_use, NUM_KPDBL_LEDS);
 static bool is_kpdbl_master_turn_on;
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 bool flash_blink_state;
 int led_flash_state;
 #endif
@@ -1268,6 +1268,10 @@ regulator_turn_off:
 	return 0;
 }
 
+#ifdef CONFIG_MACH_ONYX/*If the torch is enabled, enable BATFET_LPM mode*/
+extern int qpnp_chg_set_lpm(void);
+#endif
+
 static int qpnp_flash_set(struct qpnp_led_data *led)
 {
 	int rc, error;
@@ -1282,6 +1286,10 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 
 	/* Set led current */
 	if (val > 0) {
+#ifdef CONFIG_MACH_ONYX/*If the torch is enabled, enable BATFET_LPM mode*/
+		     qpnp_chg_set_lpm();
+#endif
+
 		if (led->flash_cfg->torch_enable) {
 			if (led->flash_cfg->peripheral_subtype ==
 							FLASH_SUBTYPE_DUAL) {
@@ -1309,7 +1317,7 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 			}
 
 			rc = qpnp_led_masked_write(led,
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_ARCH_MSM8974
 				FLASH_LED_UNLOCK_SECURE(led->base),
 				FLASH_SECURE_MASK, FLASH_UNLOCK_SECURE);
 #else
@@ -1324,7 +1332,7 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 			}
 
 			rc = qpnp_led_masked_write(led,
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_ARCH_MSM8974
 				FLASH_LED_TORCH(led->base),
 				FLASH_TORCH_MASK,
 				FLASH_LED_TORCH_ENABLE);
@@ -1362,7 +1370,7 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 			}
 
 			qpnp_led_masked_write(led,
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_ARCH_MSM8974
 				FLASH_MAX_CURR(led->base),
 				FLASH_CURRENT_MASK,
 				TORCH_MAX_LEVEL);
@@ -1519,7 +1527,7 @@ static int qpnp_flash_set(struct qpnp_led_data *led)
 		}
 
 		if (led->flash_cfg->torch_enable) {
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_ARCH_MSM8974
 			rc = qpnp_led_masked_write(led,
 				FLASH_LED_UNLOCK_SECURE(led->base),
 				FLASH_SECURE_MASK, FLASH_UNLOCK_SECURE);
@@ -2746,7 +2754,7 @@ static ssize_t blink_store(struct device *dev,
 	return count;
 }
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 static void led_flash_blink_work(struct work_struct *work)
 {
 	//int brightness;
@@ -2838,12 +2846,12 @@ static DEVICE_ATTR(ramp_step_ms, 0664, NULL, ramp_step_ms_store);
 static DEVICE_ATTR(lut_flags, 0664, NULL, lut_flags_store);
 static DEVICE_ATTR(duty_pcts, 0664, NULL, duty_pcts_store);
 static DEVICE_ATTR(blink, 0664, NULL, blink_store);
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 static DEVICE_ATTR(flash_blink, 0664, NULL, led_flash_blink_store);
 #endif
 
 static struct attribute *led_attrs[] = {
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 	&dev_attr_flash_blink.attr,
 #endif
 	&dev_attr_led_mode.attr,
