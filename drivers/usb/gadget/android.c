@@ -84,6 +84,9 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0");
 
 static const char longname[] = "Gadget Android";
+#ifdef CONFIG_MACH_ONYX
+bool is_MTP_mode = false;
+#endif
 
 /* Default vendor and product IDs, overridden by userspace */
 #define VENDOR_ID		0x18D1
@@ -2241,11 +2244,13 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		pr_err("Memory allocation failed.\n");
 		return -ENOMEM;
 	}
-
+#ifndef CONFIG_MACH_ONYX
 	config->fsg.nluns = 1;
 	name[0] = "lun";
 	config->fsg.luns[0].removable = 1;
-
+#else
+	config->fsg.nluns = 0;
+#endif
 	common = fsg_common_init(NULL, cdev, &config->fsg);
 	if (IS_ERR(common)) {
 		kfree(config);
@@ -2376,6 +2381,18 @@ static int mass_storage_function_bind_config(struct android_usb_function *f,
 	struct mass_storage_function_config *config = f->config;
 	int ret;
 
+#ifdef CONFIG_MACH_ONYX
+	/*
+	 * If is_MTP_mode is true, it means we only enable cdrom but disable sd mass storage.
+	 * If is_MTP_mode is false, it means we need to enable cdrom and sd mass storage.
+	 */
+	if (is_MTP_mode) {
+		config->common->nluns= 1;
+		is_MTP_mode = false;
+	} else {
+		config->common->nluns= 2;
+	}
+#endif
 	ret = fsg_bind_config(c->cdev, c, config->common);
 	if (ret)
 		pr_err("fsg_bind_config failed. ret:%x\n", ret);
@@ -2772,6 +2789,11 @@ static int android_enable_function(struct android_dev *dev,
 	struct android_usb_platform_data *pdata = dev->pdata;
 	struct usb_gadget *gadget = dev->cdev->gadget;
 
+#ifdef CONFIG_MACH_ONYX
+	if (!strcmp(name, "mtp")) {
+		is_MTP_mode = true;
+	}
+#endif
 	while ((f = *functions++)) {
 		if (!strcmp(name, f->name)) {
 			if (f->android_dev && f->android_dev != dev)

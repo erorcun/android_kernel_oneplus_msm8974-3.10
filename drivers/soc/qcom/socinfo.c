@@ -638,6 +638,36 @@ socinfo_show_hw_pcb_version(struct device *dev,
 		case HW_VERSION__23:
 			hw_version = "23";
 			break;
+		case HW_VERSION__30:		
+			hw_version ="30";
+			break;
+		case HW_VERSION__31:
+			hw_version = "31";
+			break;
+		case HW_VERSION__32:
+			hw_version = "32";
+			break;
+		case HW_VERSION__33:
+			hw_version = "33";
+			break;
+		case HW_VERSION__34:		
+			hw_version ="34";
+			break;
+		case HW_VERSION__40:
+			hw_version = "40";
+			break;
+		case HW_VERSION__41:
+			hw_version = "41";
+			break;
+		case HW_VERSION__42:
+			hw_version = "42";
+			break;
+		case HW_VERSION__43:
+			hw_version = "43";
+			break;
+		case HW_VERSION__44:		
+			hw_version ="44";
+break; 
 		default:
 			hw_version = "UNKNOWN";
 	}
@@ -716,6 +746,36 @@ socinfo_show_hw_rf_version(struct device *dev,
 		case RF_VERSION__99:
 			rf_version = "99";
 			break;
+		case RF_VERSION__90_CHINA_MOBILE:
+			rf_version = "90";
+			break;
+		case RF_VERSION__91_UNICOM:
+			rf_version = "91";
+			break;
+		case RF_VERSION__92_CHINA_RESERVED1:		
+			rf_version = "92";
+			break;
+		case RF_VERSION__93_CHINA_RESERVED2:
+			rf_version = "93";
+			break;
+		case RF_VERSION__94_CHINA_RESERVED3:
+			rf_version = "94";				
+			break;
+		case RF_VERSION__95_EUROPE:
+			rf_version = "95";
+			break;
+		case RF_VERSION__96_AMERICA:
+			rf_version = "96";
+			break;
+		case RF_VERSION__97_TAIWAN:
+			rf_version = "97";
+			break;
+		case RF_VERSION__98_INDONESIA:
+			rf_version = "98";
+			break;
+		case RF_VERSION__99_OVERSEA_RESERVED1:
+			rf_version = "99";
+break;
 		default:
 			rf_version = "UNKNOWN";
 	}

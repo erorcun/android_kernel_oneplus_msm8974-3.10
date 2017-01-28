@@ -86,6 +86,18 @@ static int mdss_dsi_panel_power_off(struct mdss_panel_data *pdata)
 	if (mdss_dsi_pinctrl_set_state(ctrl_pdata, false))
 		pr_debug("reset disable: pinctrl not enabled\n");
 
+/* Moved to mdss_dsi_panel_reset
+	#ifdef CONFIG_MACH_ONYX
+        if(gpio_is_valid(ctrl_pdata->vci_en_gpio)){
+            ret= mdss_dsi_panel_vci_en(pdata, 0);
+            if (ret) {
+                pr_err("%s:Failed to disable vci vregs.rc=%d\n",
+                    __func__, ret);
+            }
+            usleep(1000);
+        }
+	#endif
+*/
 	for (i = DSI_MAX_PM - 1; i >= 0; i--) {
 		/*
 		 * Core power module will be disabled when the
@@ -119,6 +131,18 @@ static int mdss_dsi_panel_power_on(struct mdss_panel_data *pdata)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
+/* Moved to mdss_dsi_panel_reset
+	#ifdef CONFIG_MACH_ONYX
+        if (gpio_is_valid(ctrl_pdata->vci_en_gpio)){
+            ret= mdss_dsi_panel_vci_en(pdata, 1);
+            if (ret) {
+                pr_err("%s:Failed to enable vci vregs.rc=%d\n",
+                    __func__, ret);
+            }
+            usleep(2000);
+        }
+	#endif
+*/
 	for (i = 0; i < DSI_MAX_PM; i++) {
 		/*
 		 * Core power module will be enabled when the
@@ -1044,6 +1068,12 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		rc = mdss_dsi_off(pdata, power_state);
 		break;
 	case MDSS_EVENT_CONT_SPLASH_FINISH:
+/* 2013-10-18 added begin for continous splash */
+#if 0//def CONFIG_MACH_ONYX
+		pr_err("%s: MDSS_EVENT_CONT_SPLASH_FINISH\n", __func__);
+		mdss_dsi_on(pdata);
+#endif
+/* 2013-10-18 added end */
 		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
 		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
@@ -1067,6 +1097,10 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 			/* Panel is Enabled in Bootloader */
 			rc = mdss_dsi_blank(pdata, MDSS_PANEL_POWER_OFF);
 		}
+/* 2013-10-18 added begin for continous splash */
+#if 0//def CONFIG_MACH_ONYX
+		 mdss_dsi_off(pdata);
+#endif
 		break;
 	case MDSS_EVENT_ENABLE_PARTIAL_UPDATE:
 		rc = mdss_dsi_ctl_partial_update(pdata);
@@ -1506,7 +1540,14 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio))
 		pr_err("%s:%d, Disp_en gpio not specified\n",
 						__func__, __LINE__);
+#ifdef CONFIG_MACH_ONYX
+	ctrl_pdata->vci_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
+		"qcom,platform-vci-enable-gpio", 0);
+	if (!gpio_is_valid(ctrl_pdata->vci_en_gpio))
+		pr_err("%s:%d, vci_en_gpio gpio not specified\n",
+						__func__, __LINE__);
 
+#endif
 	ctrl_pdata->rst_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
 			 "qcom,platform-reset-gpio", 0);
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio))
@@ -1524,33 +1565,6 @@ int dsi_panel_device_register(struct device_node *pan_node,
 	} else {
 		ctrl_pdata->mode_gpio = -EINVAL;
 	}
-
-#ifdef CONFIG_MACH_OPPO
-	ctrl_pdata->lcd_5v_en_gpio = of_get_named_gpio(ctrl_pdev->dev.of_node,
-			  "qcom,platform-lcd-5v-en-gpio", 0);
-	if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
-		rc = gpio_request(ctrl_pdata->lcd_5v_en_gpio, "lcd_5v_en");
-		if (rc) {
-			pr_err("request LCD 5V EN gpio failed, rc=%d\n", rc);
-			return -ENODEV;
-		}
-		rc = gpio_tlmm_config(GPIO_CFG(
-					ctrl_pdata->lcd_5v_en_gpio, 0,
-					GPIO_CFG_OUTPUT,
-					GPIO_CFG_NO_PULL,
-					GPIO_CFG_8MA),
-				GPIO_CFG_DISABLE);
-		if (rc) {
-			pr_err("%s: unable to config tlmm = %d\n",
-					__func__, ctrl_pdata->lcd_5v_en_gpio);
-			gpio_free(ctrl_pdata->lcd_5v_en_gpio);
-			return -ENODEV;
-		}
-	} else {
-		pr_err("%s:%d, lcd 5v en gpio not specified\n",
-						__func__, __LINE__);
-	}
-#endif
 
 	if (mdss_dsi_clk_init(ctrl_pdev, ctrl_pdata)) {
 		pr_err("%s: unable to initialize Dsi ctrl clks\n", __func__);

@@ -294,7 +294,7 @@ struct mdss_dsi_ctrl_pdata {
 	int panel_mode;
 	int irq_cnt;
 #ifdef CONFIG_MACH_OPPO
-	int lcd_5v_en_gpio;
+	int vci_en_gpio;
 #endif
 	int rst_gpio;
 	int disp_en_gpio;
@@ -352,6 +352,9 @@ struct mdss_dsi_ctrl_pdata {
 	dma_addr_t dma_addr;
 
 	struct dsi_pinctrl_res pin_res;
+#ifdef CONFIG_MACH_ONYX
+	int index;
+#endif
 };
 
 struct dsi_status_data {

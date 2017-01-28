@@ -23,18 +23,12 @@
 #include "power.h"
 
 /* OPPO 2013-08-23 wangjc Add begin for set charge current. */
-#ifndef CONFIG_VENDOR_EDIT
-#define DWC3_IDEV_CHG_MAX 1500
-#else
+#ifdef CONFIG_MACH_ONYX
+#define DWC3_IDEV_CHG_MAX 1800
+#elif CONFIG_MACH_FIND7OP
 #define DWC3_IDEV_CHG_MAX 2000
-#if 0
-/* OPPO 2013-12-13 liaofuchun change floated charger current to 2A for fastchg*/
-#define DWC3_IDEV_CHG_FLOATED	500
-#else
 #define DWC3_IDEV_CHG_FLOATED	2000
-/* OPPO 2013-12-13 liaofuchun modify end*/
-#endif 
-#endif /*CONFIG_VENDOR_EDIT*/
+#endif
 
 struct dwc3_charger;
 
@@ -55,7 +49,7 @@ struct dwc3_otg {
 	struct regulator	*vbus_otg;
 	struct delayed_work	sm_work;
 /* OPPO 2013-11-21 wangjc Add begin for delay charger detect */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_FIND7OP
 	struct delayed_work	detect_work;
 #endif
 /* OPPO 2013-11-21 wangjc Add end */
@@ -69,7 +63,7 @@ struct dwc3_otg {
 	int			charger_retry_count;
 	int			vbus_retry_count;
 /* OPPO 2013-10-05 wangjc Add begin for non-standard charger detect */
-#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_MACH_FIND7OP
 	struct delayed_work		non_standard_charger_work;
 #endif
 /* OPPO 2013-10-05 wangjc Add end */

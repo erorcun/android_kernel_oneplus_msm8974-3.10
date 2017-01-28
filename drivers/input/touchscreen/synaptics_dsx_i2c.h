@@ -76,6 +76,7 @@
 #define TP_VENDOR_TPK		2	//TPK
 #define TP_VENDOR_TRULY		3	//信利
 #define TP_VENDOR_YOUNGFAST 4   //洋华
+#define TP_15055 7   //洋华
 
 #define TP_TYPE_MAX		2	//we only use wintek and tpk now.
 
@@ -279,6 +280,7 @@ struct synaptics_rmi4_data {
 	struct mutex ops_lock;
 	struct notifier_block fb_notif;
 	atomic_t syna_use_gesture;
+	atomic_t key_rep;
 	atomic_t double_tap_enable;
 	atomic_t camera_enable;
 	atomic_t music_enable;

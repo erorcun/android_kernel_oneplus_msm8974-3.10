@@ -43,6 +43,8 @@
  * aco: Automatic Contrast Optimization. Must be configured in
  *      the panel devicetree. Boolean.
  *
+ * hbm: High Brightness Mode. Common for OLED panels. Boolean.
+ *
  * preset: Arbitrary DSI commands, up to 10 may be configured.
  *      Useful for gamma calibration.
  *
@@ -200,6 +202,9 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 	if ((mlc->caps & MODE_COLOR_ENHANCE) && (mlc->updated & MODE_COLOR_ENHANCE))
 		len += mlc->ce_enabled ? mlc->ce_on_cmds_len : mlc->ce_off_cmds_len;
 
+	if ((mlc->caps & MODE_HIGH_BRIGHTNESS) && (mlc->updated & MODE_HIGH_BRIGHTNESS))
+		len += mlc->hbm_enabled ? mlc->hbm_on_cmds_len : mlc->hbm_off_cmds_len;
+
 	if (is_cabc_cmd(mlc->updated) && is_cabc_cmd(mlc->caps)) {
 
 		// The CABC command on most modern panels is also responsible for
@@ -212,8 +217,9 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 		else if (mlc->cabc_level == CABC_VIDEO)
 			cabc_value |= mlc->cabc_video_value;
 
+#ifndef CONFIG_MACH_ONYX
 		lm3630_cabc_changed(cabc_value == 0 ? 0 : 1);
-
+#endif
 		if (mlc->sre_level == SRE_WEAK)
 			cabc_value |= mlc->sre_weak_value;
 		else if (mlc->sre_level == SRE_MEDIUM)
@@ -253,6 +259,17 @@ static void mdss_livedisplay_worker(struct work_struct *work)
 		} else {
 			memcpy(mlc->cmd_buf + dlen, mlc->ce_off_cmds, mlc->ce_off_cmds_len);
 			dlen += mlc->ce_off_cmds_len;
+		}
+	}
+
+	// High brightness mode
+	if ((mlc->caps & MODE_HIGH_BRIGHTNESS) && (mlc->updated & MODE_HIGH_BRIGHTNESS)) {
+		if (mlc->hbm_enabled) {
+			memcpy(mlc->cmd_buf + dlen, mlc->hbm_on_cmds, mlc->hbm_on_cmds_len);
+			dlen += mlc->hbm_on_cmds_len;
+		} else {
+			memcpy(mlc->cmd_buf + dlen, mlc->hbm_off_cmds, mlc->hbm_off_cmds_len);
+			dlen += mlc->hbm_off_cmds_len;
 		}
 	}
 
@@ -302,6 +319,9 @@ static ssize_t mdss_livedisplay_get_cabc(struct device *dev,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
+	if(!(mlc->caps & MODE_CABC))
+		mlc->cabc_level = 0;
+
 	return sprintf(buf, "%d\n", mlc->cabc_level);
 }
 
@@ -314,6 +334,9 @@ static ssize_t mdss_livedisplay_set_cabc(struct device *dev,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
 	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
 
+	if(!(mlc->caps & MODE_CABC))
+		goto end;
+
 	sscanf(buf, "%du", &level);
 	if (level >= CABC_OFF && level < CABC_MAX &&
 				level != mlc->cabc_level) {
@@ -322,7 +345,7 @@ static ssize_t mdss_livedisplay_set_cabc(struct device *dev,
 		mutex_unlock(&mlc->lock);
 		mdss_livedisplay_update(mlc, MODE_CABC);
 	}
-
+end:
 	return count;
 }
 
@@ -352,6 +375,37 @@ static ssize_t mdss_livedisplay_set_sre(struct device *dev,
 		mlc->sre_level = level;
 		mutex_unlock(&mlc->lock);
 		mdss_livedisplay_update(mlc, MODE_SRE);
+	}
+
+	return count;
+}
+
+static ssize_t mdss_livedisplay_get_hbm(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	return sprintf(buf, "%d\n", mlc->hbm_enabled);
+}
+
+static ssize_t mdss_livedisplay_set_hbm(struct device *dev,
+							   struct device_attribute *attr,
+							   const char *buf, size_t count)
+{
+	int value = 0;
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	struct mdss_livedisplay_ctx *mlc = get_ctx(mfd);
+
+	sscanf(buf, "%du", &value);
+	if ((value == 0 || value == 1)
+			&& value != mlc->hbm_enabled) {
+		mutex_lock(&mlc->lock);
+		mlc->hbm_enabled = value;
+		mutex_unlock(&mlc->lock);
+		mdss_livedisplay_update(mlc, MODE_HIGH_BRIGHTNESS);
 	}
 
 	return count;
@@ -524,6 +578,7 @@ static DEVICE_ATTR(color_enhance, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_
 static DEVICE_ATTR(aco, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_aco, mdss_livedisplay_set_aco);
 static DEVICE_ATTR(preset, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_preset, mdss_livedisplay_set_preset);
 static DEVICE_ATTR(num_presets, S_IRUGO, mdss_livedisplay_get_num_presets, NULL);
+static DEVICE_ATTR(hbm, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_hbm, mdss_livedisplay_set_hbm);
 static DEVICE_ATTR(rgb, S_IRUGO | S_IWUSR | S_IWGRP, mdss_livedisplay_get_rgb, mdss_livedisplay_set_rgb);
 
 int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pinfo)
@@ -565,6 +620,15 @@ int mdss_livedisplay_parse_dt(struct device_node *np, struct mdss_panel_info *pi
 			mlc->caps |= MODE_AUTO_CONTRAST;
 			mlc->aco_value = (uint8_t)(tmp & 0xFF);
 		}
+	}
+
+	mlc->hbm_on_cmds = of_get_property(np,
+			"cm,mdss-livedisplay-hbm-on-cmd", &mlc->hbm_on_cmds_len);
+	if (mlc->hbm_on_cmds_len) {
+		mlc->hbm_off_cmds = of_get_property(np,
+				"cm,mdss-livedisplay-hbm-off-cmd", &mlc->hbm_off_cmds_len);
+		if (mlc->hbm_off_cmds_len)
+			mlc->caps |= MODE_HIGH_BRIGHTNESS;
 	}
 
 	mlc->ce_on_cmds = of_get_property(np,
@@ -619,11 +683,11 @@ int mdss_livedisplay_create_sysfs(struct msm_fb_data_type *mfd)
 	if (rc)
 		goto sysfs_err;
 
-	if (mlc->caps & MODE_CABC) {
+//	if (mlc->caps & MODE_CABC) {
 		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_cabc.attr);
 		if (rc)
 			goto sysfs_err;
-	}
+//	}
 
 	if (mlc->caps & MODE_SRE) {
 		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_sre.attr);
@@ -633,6 +697,12 @@ int mdss_livedisplay_create_sysfs(struct msm_fb_data_type *mfd)
 
 	if (mlc->caps & MODE_AUTO_CONTRAST) {
 		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_aco.attr);
+		if (rc)
+			goto sysfs_err;
+	}
+
+	if (mlc->caps & MODE_HIGH_BRIGHTNESS) {
+		rc = sysfs_create_file(&mfd->fbi->dev->kobj, &dev_attr_hbm.attr);
 		if (rc)
 			goto sysfs_err;
 	}

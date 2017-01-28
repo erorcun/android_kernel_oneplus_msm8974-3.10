@@ -38,6 +38,15 @@
 
 #include "hid-ids.h"
 
+#ifdef CONFIG_MACH_ONYX
+/* Fix OTG switch cause reboot issue.+*/
+extern struct completion complet_xhci;
+extern struct completion complet_dwc3;
+extern bool running;
+extern int otg_current_state;
+/* Fix OTG switch cause reboot issue.-*/
+#endif
+
 /*
  * Version Information
  */
@@ -1524,7 +1533,7 @@ int hid_connect(struct hid_device *hdev, unsigned int connect_mask)
 	 * to any other listener. */
 	if (!hdev->claimed && !hdev->driver->raw_event) {
 		hid_err(hdev, "device has no listeners, quitting\n");
-		return -ENODEV;
+		goto err;
 	}
 
 	if ((hdev->claimed & HID_CLAIMED_INPUT) &&
@@ -1571,8 +1580,25 @@ int hid_connect(struct hid_device *hdev, unsigned int connect_mask)
 	hid_info(hdev, "%s: %s HID v%x.%02x %s [%s] on %s\n",
 		 buf, bus, hdev->version >> 8, hdev->version & 0xff,
 		 type, hdev->name, hdev->phys);
-
+#ifdef CONFIG_MACH_ONYX
+	/* Fix OTG switch cause reboot issue.+*/
+	running = false;
+	otg_current_state = 1;
+	complete(&complet_xhci);
+	complete(&complet_dwc3);
+	/* Fix OTG switch cause reboot issue.-*/
 	return 0;
+#endif
+err:
+#ifdef CONFIG_MACH_ONYX
+	/* Fix OTG switch cause reboot issue.+*/
+	running = false;
+	otg_current_state = 1;
+	complete(&complet_xhci);
+	complete(&complet_dwc3);
+	/* Fix OTG switch cause reboot issue.-*/
+#endif
+	return -ENODEV;
 }
 EXPORT_SYMBOL_GPL(hid_connect);
 

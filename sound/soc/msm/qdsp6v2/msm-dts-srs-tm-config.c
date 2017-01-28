@@ -21,7 +21,7 @@
 #include "msm-dts-srs-tm-config.h"
 #include "msm-pcm-routing-v2.h"
 
-static int srs_port_id = -1;
+int srs_port_id = -1;
 static int srs_alsa_ctrl_ever_called;
 #define SRS_TRUMEDIA_INDEX 2
 static union srs_trumedia_params_u msm_srs_trumedia_params[2];
@@ -31,7 +31,12 @@ void msm_dts_srs_tm_set_port_id(int port_id)
 {
 	srs_port_id = port_id;
 }
-
+#ifdef CONFIG_MACH_ONYX
+int msm_dts_srs_tm_get_port_id(void)
+{
+	return srs_port_id;
+}
+#endif
 void msm_dts_srs_tm_send_params(int port_id, unsigned int techs,
 				int param_block_idx)
 {

@@ -125,12 +125,16 @@ struct bms_battery_data {
 	int			cutoff_uv;
 	int			iterm_ua;
 	int			batt_id_kohm;
+#ifdef CONFIG_MACH_ONYX
+	int	best_id_kohm;
+#endif
 	const char		*battery_type;
 };
 
 #if defined(CONFIG_PM8921_BMS) || \
 	defined(CONFIG_PM8921_BMS_MODULE) || \
 	defined(CONFIG_QPNP_BMS) || \
+	defined(CONFIG_QPNP_BMS_ONYX) || \
 	defined(CONFIG_QPNP_VM_BMS)
 extern struct bms_battery_data  palladium_1500_data;
 extern struct bms_battery_data  desay_5200_data;

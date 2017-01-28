@@ -21,7 +21,6 @@
 #include <linux/leds.h>
 #include <linux/qpnp/pwm.h>
 #include <linux/err.h>
-
 #include "mdss_dsi.h"
 #include "mdss_livedisplay.h"
 
@@ -31,7 +30,7 @@
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
 
-#ifdef CONFIG_MACH_OPPO
+#ifndef CONFIG_MACH_ONYX
 extern int lm3630_bank_a_update_status(u32 bl_level);
 #endif
 
@@ -47,6 +46,89 @@ void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 	}
 	ctrl->pwm_enabled = 0;
 }
+
+#ifdef CONFIG_MACH_ONYX
+#define LCD_TE_GPIO  28
+#define ESD_TE_CHECK_ON
+
+extern int LCD_id;
+static bool first_run_init=1;
+static bool cont_splash_flag;
+#ifdef ESD_TE_CHECK_ON
+unsigned long flags;
+static bool first_run_reset=1;
+static int irq;
+static int te_state = 0;
+#include <linux/switch.h>
+#include <linux/boot_mode.h>
+#include <mach/device_info.h>
+static struct switch_dev display_switch;
+static struct delayed_work techeck_work;
+static struct completion te_comp;
+
+DEFINE_SPINLOCK(te_count_lock);
+DEFINE_SPINLOCK(te_state_lock);
+
+static irqreturn_t TE_irq_thread_fn(int irq, void *dev_id)
+{
+	complete(&te_comp);
+	return IRQ_HANDLED;
+}
+
+static int operate_display_switch(void)
+{
+    int ret = 0;
+
+    pr_err("%s : state=%d.\n", __func__, te_state);
+    spin_lock_irqsave(&te_state_lock, flags);
+    if(te_state)
+        te_state = 0;
+    else
+        te_state = 1;
+    spin_unlock_irqrestore(&te_state_lock, flags);
+
+    switch_set_state(&display_switch, te_state);
+
+    return ret;
+}
+static void techeck_work_func( struct work_struct *work )
+{
+	int ret = 0;
+
+	//pr_err("techeck_work_func\n");
+	INIT_COMPLETION(te_comp);
+	enable_irq(irq);
+    ret = wait_for_completion_killable_timeout(&te_comp,
+						msecs_to_jiffies(100));
+	if(ret == 0){
+		disable_irq(irq);
+		operate_display_switch();
+		return;
+	}
+	//pr_err("ret = %d\n", ret);
+	disable_irq(irq);
+	schedule_delayed_work(&techeck_work, msecs_to_jiffies(2000));
+}
+
+
+static ssize_t attr_mdss_dispswitch(struct device *dev,
+                                     struct device_attribute *attr, char *buf)
+{
+    printk("ESD function test--------\n");
+    operate_display_switch();
+    return 0;
+}
+
+static struct class * mdss_lcd;
+static struct device * dev_lcd;
+static struct device_attribute mdss_lcd_attrs[] = {
+	__ATTR(dispswitch, S_IRUGO|S_IWUSR, attr_mdss_dispswitch, NULL),
+	__ATTR_NULL,
+	};
+#endif
+
+#endif
+
 
 static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 {
@@ -110,7 +192,7 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	}
 }
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 static char dcs_cmd[2] = {0x56, 0x00}; /* DTYPE_DCS_READ */
 #else
 static char dcs_cmd[2] = {0x54, 0x00}; /* DTYPE_DCS_READ */
@@ -199,6 +281,17 @@ static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			goto disp_en_gpio_err;
 		}
 	}
+#ifdef CONFIG_MACH_ONYX
+	if (gpio_is_valid(ctrl_pdata->vci_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->vci_en_gpio,
+					"vci_enable");
+		if (rc) {
+			pr_err("request vci_en gpio failed, rc=%d\n",
+				       rc);
+			goto vci_en_gpio_err;
+		}
+	}
+#endif
 	rc = gpio_request(ctrl_pdata->rst_gpio, "disp_rst_n");
 	if (rc) {
 		pr_err("request reset gpio failed, rc=%d\n",
@@ -218,6 +311,9 @@ static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 mode_gpio_err:
 	gpio_free(ctrl_pdata->rst_gpio);
 rst_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->vci_en_gpio))
+		gpio_free(ctrl_pdata->vci_en_gpio);
+vci_en_gpio_err:
 	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 		gpio_free(ctrl_pdata->disp_en_gpio);
 disp_en_gpio_err:
@@ -237,12 +333,12 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
-
+#ifndef CONFIG_MACH_OPPO
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 		pr_debug("%s:%d, display enable line not configured\n",
 			   __func__, __LINE__);
 	}
-
+#endif
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_debug("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);
@@ -252,7 +348,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
 	if (enable) {
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio) &&
 				gpio_is_valid(ctrl_pdata->rst_gpio)) {
 #endif
@@ -261,6 +357,13 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			pr_err("gpio request failed\n");
 			return rc;
 		}
+
+#ifdef CONFIG_MACH_ONYX
+		if (gpio_is_valid(ctrl_pdata->vci_en_gpio)) {
+			gpio_set_value(ctrl_pdata->vci_en_gpio, 1);
+			usleep(2000);
+		}
+#endif
 		if (!pinfo->cont_splash_enabled) {
 			if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
@@ -271,11 +374,6 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				if (pdata->panel_info.rst_seq[++i])
 					usleep(pinfo->rst_seq[i] * 1000);
 			}
-#ifdef CONFIG_MACH_OPPO
-			if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
-				gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 1);
-			}
-#endif
 		}
 
 		if (gpio_is_valid(ctrl_pdata->mode_gpio)) {
@@ -284,7 +382,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			else if (pinfo->mode_gpio_state == MODE_GPIO_LOW)
 				gpio_set_value((ctrl_pdata->mode_gpio), 0);
 		}
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 		}
 #endif
 		if (ctrl_pdata->ctrl_state & CTRL_STATE_PANEL_INIT) {
@@ -294,11 +392,6 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			pr_debug("%s: Reset panel done\n", __func__);
 		}
 	} else {
-#ifdef CONFIG_MACH_OPPO
-		if (gpio_is_valid(ctrl_pdata->lcd_5v_en_gpio)) {
-			gpio_direction_output(ctrl_pdata->lcd_5v_en_gpio, 0);
-		}
-#endif
 		if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
@@ -309,9 +402,68 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
+#ifdef CONFIG_MACH_ONYX
+		if (gpio_is_valid(ctrl_pdata->vci_en_gpio)) {
+			gpio_set_value((ctrl_pdata->vci_en_gpio), 0);
+			gpio_free(ctrl_pdata->vci_en_gpio);
+			usleep(1000);
+		}
+#endif
 	}
 	return rc;
 }
+
+/* Moved to mdss_dsi_panel_reset
+#ifdef CONFIG_MACH_ONYX
+
+//add for samsung_s6e3fa3 vci en
+int mdss_dsi_panel_vci_en(struct mdss_panel_data *pdata, int enable)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	struct mdss_panel_info *pinfo = NULL;
+	int rc = 0;
+
+	if (pdata == NULL) {
+		pr_err("%s: Invalid input data\n", __func__);
+		return -EINVAL;
+	}
+
+	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+    if (!gpio_is_valid(ctrl_pdata->vci_en_gpio)) {
+		pr_debug("%s:%d, vci_en_gpio line not configured\n",
+			   __func__, __LINE__);
+		return rc;
+	}
+	pr_debug("%s: vci_en_gpio enable = %d\n", __func__, enable);
+	pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	if (enable) {
+	    rc = gpio_request(ctrl_pdata->vci_en_gpio,
+					"vci_enable");
+		if (rc) {
+			pr_err("request vci_enable gpio failed, rc=%d\n",
+				       rc);
+			return rc;
+		}
+		if (!pinfo->panel_power_on)
+		{
+            //power on vci
+            if (gpio_is_valid(ctrl_pdata->vci_en_gpio)){
+                gpio_set_value((ctrl_pdata->vci_en_gpio), 1);
+            }
+		}
+	} else {
+		if (gpio_is_valid(ctrl_pdata->vci_en_gpio)) {
+			gpio_set_value((ctrl_pdata->vci_en_gpio), 0);
+			gpio_free(ctrl_pdata->vci_en_gpio);
+		}
+	}
+	return rc;
+}
+#endif
+*/
 
 static char caset[] = {0x2a, 0x00, 0x00, 0x03, 0x00};	/* DTYPE_DCS_LWRITE */
 static char paset[] = {0x2b, 0x00, 0x00, 0x05, 0x00};	/* DTYPE_DCS_LWRITE */
@@ -422,7 +574,7 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	switch (ctrl_pdata->bklt_ctrl) {
 	case BL_WLED:
-#ifdef CONFIG_MACH_OPPO
+#ifndef CONFIG_MACH_ONYX
 		lm3630_bank_a_update_status(bl_level);
 #else
 		led_trigger_event(bl_led_trigger, bl_level);
@@ -471,6 +623,19 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->on_cmds);
 
 	pinfo->blank_state = MDSS_PANEL_BLANK_UNBLANK;
+#ifdef CONFIG_MACH_ONYX
+/* Mobile Phone Software Dept.Driver, 2014/02/25  Add for ESD test */
+#ifdef ESD_TE_CHECK_ON
+	if(ctrl->index==0  && get_boot_mode() != MSM_BOOT_MODE__FACTORY){
+		if(first_run_reset==1 && !cont_splash_flag){
+			first_run_reset=0;
+		}
+		else{
+			schedule_delayed_work(&techeck_work, msecs_to_jiffies(5000));
+		}
+	}
+#endif
+#endif 
 	pr_debug("%s:-\n", __func__);
 	return 0;
 }
@@ -490,7 +655,14 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 				panel_data);
 
 	pr_debug("%s: ctrl=%p ndx=%d\n", __func__, ctrl, ctrl->ndx);
-
+#ifdef CONFIG_MACH_ONYX
+/* Mobile Phone Software Dept.Driver, 2014/02/25  Add for ESD test */
+#ifdef ESD_TE_CHECK_ON
+	if(ctrl->index==0 && get_boot_mode() != MSM_BOOT_MODE__FACTORY){
+		cancel_delayed_work_sync(&techeck_work);
+	}
+#endif
+#endif /*VENDOR_EDIT*/
 	if (ctrl->off_cmds.cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds);
 
@@ -1351,6 +1523,17 @@ int mdss_dsi_panel_init(struct device_node *node,
 	int rc = 0;
 	static const char *panel_name;
 	struct mdss_panel_info *pinfo;
+#ifdef CONFIG_MACH_ONYX
+
+		bool cont_splash_enabled;
+	//	bool partial_update_enabled;
+
+
+		/* 2013-10-24 Add begin for panel info */
+			static const char *panel_manufacture;
+			static const char *panel_version;
+		/* 2013-10-24 Add end */
+#endif
 
 	if (!node || !ctrl_pdata) {
 		pr_err("%s: Invalid arguments\n", __func__);
@@ -1367,6 +1550,62 @@ int mdss_dsi_panel_init(struct device_node *node,
 	else
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
 
+
+#ifdef CONFIG_MACH_ONYX
+	/* 2013-10-24 Add begin for panel info */
+		/*it just need to do one time*/
+	if(first_run_init==1){
+		panel_manufacture = of_get_property(node, "qcom,mdss-dsi-panel-manufacture", NULL);
+		if (!panel_manufacture)
+			pr_info("%s:%d, panel manufacture not specified\n", __func__, __LINE__);
+		else
+			pr_info("%s: Panel Manufacture = %s\n", __func__, panel_manufacture);
+		panel_version = of_get_property(node, "qcom,mdss-dsi-panel-version", NULL);
+		if (!panel_version)
+			pr_info("%s:%d, panel version not specified\n", __func__, __LINE__);
+		else
+			pr_info("%s: Panel Version = %s\n", __func__, panel_version);
+		register_device_proc("lcd", (char *)panel_version, (char *)panel_manufacture);
+		push_component_info(LCD, (char *)panel_version, (char *)panel_manufacture);
+//	    if(strstr(panel_version, "S6E3FA3")){
+		    register_device_proc("backlight", (char *)panel_version, (char *)panel_manufacture);
+		    push_component_info(BACKLIGHT, (char *)panel_version, (char *)panel_manufacture);
+//		    is_samsung_s6e3fa3_panel = 1;
+//	    }
+	}
+	/* 2013-10-24 Add end */
+	/* Mobile Phone Software Dept.Driver, 2014/02/22  Add for ESD test*/
+		if (first_run_init==1 && get_boot_mode() != MSM_BOOT_MODE__FACTORY){  //for find7s
+			first_run_init=0;
+    #ifdef ESD_TE_CHECK_ON
+            init_completion(&te_comp);
+			irq = gpio_to_irq(LCD_TE_GPIO); //gpio 28 has configed in mdss_dsi.c
+			rc = request_threaded_irq(irq, NULL, TE_irq_thread_fn,
+				IRQF_TRIGGER_RISING, "LCD_TE",NULL);
+			if (rc < 0) {
+				pr_err("Unable to register IRQ handler\n");
+				return -ENODEV;
+			}
+			disable_irq(irq);
+			INIT_DELAYED_WORK(&techeck_work, techeck_work_func );
+			schedule_delayed_work(&techeck_work, msecs_to_jiffies(20000));
+
+			display_switch.name = "dispswitch";
+
+			rc = switch_dev_register(&display_switch);
+			if (rc)
+			{
+				pr_err("Unable to register display switch device\n");
+				return rc;
+			}
+
+			/*dir: /sys/class/mdss_lcd/lcd_control*/
+			mdss_lcd = class_create(THIS_MODULE,"mdss_lcd");
+			mdss_lcd->dev_attrs = mdss_lcd_attrs;
+			device_create(mdss_lcd,dev_lcd,0,NULL,"lcd_control");
+	#endif
+        }
+#endif /*VENDOR_EDIT*/
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {
 		pr_err("%s:%d panel dt parse failed\n", __func__, __LINE__);
@@ -1375,6 +1614,22 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	if (!cmd_cfg_cont_splash)
 		pinfo->cont_splash_enabled = false;
+#ifdef CONFIG_MACH_ONYX
+	if (cmd_cfg_cont_splash)
+		cont_splash_enabled = of_property_read_bool(node,
+				"qcom,cont-splash-enabled");
+	else
+		cont_splash_enabled = false;
+
+		if ((MSM_BOOT_MODE__FACTORY == get_boot_mode()) ||
+			(MSM_BOOT_MODE__RF == get_boot_mode()) ||
+			(MSM_BOOT_MODE__WLAN == get_boot_mode())) {
+			cont_splash_enabled = false;
+		}
+
+	/* Mobile Phone Software Dept.Driver, 2014/02/25  Add for ESD test */
+		cont_splash_flag = cont_splash_enabled;
+#endif 
 	pr_info("%s: Continuous splash %s", __func__,
 		pinfo->cont_splash_enabled ? "enabled" : "disabled");
 

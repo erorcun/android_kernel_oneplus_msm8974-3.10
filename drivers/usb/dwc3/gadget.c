@@ -2663,8 +2663,9 @@ void dwc3_gadget_usb3_phy_suspend(struct dwc3 *dwc, int suspend)
 static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 {
 	u32			reg;
+#ifndef CONFIG_MACH_ONYX
 	struct dwc3_otg		*dotg = dwc->dotg;
-
+#endif
 	dev_vdbg(dwc->dev, "%s\n", __func__);
 
 	/*
@@ -2706,9 +2707,10 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 			dwc->ssphy_clear_auto_suspend_on_disconnect)
  		dwc3_gadget_usb3_phy_suspend(dwc, false);
 
+#ifndef CONFIG_MACH_ONYX
 	if (dotg && dotg->otg.phy)
 		usb_phy_set_power(dotg->otg.phy, 0);
-
+#endif
 	if (dwc->gadget.speed != USB_SPEED_UNKNOWN)
 		dwc3_disconnect_gadget(dwc);
 

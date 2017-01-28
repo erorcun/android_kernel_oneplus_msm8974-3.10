@@ -2316,6 +2316,13 @@ static struct clk_lookup msm_camera_clocks_8974pro_only[] = {
 	CLK_LOOKUP_OF("cam_clk", camss_mclk0_clk, "0.qcom,camera"),
 	CLK_LOOKUP_OF("cam_clk", camss_mclk2_clk, "1.qcom,camera"),
 	CLK_LOOKUP_OF("cam_clk", camss_mclk2_clk, "2.qcom,camera"),
+/* oneplus 2015-5-30 longxiaowu@camera porting start for 15055 camera eeprom */
+#ifdef CONFIG_MACH_ONYX
+	CLK_LOOKUP("cam_src_clk", mclk0_clk_src.c, "0.qcom,eeprom"),
+	CLK_LOOKUP("cam_clk", camss_mclk0_clk.c, "0.qcom,eeprom"),
+	CLK_LOOKUP("cam_src_clk", mclk2_clk_src.c, "1.qcom,eeprom"),
+	CLK_LOOKUP("cam_clk", camss_mclk2_clk.c, "1.qcom,eeprom"),
+#endif
 };
 
 static struct clk_lookup msm_camera_clocks_8974_only[] = {
@@ -2361,7 +2368,9 @@ static struct clk_lookup msm_clocks_mmss_8974[] = {
 		"fd922100.qcom,hdmi_tx"),
 	CLK_LOOKUP_OF("core_clk", mdss_hdmi_clk, "fd922100.qcom,hdmi_tx"),
 	CLK_LOOKUP_OF("mdp_core_clk", mdss_mdp_clk, "fd922100.qcom,hdmi_tx"),
+#ifndef CONFIG_MACH_OPPO
 	CLK_LOOKUP_OF("extp_clk", mdss_extpclk_clk, "fd922100.qcom,hdmi_tx"),
+#endif
 	CLK_LOOKUP_OF("core_clk", mdss_mdp_clk, "mdp.0"),
 	CLK_LOOKUP_OF("lut_clk", mdss_mdp_lut_clk, "mdp.0"),
 	CLK_LOOKUP_OF("core_clk_src", mdp_clk_src, "mdp.0"),

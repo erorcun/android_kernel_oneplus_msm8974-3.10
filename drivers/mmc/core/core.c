@@ -30,7 +30,7 @@
 #include <linux/wakelock.h>
 #include <linux/pm.h>
 #include <linux/jiffies.h>
-
+#include <linux/gpio.h>
 #include <trace/events/mmc.h>
 
 #include <linux/mmc/card.h>
@@ -2277,11 +2277,22 @@ void mmc_detach_bus(struct mmc_host *host)
  */
 void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 {
+#ifdef CONFIG_MACH_ONYX
+	int status = host->ops->get_cd(host);
+#endif
 #ifdef CONFIG_MMC_DEBUG
 	unsigned long flags;
 	spin_lock_irqsave(&host->lock, flags);
 	WARN_ON(host->removed);
 	spin_unlock_irqrestore(&host->lock, flags);
+#endif
+
+#ifdef CONFIG_MACH_ONYX
+	if(status) delay = msecs_to_jiffies(300);
+	else {
+		gpio_direction_output(host->sdcard_2p95_en,0);
+		if(delay > 0) delay = msecs_to_jiffies(300);
+	}
 #endif
 	host->detect_change = 1;
 
@@ -3288,6 +3299,10 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 	if (!mmc_attach_mmc(host))
 		return 0;
 
+#ifdef CONFIG_MACH_ONYX
+	gpio_direction_output(host->sdcard_2p95_en,0);
+#endif
+
 	mmc_power_off(host);
 	return -EIO;
 }
@@ -3377,6 +3392,11 @@ void mmc_rescan(struct work_struct *work)
 	mmc_bus_get(host);
 	mmc_rpm_hold(host, &host->class_dev);
 
+#ifdef CONFIG_MACH_ONYX
+	if(host->ops->get_cd && host->ops->get_cd(host))
+		gpio_direction_output(host->sdcard_2p95_en,1);
+#endif
+
 	/*
 	 * if there is a _removable_ card registered, check whether it is
 	 * still present
@@ -3386,12 +3406,6 @@ void mmc_rescan(struct work_struct *work)
 		host->bus_ops->detect(host);
 
 	host->detect_change = 0;
-	/* If the card was removed the bus will be marked
-	 * as dead - extend the wakelock so userspace
-	 * can respond */
-	if (host->bus_dead)
-		extend_wakelock = 1;
-
 
 	/* If the card was removed the bus will be marked
 	 * as dead - extend the wakelock so userspace
@@ -3423,6 +3437,9 @@ void mmc_rescan(struct work_struct *work)
 
 	if (host->ops->get_cd && host->ops->get_cd(host) == 0) {
 		mmc_claim_host(host);
+#ifdef CONFIG_MACH_ONYX
+		gpio_direction_output(host->sdcard_2p95_en,0);
+#endif
 		mmc_power_off(host);
 		mmc_release_host(host);
 		goto out;
@@ -3432,6 +3449,7 @@ void mmc_rescan(struct work_struct *work)
 	mmc_claim_host(host);
 	if (!mmc_rescan_try_freq(host, host->f_min))
 		extend_wakelock = true;
+
 	mmc_release_host(host);
 	mmc_rpm_release(host, &host->class_dev);
  out:

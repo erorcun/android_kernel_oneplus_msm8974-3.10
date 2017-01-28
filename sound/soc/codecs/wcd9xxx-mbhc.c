@@ -885,6 +885,9 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 		mbhc->zl = mbhc->zr = 0;
 		pr_debug("%s: Reporting removal %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
+		#ifdef CONFIG_MACH_ONYX
+		switch_set_state(&mbhc->wcd9xxx_sdev,0);
+		#endif
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack, mbhc->hph_status,
 				    WCD9XXX_JACK_MASK);
 		wcd9xxx_set_and_turnoff_hph_padac(mbhc);
@@ -964,6 +967,34 @@ static void wcd9xxx_report_plug(struct wcd9xxx_mbhc *mbhc, int insertion,
 
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
+	#ifdef CONFIG_MACH_ONYX
+              //liuyan 2013-3-13 add
+              switch(mbhc->current_plug){
+               case PLUG_TYPE_HEADPHONE:
+		case PLUG_TYPE_HIGH_HPH:
+			mbhc->mbhc_cfg->headset_type = 0;
+			switch_set_state(&mbhc->wcd9xxx_sdev,2);
+			break;
+	        case PLUG_TYPE_GND_MIC_SWAP:
+			mbhc->mbhc_cfg->headset_type = 0;
+			//gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,1);
+			switch_set_state(&mbhc->wcd9xxx_sdev,1);
+			//mdelay(20);
+			break;
+		 case PLUG_TYPE_HEADSET:
+		 	mbhc->mbhc_cfg->headset_type = 1;
+		 	//gpio_set_value(mbhc->mbhc_cfg->hpmic_switch_gpio,0);
+		 	switch_set_state(&mbhc->wcd9xxx_sdev,1);
+			break;
+		default:
+			mbhc->mbhc_cfg->headset_type = 0;
+			switch_set_state(&mbhc->wcd9xxx_sdev,0);
+			break;
+		}
+              printk("%s: Reporting insertion %d(%x)\n", __func__,
+			 jack_type, mbhc->hph_status);
+	       // liuyan add end
+#endif
 		wcd9xxx_jack_report(mbhc, &mbhc->headset_jack,
 				    (mbhc->hph_status | SND_JACK_MECHANICAL),
 				    WCD9XXX_JACK_MASK);
@@ -5109,7 +5140,7 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 			return ret;
 		}
 
-#ifdef CONFIG_MACH_OPPO
+#ifdef CONFIG_MACH_FIND7OP
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_0,
 				       KEY_MEDIA);
@@ -5119,6 +5150,19 @@ int wcd9xxx_mbhc_init(struct wcd9xxx_mbhc *mbhc, struct wcd9xxx_resmgr *resmgr,
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_7,
 				       KEY_VOLUMEDOWN);
+#else
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_1,
+				       KEY_VOLUMEDOWN);
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_2,
+				       KEY_VOLUMEUP);
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_3,
+				       KEY_VOLUMEUP);
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+				       SND_JACK_BTN_7,
+					KEY_VOLUMEDOWN);
 #endif
 
 		if (ret) {

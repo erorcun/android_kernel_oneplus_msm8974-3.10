@@ -45,8 +45,13 @@
 
 extern int lcd_type_id;
 
+#ifdef CONFIG_MACH_FIND7OP
 #define FW_IMAGE_NAME "synaptics/startup_fw_update.img"
 #define DO_STARTUP_FW_UPDATE
+#elif CONFIG_MACH_ONYX
+#define FW_IMAGE_NAME "tp/15055/15055_FW_S3508_Tpk.img"
+#endif
+
 #define STARTUP_FW_UPDATE_DELAY_MS 200 /* ms */
 #define FORCE_UPDATE false
 #define DO_LOCKDOWN false
@@ -152,6 +157,14 @@ static ssize_t fwu_sysfs_bl_config_block_count_show(struct device *dev,
 
 static ssize_t fwu_sysfs_disp_config_block_count_show(struct device *dev,
 		struct device_attribute *attr, char *buf);
+
+#ifdef CONFIG_MACH_ONYX
+static ssize_t synaptics_update_fw_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
+
+static ssize_t synaptics_update_fw_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+#endif
 
 enum bl_version {
 	V5 = 5,
@@ -305,6 +318,11 @@ static struct bin_attribute dev_attr_data = {
 };
 
 static struct device_attribute attrs[] = {
+#ifdef CONFIG_MACH_ONYX
+	__ATTR(tp_fw_update, 0664,
+			synaptics_update_fw_show,
+			synaptics_update_fw_store),
+#endif
 	__ATTR(doreflash, S_IWUSR,
 			synaptics_rmi4_show_error,
 			fwu_sysfs_do_reflash_store),
@@ -2076,7 +2094,35 @@ static const struct file_operations synaptics_proc = {
 	.open = simple_open,
 	.owner = THIS_MODULE,
 };
+#ifdef CONFIG_MACH_ONYX
+static ssize_t synaptics_update_fw_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
+	return snprintf(buf, 2, "%d\n", rmi4_data->stay_awake);
+}
 
+
+static ssize_t synaptics_update_fw_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t size)
+{
+	int retval;
+	struct synaptics_rmi4_data *ts = fwu->rmi4_data;
+	unsigned char *empty_source = 0;
+	retval = synaptics_dsx_fw_updater(empty_source);
+	if (retval < 0) {
+		dev_err(&ts->i2c_client->dev,
+				"%s: Failed to do reflash\n",
+				__func__);
+		goto exit;
+	}
+
+	retval = size;
+exit:
+	return retval;
+}
+#endif
 static int init_synaptics_proc(void)
 {
 	int ret=0;

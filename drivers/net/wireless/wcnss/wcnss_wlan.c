@@ -43,6 +43,10 @@
 
 #include <mach/msm_smd.h>
 
+#ifdef CONFIG_MACH_ONYX
+#include <mach/device_info.h>
+#endif
+
 #define DEVICE "wcnss_wlan"
 #define CTRL_DEVICE "wcnss_ctrl"
 #define VERSION "1.01"
@@ -376,6 +380,10 @@ static struct {
 	u32		wlan_rx_buff_count;
 	smd_channel_t	*smd_ch;
 	unsigned char	wcnss_version[WCNSS_VERSION_LEN];
+	#ifdef CONFIG_MACH_ONYX
+	//hedong.liu@Connectivity, 2014/07/03, Add for wcnss firmware version show
+	unsigned char	wcnss_build_version[WCNSS_MAX_BUILD_VER_LEN];
+	#endif /* VENDOR_EDIT */
 	unsigned char   fw_major;
 	unsigned char   fw_minor;
 	unsigned int	serial_number;
@@ -537,6 +545,23 @@ static ssize_t wcnss_thermal_mitigation_store(struct device *dev,
 		(penv->tm_notify)(dev, value);
 	return count;
 }
+
+#ifdef CONFIG_MACH_ONYX
+//hedong.liu@Connectivity, 2014/07/03, Add for wcnss firmware version show
+
+static ssize_t wcnss_buld_version_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	if (!penv)
+		return -ENODEV;
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", penv->wcnss_build_version);
+}
+
+static DEVICE_ATTR(wcnss_build_version, S_IRUSR,
+		wcnss_buld_version_show, NULL);
+    
+#endif /* VENDOR_EDIT */
 
 static DEVICE_ATTR(thermal_mitigation, S_IRUSR | S_IWUSR,
 	wcnss_thermal_mitigation_show, wcnss_thermal_mitigation_store);
@@ -1209,7 +1234,13 @@ static int wcnss_create_sysfs(struct device *dev)
 	ret = device_create_file(dev, &dev_attr_wcnss_mac_addr);
 	if (ret)
 		goto remove_version;
-
+		
+    #ifdef CONFIG_MACH_ONYX
+    //hedong.liu@Connectivity, 2014/07/03, Add for wcnss firmware version show 
+    ret = device_create_file(dev, &dev_attr_wcnss_build_version);
+	if (ret)
+		goto remove_thermal;
+    #endif /* VENDOR_EDIT */
 	return 0;
 
 remove_version:
@@ -1229,6 +1260,10 @@ static void wcnss_remove_sysfs(struct device *dev)
 		device_remove_file(dev, &dev_attr_thermal_mitigation);
 		device_remove_file(dev, &dev_attr_wcnss_version);
 		device_remove_file(dev, &dev_attr_wcnss_mac_addr);
+		#ifdef CONFIG_MACH_ONYX
+		//hedong.liu@Connectivity, 2014/07/03, Add for wcnss firmware version show
+		device_remove_file(dev, &dev_attr_wcnss_build_version);
+		#endif /* VENDOR_EDIT */	
 	}
 }
 
@@ -2130,6 +2165,11 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 	int hw_type;
 	unsigned char fw_status = 0;
 
+	#ifdef CONFIG_MACH_ONYX
+	//hedong.liu@Connectivity, 2014/07/03, Add for wcnss firmware version show
+	int i = 0 ;    
+	#endif /* VENDOR_EDIT */
+
 	len = smd_read_avail(penv->smd_ch);
 	if (len > WCNSS_MAX_FRAME_SIZE) {
 		pr_err("wcnss: frame larger than the allowed size\n");
@@ -2216,6 +2256,11 @@ static void wcnssctrl_rx_handler(struct work_struct *worker)
 			return;
 		}
 		build[len] = 0;
+		#ifdef CONFIG_MACH_ONYX
+		//hedong.liu@Connectivity, 2014/07/03, Add for wcnss firmware version show 
+		for (i = 0 ; i <= len ; i ++)  
+		    penv->wcnss_build_version[i] = build[i];
+		#endif /* VENDOR_EDIT */
 		pr_info("wcnss: build version %s\n", build);
 		break;
 
@@ -3246,6 +3291,11 @@ wcnss_wlan_probe(struct platform_device *pdev)
 	 * place
 	 */
 	pr_info(DEVICE " probed in built-in mode\n");
+
+	#ifdef CONFIG_MACH_ONYX
+	/*product information*/
+	push_component_info(WCN, "WCN3680", "Qualcomm");
+	#endif /*VENDOR_EDIT*/
 
 	misc_register(&wcnss_usr_ctrl);
 

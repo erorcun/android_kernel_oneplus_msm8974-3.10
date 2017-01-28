@@ -437,6 +437,17 @@ config QPNP_CHARGER
 	  also offers relevant information to userspace via the power supply
 	  framework.
 
+config QPNP_CHARGER_ONYX
+	tristate "QPNP Charger driver"
+	depends on SPMI
+	depends on OF_SPMI
+	depends on THERMAL_QPNP_ADC_TM
+	help
+	  Say Y here to enable the switch mode battery charger
+	  and boost device which supports USB detection and charging. The driver
+	  also offers relevant information to userspace via the power supply
+	  framework.
+
 config BQ24196_CHARGER
 	tristate "BQ24196 Charger driver"
 	help
@@ -500,6 +511,15 @@ config QPNP_VM_BMS
 	  Charge.
 
 config QPNP_BMS
+	tristate "QPNP Battery Monitoring System driver"
+	depends on SPMI
+	depends on MSM_QPNP_INT
+	help
+	  Say Y here to enable support for QPNP chip bms device.
+	  It registers a fuelgauge bms power supply to report
+	  State of Charge.
+
+config QPNP_BMS_ONYX
 	tristate "QPNP Battery Monitoring System driver"
 	depends on SPMI
 	depends on MSM_QPNP_INT

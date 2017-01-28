@@ -1772,8 +1772,10 @@ composite_suspend(struct usb_gadget *gadget)
 		cdev->driver->suspend(cdev);
 
 	cdev->suspended = 1;
-
+#ifndef CONFIG_MACH_ONYX
+// delete by xcb
 	usb_gadget_vbus_draw(gadget, 2);
+#endif
 }
 
 static void

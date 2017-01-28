@@ -164,7 +164,7 @@ static void __init oppo_config_sns_power(void)
 }
 
 #define DISP_ESD_GPIO 28
-#define DISP_LCD_UNK_GPIO 62
+#define ERR_FG_GPIO 59
 static void __init oppo_config_display(void)
 {
 	int rc;
@@ -196,22 +196,35 @@ static void __init oppo_config_display(void)
 		return;
 	}
 
-	if (get_pcb_version() >= HW_VERSION__20) {
-		rc = gpio_request(DISP_LCD_UNK_GPIO, "lcd_unk");
-		if (rc) {
-			pr_err("%s: request DISP_UNK GPIO failed, rc: %d",
-					__func__, rc);
-			return;
-		}
-
-		rc = gpio_direction_output(DISP_LCD_UNK_GPIO, 0);
-		if (rc) {
-			pr_err("%s: set direction for DISP_LCD_UNK GPIO failed, rc: %d",
-					__func__, rc);
-			gpio_free(DISP_LCD_UNK_GPIO);
-			return;
-		}
+#ifdef CONFIG_MACH_ONYX
+	rc = gpio_request(ERR_FG_GPIO, "err_fg_gpio");
+	if (rc) {
+		pr_err("%s: request ERR_FG_GPIO failed, rc: %d",
+				__func__, rc);
+		return;
 	}
+
+	rc = gpio_tlmm_config(GPIO_CFG(ERR_FG_GPIO, 0,
+				GPIO_CFG_INPUT,
+				GPIO_CFG_PULL_DOWN,
+				GPIO_CFG_2MA),
+			GPIO_CFG_ENABLE);
+	if (rc) {
+		pr_err("%s: unable to configure ERR_FG_GPIO, rc: %d",
+				__func__, rc);
+		gpio_free(ERR_FG_GPIO);
+		return;
+	}
+
+	rc = gpio_direction_input(ERR_FG_GPIO);
+	if (rc) {
+		pr_err("%s: set direction for ERR_FG_GPIO failed, rc: %d",
+				__func__, rc);
+		gpio_free(ERR_FG_GPIO);
+		return;
+	}
+#endif
+
 }
 #endif /*VENDOR_EDIT*/
 

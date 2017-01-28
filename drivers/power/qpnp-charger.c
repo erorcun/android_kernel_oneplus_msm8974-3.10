@@ -44,7 +44,6 @@
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #endif/*CONFIG_FB*/
-#include <linux/gpio.h>
 /* jingchun.wang@Onlinerd.Driver, 2014/04/24  Add for control charger */
 #include <linux/proc_fs.h>
 #ifdef CONFIG_VENDOR_EDIT

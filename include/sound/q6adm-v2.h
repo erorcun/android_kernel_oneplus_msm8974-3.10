@@ -118,4 +118,9 @@ int adm_get_topology_id(int port_id);
 int adm_send_compressed_device_mute(int port_id, bool mute_on);
 
 int adm_send_compressed_device_latency(int port_id, int latency);
+
+#ifdef CONFIG_MACH_ONYX
+//#lifei@OnePlus.MultiMediaService, 2015/09/25 add set/get dsp interface
+int adm_set_dirac_enable_params(int port_id, uint32_t module_id, uint32_t param_id, int enable);
+#endif
 #endif /* __Q6_ADM_V2_H__ */

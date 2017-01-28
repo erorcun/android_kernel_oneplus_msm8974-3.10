@@ -66,9 +66,9 @@
 			};
 		};
 
-		sdhc2_cd: sdhc2_cd_pin {
+		//sdhc2_cd: sdhc2_cd_pin {
 			/* check that this is indeed gpio 38 */
-			qcom,pins = <&gp 62>;
+		/*	qcom,pins = <&gp 62>;
 			qcom,num-grp-pins = <1>;
 			label = "cd-gpio";
 			sdhc2_cd_on: cd_on {
@@ -79,7 +79,7 @@
 				drive-strength = <2>;
 				bias-disable;
 			};
-		};
+		}; */
 		/* SDC pin type */
 		sdc: sdc {
 			qcom,pin-type-sdc;
@@ -137,10 +137,12 @@
 			};
 		};
 
-		pmx_sdc2_clk {
+		sdc2switch1: pmx_sdc2_clk {
 			qcom,pins = <&sdc 4>;
 			qcom,num-grp-pins = <1>;
 			label = "sdc2-clk";
+			status = "disabled";
+
 			sdc2_clk_on: clk_on {
 				bias-disable; /* NO pull */
 				drive-strength = <10>; /* 10 MA */
@@ -155,10 +157,12 @@
 			};
 		};
 
-		pmx_sdc2_cmd {
+		sdc2switch2: pmx_sdc2_cmd {
 			qcom,pins = <&sdc 5>;
 			qcom,num-grp-pins = <1>;
 			label = "sdc2-cmd";
+			status = "disabled";
+
 			sdc2_cmd_on: cmd_on {
 				bias-pull-up; /* pull up */
 				drive-strength = <10>; /* 10 MA */
@@ -169,10 +173,12 @@
 			};
 		};
 
-		pmx_sdc2_data {
+		sdc2switch3: pmx_sdc2_data {
 			qcom,pins = <&sdc 6>;
 			qcom,num-grp-pins = <1>;
 			label = "sdc2-data";
+			status = "disabled";
+
 			sdc2_data_on: data_on {
 				bias-pull-up; /* pull up */
 				drive-strength = <10>; /* 10 MA */
@@ -630,11 +636,12 @@
 			};
 		};
 
-		pmx_i2c_1 {
+		pinctrl_i2c_1: pmx_i2c_1 {
 			qcom,pins = <&gp 2>, <&gp 3>; /* SDA, SCL */
 			qcom,num-grp-pins = <2>;
 			qcom,pin-func = <3>;
 			label = "pmx_i2c_1";
+			status = "disabled";
 
 			i2c_1_active: i2c_1_active {
 				drive-strength = <2>;

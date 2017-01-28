@@ -23,6 +23,10 @@ config MACH_FIND7OP
 	help
 	  Support for the Oneplus variant
 
+config MACH_ONYX
+	select MACH_OPPO_MSM8974
+	bool "Oneplus X"
+
 endmenu
 
 menu "Oppo specific options"

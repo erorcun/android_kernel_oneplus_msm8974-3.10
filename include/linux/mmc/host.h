@@ -415,6 +415,11 @@ struct mmc_host {
 
 	unsigned int		slotno;	/* used for sdio acpi binding */
 
+#ifdef CONFIG_MACH_ONYX
+//hefaxi@bsp,2015/08/13, add for configuate sdcard_2p95_en gpio in dtsi
+	int sdcard_2p95_en;
+#endif
+
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 	struct {
 		struct sdio_cis			*cis;

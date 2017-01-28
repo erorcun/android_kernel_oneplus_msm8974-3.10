@@ -1,0 +1,631 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include "dsi-panel-samsung_s6e3fa3_1080p_cmd.dtsi"
+#include "msm8974-15055-camera.dtsi"
+#include "msm8974-oppo-pm.dtsi"
+#include "msm8974-oppo-regulator.dtsi"
+#include "msm8974-oppo-leds.dtsi"
+
+/ {
+	aliases {
+		serial0 = &blsp1_uart1;
+	};
+
+	memory {
+		oem_data_mem: oem_data_region@5900000 {
+			linux,reserve-contiguous-region;
+			linux,reserve-region;
+			linux,remove-completely;
+			reg = <0x5900000 0x100000>;
+			label = "oem_data";
+		};
+	};
+};
+
+&soc {
+/*
+	serial@f991e000 {
+		status = "ok";
+	};
+*/
+	oem_data_sharedmem {
+		compatible = "qcom,sharedmem-uio";
+		reg = <0x5900000 0x100000>;
+		reg-names = "oem_data";
+	};
+
+	qcom,mdss_dsi@fd922800 {
+		qcom,dsi-pref-prim-pan = <&dsi_samsung_s6e3fa3_1080p_cmd>;
+		/delete-property/ qcom,platform-enable-gpio;
+		qcom,platform-vci-enable-gpio = <&pm8941_gpios 33 0>;  //VCI
+	};
+
+	qcom,mdss_mdp@fd900000 {
+		qcom,mdss-pref-prim-intf = "dsi";
+		batfet-supply = <&pm8941_chg_batif>;
+	};
+
+	qcom,hdmi_tx@fd922100 {
+		status = "disabled";
+	};
+
+	i2c@f9924000 {
+		synaptics-rmi-ts@20 {
+			compatible = "synaptics,rmi-ts";
+			reg = <0x20>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <61 0x2008>;
+			synaptics,irq-gpio = <&msmgpio 61 0x2008>;
+			synaptics,reset-gpio = <&msmgpio 60 0x00>;
+		};
+/*		dhall@0C {
+			compatible = "magna,dhall";
+			reg = <0x0c>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <64 0x4>;
+			dhall,irq-gpio = <&msmgpio 64 0x2008>;
+			vdd_2v8-supply = <&pm8941_l17>;
+			vcc_i2c_1v8-supply = <&pm8941_lvs2>;
+		}; */
+	};
+
+	i2c@f9928000 {
+		qcom,i2c-bus-freq = <100000>;
+		qcom,i2c-src-freq = <50000000>;
+		tfa9890@36 {
+			status = "okay";
+                  	compatible = "nxp,tfa9890";
+                  	reg = <0x36>;
+                  	nxp,tfa_max-vol-steps=<0x01>;
+                  	reset_gpio= <&msmgpio 77 0>;
+		};
+	};
+
+	qcom,wcnss-wlan@fb000000 {
+		qcom,pronto-vddcx-supply = <&pm8841_s2>;
+		qcom,wcnss-pm = <11 21 1200 1 1>;
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		input-name = "gpio-keys";
+/*OPPO yuyi 2013-09-27 add begin for enable gpio_key*/
+		status = "ok"; 
+/*OPPO yuyi 2013-09-27 add end for enable gpio_key*/
+		camera_snapshot {
+			label = "camera_snapshot";
+/* OPPO 2014-06-23 sjc Delete begin for 14021 */
+			#gpios = <&pm8941_gpios 3 0x1>;
+/* OPPO 2014-06-23 sjc Delete end */
+			linux,input-type = <1>;
+			linux,code = <0x2fe>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+
+		camera_focus {
+			label = "camera_focus";
+			gpios = <&pm8941_gpios 4 0x1>;
+			linux,input-type = <1>;
+			linux,code = <0x210>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+/*OPPO yuyi delete begin for vol_up and vol_down*/
+/*		vol_up {
+			label = "volume_up";
+			gpios = <&pm8941_gpios 5 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+*/
+/*OPPO yuyi delete end for vol_up and vol_down*/
+/*OPPO yuyi add begin for vol_up and vol_down*/
+		vol_up {
+			label = "volume_up";
+			gpios = <&pm8941_gpios 5 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			/* gpio-key,wakeup; mingqiang.guo@bsp.phone remove volume_key wakeup phone,because remove Track gestures */
+			debounce-interval = <15>;
+		};
+/*VENDOR_EDIT*/
+/*OPPO yuyi 2013-11-05 add begin for vol_down*/		
+		vol_down {
+			label = "volume_down";
+			gpios = <&pm8941_gpios 2 0x1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			/* gpio-key,wakeup; mingqiang.guo@bsp.phone remove volume_key wakeup phone,because remove Track gestures */
+			debounce-interval = <15>;
+		};
+/*OPPO yuyi 2013-11-05 add end for vol_down*/	
+/* OPPO zhengzk 2013-04-18 add begin for hallsensor */
+/* #if 1 //#ifdef CONFIG_VENDOR_EDIT */
+		hallsensor_key {
+			label = "hallsensor_key";
+			gpios = <&msmgpio 68 1>;
+			interrupt-parent = <&msmgpio>; 
+			interrupts = <68 0x0>;
+			linux,input-type = <5>;
+			linux,code = <0>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+/* #endif */
+/* OPPO zhengzk 2013-04-18 add end */
+	};
+
+	sound {
+		qcom,model = "msm8974-taiko-mtp-snd-card";
+		qcom,cdc-micbias2-headset-only;
+		asoc-codec = <&stub_codec>, <&hdmi_audio>; /* 3.10 */
+		asoc-codec-names = "msm-stub-codec.1", "msm-hdmi-audio-codec-rx"; /* 3.10 */
+	};
+
+	tri_state: tri_state_key {
+			compatible = "oneplus,tri-state-key";
+			interrupt-parent = <&msmgpio>; //GPIO Handler
+			//interrupts = <77 0>; //GPIO # and flags
+		/* bits[3:0] trigger type and level flags
+        1 = low-to-high edge triggered
+        2 = high-to-low edge triggered
+        4 = active high level-sensitive
+        8 = active low level-sensitive
+		*/
+			tristate,gpio_key2 = <&msmgpio 92 0x00>; //Pass a GPIO
+			//tristate,gpio_key2 = <&msm_gpio 61 0x00>;//use gpio61 for test,MP will use 77
+			tristate,gpio_key1 = <&msmgpio 1 0x00>;
+			//vdd_io-supply = <&pm8994_s4>;  // 1.8V
+
+			/* MSM GPIO active and sleep settings */
+		//	pinctrl-names = "key2_active","key2_suspend";
+		//	pinctrl-0 = <&tristate_key2_active>;
+		//	pinctrl-1 = <&tristate_key2_suspend>;
+	};
+
+};
+
+&sdhc_1 {
+	vdd-supply = <&pm8941_l20>;
+	vdd-io-supply = <&pm8941_s3>;
+
+	qcom,vdd-always-on;
+	qcom,vdd-lpm-sup;
+	qcom,vdd-voltage-level = <2950000 2950000>;
+	qcom,vdd-current-level = <800 500000>;
+
+	qcom,vdd-io-always-on;
+	qcom,vdd-io-voltage-level = <1800000 1800000>;
+	qcom,vdd-io-current-level = <250 154000>;
+
+	pinctrl-names = "active", "sleep";
+	pinctrl-0 = <&sdc1_clk_on &sdc1_cmd_on &sdc1_data_on>;
+	pinctrl-1 = <&sdc1_clk_off &sdc1_cmd_off &sdc1_data_off>;
+
+	qcom,nonremovable;
+	status = "ok";
+};
+
+&sdhc_2 {
+	#address-cells = <0>;
+	interrupt-parent = <&sdhc_2>;
+	interrupts = <0 1 2>;
+	#interrupt-cells = <1>;
+	interrupt-map-mask = <0xffffffff>;
+	interrupt-map = <0 &intc 0 125 0
+			1 &intc 0 221 0
+			2 &msmgpio 62 0x3>; /* hefaxi@filesystems, 2015/06/11, Modify for the SD card detect pin */
+	interrupt-names = "hc_irq", "pwr_irq", "status_irq";
+	cd-gpios = <&msmgpio 62 0x0>; /* hefaxi@filesystems, 2015/06/11, Modify for the SD card detect pin */
+
+	sdcard_2p95_en = <64>; /* hefaxi@bsp,2015/08/13, add for configuate sdcard_2p95_en gpio */
+
+	vdd-supply = <&pm8941_l21>;
+	vdd-io-supply = <&pm8941_l13>;
+
+	qcom,vdd-voltage-level = <2950000 2950000>;
+	qcom,vdd-current-level = <9000 800000>;
+
+	qcom,vdd-io-voltage-level = <1800000 2950000>;
+	qcom,vdd-io-current-level = <6 22000>;
+
+	pinctrl-names = "active", "sleep";
+	pinctrl-0 = <&sdc2_clk_on &sdc2_cmd_on &sdc2_data_on>;
+	pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off>;
+
+	status = "ok";
+};
+
+&sdc2switch1 {
+	status = "ok";
+}
+
+&sdc2switch2 {
+	status = "ok";
+}
+
+&sdc2switch3 {
+	status = "ok";
+}
+
+/* Drive strength recommendations for clock line from hardware team is 10 mA.
+ * But since the driver has been been using the below values from the start
+ * without any problems, continue to use those.
+ */
+&sdhc_1 {
+	pinctrl-0 = <&sdc1_clk_on_16 &sdc1_cmd_on &sdc1_data_on>;
+};
+
+&sdhc_2 {
+	pinctrl-0 = <&sdc2_clk_on_16 &sdc2_cmd_on &sdc2_data_on>;
+};
+
+/*
+&uart7 {
+	status = "ok";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart_console_sleep>;
+};
+*/
+
+&usb3 {
+	qcom,otg-capability;
+};
+
+&pm8941_gpios {
+	gpio@c000 { /* GPIO 1 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c100 { /* GPIO 2 */
+	/*OPPO yuyi 2013-09-27 modify begin for gpio_keys*/
+	/*	qcom,mode = <0>;   */     /* QPNP_PIN_MODE_DIG_IN */
+	/*	qcom,pull = <0>;    */    /* QPNP_PIN_PULL_UP_30  */
+		qcom,mode = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>;
+		/*qcom,master-en = <1>;*/ 
+	/*OPPO yuyi 2013-09-27 modify end for gpio_keys*/
+	};
+
+	gpio@c200 { /* GPIO 3 */
+/* OPPO 2014-06-23 sjc Modify begin for 14021 */
+		#qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		#qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		#qcom,vin-sel = <2>;
+		#qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		#qcom,master-en = <1>;
+		qcom,mode = <1>;	
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <3>;
+		qcom,src-sel = <2>;
+		qcom,master-en = <1>;
+/* OPPO 2014-06-23 sjc Modify end */
+	};
+
+	gpio@c300 { /* GPIO 4 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,vin-sel = <2>;     /* QPNP_PIN_VIN2  */
+		qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+/*OPPO yuyi 2013-09-27 modify begin for gpio_keys*/
+	gpio@c400 { /* GPIO 5 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <5>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,vin-sel = <2>;     /* QPNP_PIN_VIN2  */
+		qcom,src-sel = <0>;	/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		/*qcom,master-en = <1>;*/
+/*OPPO yuyi 2013-09-27 modify end for gpio_keys*/
+	};
+
+	gpio@c500 { /* GPIO 6 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c600 { /* GPIO 7 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c700 { /* GPIO 8 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <0>;        /* QPNP_PIN_PULL_UP_30  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c800 { /* GPIO 9 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@c900 { /* GPIO 10 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@ca00 { /* GPIO 11 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@cb00 { /* GPIO 12 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@cc00 { /* GPIO 13 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@cd00 { /* GPIO 14 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@ce00 { /* GPIO 15 */
+		qcom,mode = <1>;
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <1>;
+		qcom,src-sel = <2>;
+		qcom,master-en = <1>;
+	};
+
+	gpio@cf00 { /* GPIO 16 */
+		qcom,mode = <1>;
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <2>;
+		qcom,out-strength = <3>;
+		qcom,src-sel = <3>;       /* QPNP_PIN_SEL_FUNC_2  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d000 { /* GPIO 17 */
+	};
+
+	gpio@d100 { /* GPIO 18 */
+	};
+
+	gpio@d200 { /* GPIO 19 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d300 { /* GPIO 20 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d400 { /* GPIO 21 */
+	};
+
+	gpio@d500 { /* GPIO 22 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d600 { /* GPIO 23 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d700 { /* GPIO 24 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d800 { /* GPIO 25 */
+		/*wangjc change to enable charge 1-->0.*/
+		qcom,mode = <0>;          /* QPNP_PIN_MODE_DIG_IN */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@d900 { /* GPIO 26 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@da00 { /* GPIO 27 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@db00 { /* GPIO 28 */
+	};
+
+	gpio@dc00 { /* GPIO 29 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <2>;       /* QPNP_PIN_SEL_FUNC_1  */
+		qcom,master-en = <1>;
+	};
+
+	gpio@dd00 { /* GPIO 30 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@de00 { /* GPIO 31 */
+	};
+
+/*OPPO yuyi 2014-05-24 modify begin for config NFC clock_requset pin*/
+//#ifndef VENDOR_EDIT
+//	gpio@df00 { /* GPIO 32 */
+//		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+//		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+//		qcom,master-en = <1>;
+//	};
+//#else
+	gpio@df00 { /* GPIO 32 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,vin-sel = <2>;
+		qcom,src-sel = <0>; /* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+//#endif
+/*OPPO yuyi 2014-05-24 modify end for config NFC clock_requset pin*/
+//#ifndef VENDOR_EDIT
+//	gpio@e000 { /* GPIO 33 */
+//		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+//		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+//		qcom,master-en = <1>;
+//	};
+//#else
+/*LiQiu@oem.cn modify for VCI enable*/
+gpio@e000 { /* GPIO 33 */
+		qcom,mode = <1>;		/* QPNP_PIN_MODE_DIG_OUT */
+		qcom,output-type = <0>;		/* QPNP_PIN_OUT_BUF_CMOS */
+		qcom,pull = <5>;		/* QPNP_PIN_PULL_NO */
+		qcom,vin-sel = <2>;		/* QPNP_PIN_VIN2 */
+		qcom,out-strength = <1>;	/* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,src-sel = <0>;		/* QPNP_PIN_SEL_FUNC_CONSTANT */
+		qcom,master-en = <1>;
+	};
+//#endif
+
+	gpio@e100 { /* GPIO 34 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@e200 { /* GPIO 35 */
+		qcom,mode = <0>;        /* QPNP_PIN_MODE_DIG_IN */
+		qcom,pull = <4>;	/* QPNP_PIN_PULL_DN */
+		qcom,master-en = <1>;
+	};
+
+	gpio@e300 { /* GPIO 36 */
+	};
+};
+
+
+&pm8941_mpps {
+
+	mpp@a000 { /* MPP 1 */
+		status = "disabled";
+	};
+
+        //#ifdef VENDOR_EDIT
+        /* Comment out by yangrujin@bsp 2015/6/18, for not affect HW1_VERSION,otherwise maybe affect cost current*/
+	//mpp@a100 { /* MPP 2 */
+	//	qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+	//	qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+	//	qcom,master-en = <1>;
+	//};
+        //#endif /* VENDOR_EDIT*/
+
+	mpp@a200 { /* MPP 3 */
+	};
+
+	mpp@a300 { /* MPP 4 */
+	};
+
+        //#ifdef VENDOR_EDIT
+        /* Modify by yangrujin@bsp 2015/6/18, for not affect RF_VERSION,otherwise maybe affect cost current*/
+	mpp@a400 { /* MPP 5 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>;
+	};
+        //#endif /* VENDOR_EDIT*/
+
+	mpp@a500 { /* MPP 6 */
+		/* SPI_ETH_RST config */
+		qcom,mode = <1>; /* DIG_OUT */
+		qcom,output-type = <0>; /* CMOS */
+		qcom,vin-sel = <2>; /* PM8941_S3 1.8V > 1.6V */
+		qcom,src-sel = <0>; /* CONSTANT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>; /* ENABLE MPP */
+	};
+
+	mpp@a600 { /* MPP 7 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>;
+	};
+
+	mpp@a700 { /* MPP 8 */
+		qcom,mode = <1>;          /* QPNP_PIN_MODE_DIG_OUT */
+		qcom,out-strength = <1>;  /* QPNP_PIN_OUT_STRENGTH_LOW */
+		qcom,master-en = <1>;
+	};
+};
+
+&pm8941_lsid1 {
+	qcom,vibrator@c000 {
+		qcom,vib-timeout-ms = <15000>;
+		qcom,vib-vtg-level-mV = <3100>;
+		qcom,vib-vtg-min-mV = <1900>;
+		status = "okay";
+	};
+};
+
+&usb_otg {
+	qcom,hsusb-otg-phy-init-seq = <0x44 0x80 0x3F 0x81 0x4D 0x82 0x13 0x83 0xffffffff>;
+	qcom,hsusb-otg-otg-control = <2>;
+};
+
+&lpm_levels {
+	/delete-property/ qcom,allow-synced-levels;
+}
+#include "msm8974-15055-sound.dtsi"
+

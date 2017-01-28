@@ -118,6 +118,15 @@ static void sd_print_result(struct scsi_disk *, int);
 static DEFINE_SPINLOCK(sd_index_lock);
 static DEFINE_IDA(sd_index_ida);
 
+#ifdef CONFIG_MACH_ONYX
+/* Fix OTG switch cause reboot issue.+*/
+extern struct completion complet_xhci;
+extern struct completion complet_dwc3;
+extern bool running;
+extern int otg_current_state;
+/* Fix OTG switch cause reboot issue.-*/
+#endif
+
 /* This semaphore is used to mediate the 0->1 reference get in the
  * face of object destruction (i.e. we can't allow a get on an
  * object after last put) */
@@ -2872,6 +2881,14 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 		  sdp->removable ? "removable " : "");
 	scsi_autopm_put_device(sdp);
 	put_device(&sdkp->dev);
+#ifdef CONFIG_MACH_ONYX
+	/* Fix OTG switch cause reboot issue.+*/
+	running = false;
+	otg_current_state = 1;
+	complete(&complet_xhci);
+	complete(&complet_dwc3);
+	/* Fix OTG switch cause reboot issue.-*/
+#endif
 }
 
 /**

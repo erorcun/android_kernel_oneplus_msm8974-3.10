@@ -47,7 +47,7 @@
 #include <linux/file.h>
 #include <linux/kthread.h>
 #include <linux/of_address.h>
-
+#include <linux/pcb_version.h>
 #include <mach/board.h>
 #include <mach/memory.h>
 #include <mach/iommu.h>
@@ -420,6 +420,42 @@ static ssize_t mdss_fb_get_idle_notify(struct device *dev,
 	return ret;
 }
 
+/* 2013-11-26 Add begin for suspend the device */
+#ifdef CONFIG_MACH_ONYX
+extern struct mdss_dsi_ctrl_pdata *panel_data;
+static ssize_t mdss_mdp_lcdoff_event(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+    	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)fbi->par;
+	pr_err("%smfd=0x%p\n", __func__, mfd);
+	if (!mfd)
+		return -ENODEV;
+
+	return mdss_fb_blank_sub(FB_BLANK_POWERDOWN, mfd->fbi,
+				mfd->op_enable);
+}
+/* Mobile Phone Software Dept.Driver, 2014/04/12  Add for gamma correction */
+
+// There is no gamma setting on X.
+static ssize_t mdss_set_gamma(struct device *dev,
+                               struct device_attribute *attr,
+                               const char *buf, size_t count)
+{
+    return count;
+}
+
+static ssize_t mdss_get_gamma(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	printk(KERN_INFO "get fix resume gamma index = 1\n");
+
+    return sprintf(buf, "1\n");
+}
+
+#endif
+
+
 static ssize_t mdss_fb_get_panel_info(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -529,6 +565,17 @@ static int mdss_fb_lpm_enable(struct msm_fb_data_type *mfd, int mode)
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO, mdss_fb_get_split, NULL);
 static DEVICE_ATTR(show_blank_event, S_IRUGO, mdss_mdp_show_blank_event, NULL);
+/* 2013-11-26 Add begin for suspend the device */
+#ifdef CONFIG_MACH_ONYX
+static DEVICE_ATTR(lcdoff, S_IRUGO, mdss_mdp_lcdoff_event, NULL);
+/* Mobile Phone Software Dept.Driver, 2014/04/12  Add for gamma correction */
+static DEVICE_ATTR(gamma, S_IRUGO|S_IWUSR, mdss_get_gamma, mdss_set_gamma);
+
+// Livedisplay provides these.
+// static DEVICE_ATTR(cabc, S_IRUGO|S_IWUSR, mdss_get_cabc, mdss_set_cabc);
+// static DEVICE_ATTR(hbm, S_IRUGO|S_IWUSR|S_IWUGO, mdss_get_hbm, mdss_set_hbm);
+// static DEVICE_ATTR(lpm, S_IRUGO|S_IWUSR, mdss_get_acl_mode, mdss_set_low_power_mode);
+#endif
 static DEVICE_ATTR(idle_time, S_IRUGO | S_IWUSR | S_IWGRP,
 	mdss_fb_get_idle_time, mdss_fb_set_idle_time);
 static DEVICE_ATTR(idle_notify, S_IRUGO, mdss_fb_get_idle_notify, NULL);
@@ -538,6 +585,14 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
 	&dev_attr_msm_fb_split.attr,
 	&dev_attr_show_blank_event.attr,
+	/* 2013-11-26Add begin for suspend the device */
+#ifdef CONFIG_MACH_ONYX
+	&dev_attr_lcdoff.attr,
+	&dev_attr_gamma.attr,
+//	&dev_attr_cabc.attr,
+//	&dev_attr_hbm.attr,
+//	&dev_attr_lpm.attr,
+#endif
 	&dev_attr_idle_time.attr,
 	&dev_attr_idle_notify.attr,
 	&dev_attr_msm_fb_panel_info.attr,
@@ -574,7 +629,14 @@ static void mdss_fb_remove_sysfs(struct msm_fb_data_type *mfd)
 static void mdss_fb_shutdown(struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
-
+#ifdef CONFIG_MACH_ONYX
+/* 2014/09/26  Add for truly panle will flash before panel off,should close back light */
+       if((get_pcb_version() < HW_VERSION__20)||
+	   ((get_pcb_version() >= HW_VERSION__30)&&
+	   (get_pcb_version() < HW_VERSION__40))){
+                mdss_fb_set_backlight(mfd,0);
+       }
+#endif
 	mfd->shutdown_pending = true;
 
 	/* wake up threads waiting on idle or kickoff queues */

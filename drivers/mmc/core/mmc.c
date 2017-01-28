@@ -20,6 +20,9 @@
 #include <linux/mmc/mmc.h>
 #include <linux/pm_runtime.h>
 #include <linux/reboot.h>
+#ifdef CONFIG_MACH_ONYX
+#include <mach/device_info.h>
+#endif
 
 #include "core.h"
 #include "bus.h"
@@ -84,6 +87,9 @@ static const struct mmc_fixup mmc_fixups[] = {
 static int mmc_decode_cid(struct mmc_card *card)
 {
 	u32 *resp = card->raw_cid;
+#ifdef CONFIG_MACH_ONYX
+	char *manufactureid;
+#endif
 
 	/*
 	 * The selection of the format here is based upon published
@@ -129,6 +135,42 @@ static int mmc_decode_cid(struct mmc_card *card)
 			mmc_hostname(card->host), card->csd.mmca_vsn);
 		return -EINVAL;
 	}
+
+#ifdef CONFIG_MACH_ONYX
+#define CID_MANFID_SANDISK	0x2
+#define CID_MANFID_TOSHIBA	0x11
+#define CID_MANFID_MICRON	0x13
+#define CID_MANFID_SAMSUNG	0x15
+#define CID_MANFID_KINGSTON	0x70
+#define CID_MANFID_HYNIX	0x90
+	//hefaxi@filesystems, 2015/07/18, push emmc card information
+	if(!strncmp(mmc_hostname(card->host),"mmc0",4)){
+		switch(card->cid.manfid){
+		case CID_MANFID_SANDISK:
+			manufactureid = "SANDISK";
+			break;
+		case CID_MANFID_TOSHIBA:
+			manufactureid = "TOSHIBA";
+			break;
+		case CID_MANFID_MICRON:
+			manufactureid = "MICRON";
+			break;
+		case CID_MANFID_SAMSUNG:
+			manufactureid = "SAMSUNG";
+			break;
+		case CID_MANFID_KINGSTON:
+			manufactureid = "KINGSTON";
+			break;
+		case CID_MANFID_HYNIX:
+			manufactureid = "HYNIX";
+			break;
+		default:
+			manufactureid = "UNKNOWN";
+			break;
+		}
+		push_component_info(EMMC, manufactureid, card->cid.prod_name);
+	}
+#endif /*VENDOR_EDIT*/
 
 	return 0;
 }

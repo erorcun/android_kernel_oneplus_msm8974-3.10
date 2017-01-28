@@ -1,0 +1,142 @@
+/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/ {
+	mtp_batterydata: qcom,battery-data {
+		qcom,rpull-up-kohm = <100>;
+		qcom,vref-batt-therm = <1800000>;
+
+		#include "batterydata-atl-4v35-2500mAh.dtsi"
+		#include "batterydata-atl-4v35-2500mAh-second.dtsi"
+	};
+};
+
+&pm8941_bms {
+	qcom,use-external-rsense;
+	qcom,shutdown-soc-valid-limit = <30>;
+	qcom,enable-fcc-learning;
+	qcom,min-fcc-learning-soc = <20>;
+	qcom,min-fcc-ocv-pc = <30>;
+	qcom,min-fcc-learning-samples = <5>;
+	qcom,fcc-resolution = <10>;
+	status = "ok";
+	qcom,battery-data = <&mtp_batterydata>;
+};
+
+&pm8941_adc_tm {
+//#ifdef VENDOR_EDIT
+// add by yangrujin@bsp 2015/9/8, support quiet_therm
+	chan@b8 {
+		label = "quiet_therm";
+		reg = <0xb8>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <2>;
+		qcom,fast-avg-setup = <3>;
+		qcom,btm-channel-number = <0xb8>;
+		qcom,thermal-node;
+	};
+//#endif /* VENDOR_EDIT */
+};
+
+&pm8941_iadc {
+	qcom,rsense = <10000000>; // add by xcb
+	// add by xcb
+	chan@1 {
+		label = "external_rsense";
+		reg = <1>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <1>;
+		qcom,calibration-type = "absolute";
+		qcom,scale-function = <0>;
+		qcom,hw-settle-time = <0>;
+		qcom,fast-avg-setup = <0>;
+	};
+};
+
+&pm8941_chg {
+	status = "ok";
+	qcom,battery-data = <&mtp_batterydata>;
+//#ifdef CONFIG_VENDOR_EDIT
+	// add by xcb
+	qcom,batt-hot-percentage = <25>;
+	qcom,batt-cold-percentage = <80>;
+		
+	qcom,cold-bat-decidegc = <30>; // -30
+	qcom,overheat-bat-decidegc = <530>;
+	qcom,little-cool-bat-decidegc = <220>;
+	qcom,little-cool-bat-mv = <4320>;
+	qcom,ibatmax-little-cool-ma = <1000>;
+	qcom,little-cold-bat-decidegc = <0>;
+	qcom,little-cold-bat-mv = <3980>;
+	qcom,ibatmax-little-cold-ma = <300>;
+//#endif
+	qcom,tchg-mins = <600>;
+
+	qcom,chgr@1000 {
+		status = "ok";
+	};
+
+	qcom,buck@1100 {
+		status = "ok";
+	};
+
+	qcom,bat-if@1200 {
+		status = "ok";
+	};
+
+	qcom,usb-chgpth@1300 {
+		status = "ok";
+	};
+
+	qcom,dc-chgpth@1400 {
+		status = "ok";
+	};
+
+	qcom,boost@1500 {
+		status = "ok";
+	};
+
+	qcom,chg-misc@1600 {
+		status = "ok";
+	};
+};
+
+
+&pm8941_lsid0 {
+	qcom,power-on@800 {
+		/delete-node/ qcom,pon_2;
+		/delete-node/ qcom,pon_3;
+	};
+
+	qcom,pm8941_rtc {
+		qcom,qpnp-rtc-alarm-pwrup = <1>;
+	};
+};
+
+&pm8941_chg_boost {
+	status = "ok";
+};
+
+&spi_0 {
+	status = "disabled";
+};
+
+&spi_7 {
+	status = "disabled";
+};
+
+&i2c_1 {
+	status = "disabled";
+};

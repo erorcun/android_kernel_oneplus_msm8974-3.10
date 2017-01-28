@@ -345,6 +345,10 @@ struct sdhci_msm_pltfm_data {
 	unsigned char sup_clk_cnt;
 	int mpm_sdiowakeup_int;
 	int sdiowakeup_irq;
+#ifdef CONFIG_MACH_ONYX
+//hefaxi@bsp,2015/08/13, add for configuate sdcard_2p95_en gpio in dtsi
+	int sdcard_2p95_en;
+#endif
 };
 
 struct sdhci_msm_bus_vote {
@@ -1740,6 +1744,10 @@ static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
 	int clk_table_len;
 	u32 *clk_table = NULL;
 	enum of_gpio_flags flags = OF_GPIO_ACTIVE_LOW;
+#ifdef CONFIG_MACH_ONYX
+//hefaxi@bsp,2015/08/13, add for configuate sdcard_2p95_en gpio in dtsi
+	int sdcard_2p95_en;
+#endif
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
@@ -1750,6 +1758,13 @@ static struct sdhci_msm_pltfm_data *sdhci_msm_populate_pdata(struct device *dev)
 	pdata->status_gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
 	if (gpio_is_valid(pdata->status_gpio) & !(flags & OF_GPIO_ACTIVE_LOW))
 		pdata->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+
+#ifdef CONFIG_MACH_ONYX
+//hefaxi@bsp,2015/08/13, add for configuate sdcard_2p95_en gpio in dtsi
+    if(!of_property_read_u32(np, "sdcard_2p95_en", &sdcard_2p95_en)){
+        pdata->sdcard_2p95_en = sdcard_2p95_en;
+    }
+#endif
 
 	of_property_read_u32(np, "qcom,bus-width", &bus_width);
 	if (bus_width == 8)
@@ -3557,6 +3572,20 @@ static int sdhci_msm_probe(struct platform_device *pdev)
 			goto vreg_deinit;
 		}
 	}
+
+#ifdef CONFIG_MACH_ONYX
+//hefaxi@filesystems, 2015/08/07, add for drop power if sdcard not present
+	if(msm_host->pdata->sdcard_2p95_en){
+		ret = gpio_request_one(msm_host->pdata->sdcard_2p95_en,
+		            GPIOF_INIT_HIGH,"sdcard_2p95_en");
+		msm_host->mmc->sdcard_2p95_en = msm_host->pdata->sdcard_2p95_en;
+		if(ret < 0){
+			pr_err("%s: Failed to request gpio 64(%d)\n",
+				mmc_hostname(host->mmc),ret);
+			return ret;
+		}
+	}
+#endif
 
 	if ((sdhci_readl(host, SDHCI_CAPABILITIES) & SDHCI_CAN_64BIT) &&
 		(dma_supported(mmc_dev(host->mmc), DMA_BIT_MASK(64)))) {

@@ -56,8 +56,8 @@ static ssize_t power_supply_show_property(struct device *dev,
 	};
 	static char *health_text[] = {
 		"Unknown", "Good", "Overheat", "Warm", "Dead", "Over voltage",
-		"Unspecified failure", "Cold", "Cool", "Watchdog timer expire",
-		"Safety timer expire"
+		"Unspecified failure", "Cold", "Cool", "Little cold",
+		"Little cool"
 	};
 	static char *technology_text[] = {
 		"Unknown", "NiMH", "Li-ion", "Li-poly", "LiFe", "NiCd",
@@ -103,6 +103,10 @@ static ssize_t power_supply_show_property(struct device *dev,
 		return sprintf(buf, "%s\n", type_text[value.intval]);
 	else if (off == POWER_SUPPLY_PROP_SCOPE)
 		return sprintf(buf, "%s\n", scope_text[value.intval]);
+#ifdef CONFIG_MACH_ONYX
+	else if (off == POWER_SUPPLY_PROP_BATTERY_TYPE)
+		return sprintf(buf, "%s\n", value.strval);
+#endif /*CONFIG_MACH_ONYX*/
 	else if (off >= POWER_SUPPLY_PROP_MODEL_NAME)
 		return sprintf(buf, "%s\n", value.strval);
 
@@ -153,8 +157,8 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(voltage_min_design),
 	POWER_SUPPLY_ATTR(voltage_now),
 	POWER_SUPPLY_ATTR(voltage_avg),
-	POWER_SUPPLY_ATTR(voltage_ocv),
 	POWER_SUPPLY_ATTR(input_voltage_regulation),
+	POWER_SUPPLY_ATTR(voltage_ocv),
 	POWER_SUPPLY_ATTR(current_max),
 	POWER_SUPPLY_ATTR(input_current_max),
 	POWER_SUPPLY_ATTR(input_current_trim),
@@ -195,6 +199,17 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(temp_alert_max),
 	POWER_SUPPLY_ATTR(temp_cool),
 	POWER_SUPPLY_ATTR(temp_warm),
+#ifdef CONFIG_MACH_ONYX
+	// add by xcb
+	POWER_SUPPLY_ATTR(temp_cold),
+	POWER_SUPPLY_ATTR(temp_overheat),
+	POWER_SUPPLY_ATTR(temp_little_cool),
+	POWER_SUPPLY_ATTR(temp_little_cold),
+	POWER_SUPPLY_ATTR(temp_status),
+	POWER_SUPPLY_ATTR(calculated_soc),
+	POWER_SUPPLY_ATTR(charge_done),
+	POWER_SUPPLY_ATTR(charge_ovp),
+#endif
 	POWER_SUPPLY_ATTR(temp_ambient),
 	POWER_SUPPLY_ATTR(temp_ambient_alert_min),
 	POWER_SUPPLY_ATTR(temp_ambient_alert_max),
@@ -222,12 +237,14 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(serial_number),
 	POWER_SUPPLY_ATTR(battery_type),
 	POWER_SUPPLY_ATTR(authenticate),//wangjc add for authentication
-	#ifdef CONFIG_VENDOR_EDIT
+#ifdef CONFIG_VENDOR_EDIT
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/16  Add for charge timeout */
 	POWER_SUPPLY_ATTR(charge_timeout),
-	#endif /*CONFIG_VENDOR_EDIT*/
+#endif /*CONFIG_VENDOR_EDIT*/
+#ifdef CONFIG_MACH_FIND7OP
 	/* jingchun.wang@Onlinerd.Driver,2013/12/22 Add for fastchg*/
 	POWER_SUPPLY_ATTR(fastcharger),
+#endif
 };
 
 static struct attribute *

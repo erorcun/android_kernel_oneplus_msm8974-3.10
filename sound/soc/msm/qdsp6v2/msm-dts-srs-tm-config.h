@@ -21,7 +21,11 @@ union srs_trumedia_params_u {
 	unsigned short int raw_params[1];
 };
 
+
 void msm_dts_srs_tm_set_port_id(int port_id);
+#ifdef CONFIG_MACH_ONYX
+int msm_dts_srs_tm_get_port_id(void);
+#endif
 void msm_dts_srs_tm_send_params(int port_id, unsigned int techs,
 				int param_block_idx);
 void msm_dts_srs_tm_add_controls(struct snd_soc_platform *platform);

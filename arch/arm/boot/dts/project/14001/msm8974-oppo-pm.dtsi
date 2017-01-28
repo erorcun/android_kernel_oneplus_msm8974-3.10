@@ -65,6 +65,10 @@
 	};
 };
 
+&pinctrl_i2c_1 {
+	status = "ok";
+};
+
 &i2c_1 {
 	status = "ok";
 	bq27541-battery@55 {
