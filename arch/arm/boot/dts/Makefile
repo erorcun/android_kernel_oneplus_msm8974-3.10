@@ -90,6 +90,11 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
 	kirkwood-openblocks_a6.dtb
 dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
 dtb-$(CONFIG_MACH_FIND7OP) += msm8974-14001.dtb
+dtb-$(CONFIG_MACH_ONYX) += msm8974pro-ab-pm8941-mtp_15055_HW_11.dts
+dtb-$(CONFIG_MACH_ONYX) += msm8974pro-ab-pm8941-mtp_15055_HW_12.dts
+dtb-$(CONFIG_MACH_ONYX) += msm8974pro-ab-pm8941-mtp_15055_HW_13.dts
+dtb-$(CONFIG_MACH_ONYX) += msm8974pro-ab-pm8941-mtp_15055_HW_14.dts
+dtb-$(CONFIG_MACH_ONYX) += msm8974pro-ab-pm8941-mtp_15055_HW_15.dts
 dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
 	armada-370-mirabox.dtb \
 	armada-370-rd.dtb \
