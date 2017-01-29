@@ -251,15 +251,15 @@
 
 &sdc2switch1 {
 	status = "ok";
-}
+};
 
 &sdc2switch2 {
 	status = "ok";
-}
+};
 
 &sdc2switch3 {
 	status = "ok";
-}
+};
 
 /* Drive strength recommendations for clock line from hardware team is 10 mA.
  * But since the driver has been been using the below values from the start
@@ -626,6 +626,7 @@ gpio@e000 { /* GPIO 33 */
 
 &lpm_levels {
 	/delete-property/ qcom,allow-synced-levels;
-}
+};
+
 #include "msm8974-15055-sound.dtsi"
 
