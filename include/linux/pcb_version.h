@@ -74,10 +74,14 @@ enum {
 
 };
 
+#ifdef CONFIG_MACH_ONYX
 struct ddr_info{
 	char ddr_manufacture[64];
 	char ddr_row_info[8];
 };
+
+extern int get_ddr_info(struct ddr_info *str);
+#endif
 
 int get_pcb_version(void);
 int get_rf_version(void);

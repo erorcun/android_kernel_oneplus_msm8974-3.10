@@ -2086,11 +2086,23 @@ static struct synaptics_dsx_cap_button_map button_map = {
 	.map = "NULL",
 };
 
+#ifdef CONFIG_MACH_ONYX
+static int gpio_config_for_onyx(int gpio, bool configure)
+{
+	gpio_direction_output(gpio,configure);
+
+	return 0;
+}
+#endif
+
 static struct synaptics_dsx_platform_data dsx_platformdata = {
 	.irq_flags = IRQF_ONESHOT | IRQF_TRIGGER_LOW,
 	.reset_delay_ms = 100,
 	.cap_button_map = &button_map,
 	.regulator_en = 1,
+#ifdef CONFIG_MACH_ONYX
+	.gpio_config = gpio_config_for_onyx,
+#endif
 };
 
 static int synaptics_init_gpio(struct synaptics_rmi4_data *ts)
@@ -2106,7 +2118,9 @@ static int synaptics_init_gpio(struct synaptics_rmi4_data *ts)
 	};
 
 	for (i = 0;i < sizeof(synaptics_all_gpio)/sizeof(struct gpio); i++) {
+#ifdef CONFIG_MACH_FIND70P
 		gpio_tlmm_config(synaptics_all_gpio[i].flags, GPIO_CFG_ENABLE);
+#endif
 		gpio_request(synaptics_all_gpio[i].gpio,synaptics_all_gpio[i].label);
 	}
 
@@ -4835,7 +4849,15 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 			container_of(work, struct synaptics_rmi4_data, init_work);
 	int retval;
 	unsigned char val = 1;
-	unsigned char tmp = 4;
+#ifdef CONFIG_MACH_ONYX
+	const struct synaptics_dsx_platform_data *platform_data =
+		rmi4_data->board;
+
+	retval = platform_data->gpio_config(
+			platform_data->reset_gpio,
+			true);	
+#endif
+
 #ifdef CONFIG_MACH_FIND7OP
 	if (rmi4_data->smartcover_enable)
 		synaptics_rmi4_open_smartcover();
@@ -4860,17 +4882,15 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 				__func__);
 	}
 */
-	retval = synaptics_rmi4_i2c_write(rmi4_data, F54_CMD_BASE_ADDR,
-		(unsigned char*) &tmp, 1);
 
 out:
     	mutex_lock(&suspended_mutex);
     	rmi4_data->suspended = false;
     	mutex_unlock(&suspended_mutex);
 }
-
-static struct i2c_driver synaptics_rmi4_driver;
-
+#ifdef CONFIG_MACH_ONYX
+static void create_driver_files(void);
+#endif
 /**
  * synaptics_rmi4_probe()
  *
@@ -5004,7 +5024,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 #endif
 
 	if (platform_data->gpio_config) {
-		retval = platform_data->gpio_config(
+/*		retval = platform_data->gpio_config(
 				platform_data->irq_gpio,
 				true);
 		if (retval < 0) {
@@ -5013,7 +5033,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 					__func__);
 			goto err_gpio_attn;
 		}
-
+*/
 		if (platform_data->reset_gpio >= 0) {
 			retval = platform_data->gpio_config(
 					platform_data->reset_gpio,
@@ -5080,9 +5100,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 		}
 	}
 #ifdef CONFIG_MACH_ONYX
-	if( driver_create_file(&synaptics_rmi4_driver.driver, &driver_attr_oppo_tp_delta_image) ){
-		print_ts(TS_ERROR,KERN_ERR "driver_create_file failt\n");
-	}
+	create_driver_files();
 #endif
 	return retval;
 
@@ -5104,11 +5122,11 @@ err_enable_irq:
 		platform_data->gpio_config(platform_data->reset_gpio, false);
 
 err_gpio_reset:
-	if (platform_data->gpio_config)
+/*	if (platform_data->gpio_config)
 		platform_data->gpio_config(platform_data->irq_gpio, false);
 
 err_gpio_attn:
-	synaptics_rmi4_empty_fn_list(rmi4_data);
+*/	synaptics_rmi4_empty_fn_list(rmi4_data);
 
 	input_unregister_device(rmi4_data->input_dev);
 	rmi4_data->input_dev = NULL;
@@ -5145,7 +5163,7 @@ static int synaptics_rmi4_remove(struct i2c_client *client)
 	synaptics_rmi4_irq_enable(rmi4_data, false);
 
 	if (platform_data->gpio_config) {
-		platform_data->gpio_config(platform_data->irq_gpio, false);
+//		platform_data->gpio_config(platform_data->irq_gpio, false);
 
 		if (platform_data->reset_gpio >= 0) {
 			platform_data->gpio_config(
@@ -5392,6 +5410,14 @@ static struct i2c_driver synaptics_rmi4_driver = {
 	.remove = synaptics_rmi4_remove,
 	.id_table = synaptics_rmi4_id_table,
 };
+
+#ifdef CONFIG_MACH_ONYX
+static void create_driver_files(void) {
+	if( driver_create_file(&synaptics_rmi4_driver.driver, &driver_attr_oppo_tp_delta_image) ){
+		print_ts(TS_ERROR,KERN_ERR "driver_create_file failt\n");
+	}
+}
+#endif
 
 /**
  * synaptics_rmi4_init()

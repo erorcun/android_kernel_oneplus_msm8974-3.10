@@ -1524,15 +1524,10 @@ int mdss_dsi_panel_init(struct device_node *node,
 	static const char *panel_name;
 	struct mdss_panel_info *pinfo;
 #ifdef CONFIG_MACH_ONYX
-
-		bool cont_splash_enabled;
-	//	bool partial_update_enabled;
-
-
-		/* 2013-10-24 Add begin for panel info */
-			static const char *panel_manufacture;
-			static const char *panel_version;
-		/* 2013-10-24 Add end */
+/* 2013-10-24 Add begin for panel info */
+	static const char *panel_manufacture;
+	static const char *panel_version;
+/* 2013-10-24 Add end */
 #endif
 
 	if (!node || !ctrl_pdata) {
@@ -1614,21 +1609,16 @@ int mdss_dsi_panel_init(struct device_node *node,
 
 	if (!cmd_cfg_cont_splash)
 		pinfo->cont_splash_enabled = false;
+
 #ifdef CONFIG_MACH_ONYX
-	if (cmd_cfg_cont_splash)
-		cont_splash_enabled = of_property_read_bool(node,
+	if ((MSM_BOOT_MODE__FACTORY == get_boot_mode()) ||
+		(MSM_BOOT_MODE__RF == get_boot_mode()) ||
+		(MSM_BOOT_MODE__WLAN == get_boot_mode())) {
+		cont_splash_flag = false;
+	} else {
+		cont_splash_flag = of_property_read_bool(node,
 				"qcom,cont-splash-enabled");
-	else
-		cont_splash_enabled = false;
-
-		if ((MSM_BOOT_MODE__FACTORY == get_boot_mode()) ||
-			(MSM_BOOT_MODE__RF == get_boot_mode()) ||
-			(MSM_BOOT_MODE__WLAN == get_boot_mode())) {
-			cont_splash_enabled = false;
-		}
-
-	/* Mobile Phone Software Dept.Driver, 2014/02/25  Add for ESD test */
-		cont_splash_flag = cont_splash_enabled;
+	}
 #endif 
 	pr_info("%s: Continuous splash %s", __func__,
 		pinfo->cont_splash_enabled ? "enabled" : "disabled");

@@ -160,3 +160,30 @@ int __init board_lcd_id_init(char *s)
 }
 __setup("LCD_id=", board_lcd_id_init);
 
+#ifdef CONFIG_MACH_ONYX
+static struct ddr_info saved_command_line_ddr_version;
+
+/*Get ddr information, include ddr manufacture information and ddr row information*/
+int get_ddr_info(struct ddr_info *ddr_information){
+
+	strcpy(ddr_information->ddr_manufacture,saved_command_line_ddr_version.ddr_manufacture);
+	strcpy(ddr_information->ddr_row_info,saved_command_line_ddr_version.ddr_row_info);
+	return 0;
+}
+
+int __init board_ddr_info_get(char *s)
+{
+	sprintf(saved_command_line_ddr_version.ddr_manufacture,s);
+
+	return 0;
+}
+__setup("ddr_manufacture_info=", board_ddr_info_get);
+
+int __init board_ddr_row0_get(char *s)
+{
+	sprintf(saved_command_line_ddr_version.ddr_row_info,s);
+
+	return 0;
+}
+__setup("ddr_row0_info=", board_ddr_row0_get);
+#endif

@@ -421,10 +421,10 @@ int __init init_project_info(void)
 	push_component_info(MAINBOARD, mainboard_version, mainboard_manufacture);
 
 	//add ddr row, column information and manufacture name information
-/*	get_ddr_manufacture_name();
+	get_ddr_manufacture_name();
 	snprintf(ddr_version, sizeof(ddr_version), "row:%d, column:%d", project_info_desc->ddr_raw, project_info_desc->ddr_column);
 	push_component_info(DDR, ddr_version, ddr_manufacture);
-*/
+
 	project_info_init_done = true;
 
 	return 0;
