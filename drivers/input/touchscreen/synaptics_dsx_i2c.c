@@ -5351,7 +5351,7 @@ static struct of_device_id synaptics_of_match_table[] = {
 };
 
 //add by jiachenghui for boot time optimize 2015-5-13
-#ifdef VENDOR_EDIT
+#if 0//def VENDOR_EDIT
 static int probe_ret;
 struct synaptics_optimize_data{
 	struct delayed_work work;
@@ -5406,7 +5406,7 @@ static struct i2c_driver synaptics_rmi4_driver = {
 #endif
 		.of_match_table = synaptics_of_match_table,
 	},
-	.probe = synaptics_rmi4_probe_delay, // synaptics_rmi4_probe,
+	.probe = synaptics_rmi4_probe, // synaptics_rmi4_probe_delay,
 	.remove = synaptics_rmi4_remove,
 	.id_table = synaptics_rmi4_id_table,
 };
