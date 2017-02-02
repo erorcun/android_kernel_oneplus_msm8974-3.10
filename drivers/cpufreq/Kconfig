@@ -194,6 +194,12 @@ config CPU_FREQ_GOV_INTELLIMM
 config CPU_FREQ_GOV_WHEATLEY
 	tristate "intellimm"
 
+config CPU_FREQ_GOV_SMARTMAX
+	tristate "smartmax"
+
+config CPU_FREQ_GOV_SMARTMAX_EPS
+	tristate "smartmax_eps"
+
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
 	depends on CPU_FREQ
