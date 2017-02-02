@@ -182,6 +182,18 @@ config CPU_FREQ_GOV_INTERACTIVE
 
 	  If in doubt, say N.
 
+config CPU_FREQ_GOV_ZZMOOVE
+	tristate "zzmoove"
+
+config CPU_FREQ_GOV_INTELLIACTIVE
+	tristate "intelliactive"
+
+config CPU_FREQ_GOV_INTELLIMM
+	tristate "intellimm"
+
+config CPU_FREQ_GOV_WHEATLEY
+	tristate "intellimm"
+
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
 	depends on CPU_FREQ

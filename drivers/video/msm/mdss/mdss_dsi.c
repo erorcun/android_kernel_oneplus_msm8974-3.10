@@ -21,6 +21,7 @@
 #include <linux/gpio.h>
 #include <linux/err.h>
 #include <linux/regulator/consumer.h>
+#include <linux/lcd_notify.h>
 
 #include "mdss.h"
 #include "mdss_panel.h"
@@ -243,6 +244,7 @@ error:
 int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata, int power_state)
 {
 	int ret = 0;
+	int real_power_state = power_state;
 	struct mdss_panel_info *pinfo;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 
@@ -270,6 +272,8 @@ int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata, int power_state)
 	 */
 	if (pdata->panel_info.dynamic_switch_pending)
 		return 0;
+
+	lcd_notifier_call_chain((power_state == MDSS_PANEL_POWER_LP1 || power_state == MDSS_PANEL_POWER_ON) ? LCD_EVENT_ON_START : LCD_EVENT_OFF_START, NULL);
 
 	switch (power_state) {
 	case MDSS_PANEL_POWER_OFF:
@@ -305,6 +309,8 @@ int mdss_dsi_panel_power_ctrl(struct mdss_panel_data *pdata, int power_state)
 			__func__, power_state);
 		ret = -EINVAL;
 	}
+
+	lcd_notifier_call_chain((real_power_state == MDSS_PANEL_POWER_LP1 || real_power_state == MDSS_PANEL_POWER_ON) ? LCD_EVENT_ON_END : LCD_EVENT_OFF_END, NULL);
 
 	if (!ret)
 		pinfo->panel_power_state = power_state;
