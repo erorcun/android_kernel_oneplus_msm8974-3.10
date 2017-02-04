@@ -2500,6 +2500,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		ret = PTR_ERR(mdwc->core_clk);
 		goto disable_xo;
 	}
+	clk_set_rate(mdwc->core_clk, 125000000);
 	clk_prepare_enable(mdwc->core_clk);
 
 	mdwc->iface_clk = devm_clk_get(&pdev->dev, "iface_clk");
