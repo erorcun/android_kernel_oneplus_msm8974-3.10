@@ -1462,7 +1462,7 @@ static int functionfs_bind(struct ffs_data *ffs, struct usb_composite_dev *cdev)
 	if (lang) {
 		for (; *lang; ++lang) {
 			struct usb_string *str = (*lang)->strings;
-			int id = first_id;
+			int id = ffs->first_id;
 			for (; str->s; ++id, ++str)
 				str->id = id;
 		}
