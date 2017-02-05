@@ -3929,6 +3929,9 @@ static int xhci_usb2_software_lpm_test(struct usb_hcd *hcd,
 			udev->descriptor.bDeviceClass == USB_CLASS_HUB)
 		return -EINVAL;
 
+	// USB2 LPM is problematic, disable it (erorcun - 3.10 bacon)
+		return 0;
+
 	spin_lock_irqsave(&xhci->lock, flags);
 
 	/* Look for devices in lpm_failed_devs list */
