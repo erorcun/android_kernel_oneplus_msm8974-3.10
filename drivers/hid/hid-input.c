@@ -1205,15 +1205,18 @@ static void hidinput_led_worker(struct work_struct *work)
 		return;
 
 	hid_output_report(report, buf);
+
 	/* synchronous output report */
-	if(hid->hid_output_raw_report)
-		hid->hid_output_raw_report(hid, buf, len, HID_OUTPUT_REPORT);
-	else {
-		ret = hid_hw_output_report(hid, buf, len);
-		if (ret == -ENOSYS)
-			hid_hw_raw_request(hid, report->id, buf, len, HID_OUTPUT_REPORT,
+	ret = hid_hw_output_report(hid, buf, len);
+	if (ret == -ENOSYS) {
+		ret = hid_hw_raw_request(hid, report->id, buf, len, HID_OUTPUT_REPORT,
 					HID_REQ_SET_REPORT);
+		if (ret == -ENOSYS) {
+			if(hid->hid_output_raw_report)
+				hid->hid_output_raw_report(hid, buf, len, HID_OUTPUT_REPORT);
+		}
 	}
+
 	kfree(buf);
 }
 
