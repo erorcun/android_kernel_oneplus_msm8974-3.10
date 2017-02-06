@@ -42,9 +42,12 @@ extern int usb_choose_configuration(struct usb_device *udev);
 static inline unsigned usb_get_max_power(struct usb_device *udev,
 		struct usb_host_config *c)
 {
+#if 0
 	/* SuperSpeed power is in 8 mA units; others are in 2 mA units */
 	unsigned mul = (udev->speed == USB_SPEED_SUPER ? 8 : 2);
-
+#else
+	unsigned mul = 2;
+#endif
 	return c->desc.bMaxPower * mul;
 }
 
