@@ -2974,8 +2974,14 @@ static void dwc3_gadget_suspend_interrupt(struct dwc3 *dwc,
 						__func__, dwc->gadget.state);
 			return;
 		}
-
+		/*
+		 * gadget_driver suspend function might require some dwc3-gadget
+		 * operations, such as ep_disable. Hence, dwc->lock must be
+		 * released.
+		 */
+		spin_unlock(&dwc->lock);
 		dwc->gadget_driver->suspend(&dwc->gadget);
+		spin_lock(&dwc->lock);
 	}
 
 	dwc->link_state = next;
