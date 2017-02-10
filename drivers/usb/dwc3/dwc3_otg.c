@@ -60,6 +60,8 @@ void dwc3_otg_set_host_power(struct dwc3_otg *dotg)
 	dwc3_writel(dotg->regs, DWC3_OCTL, DWC3_OTG_OCTL_PRTPWRCTL);
 }
 
+extern void bq24196_wait_for_resume(void);
+
 /**
  * dwc3_otg_start_host -  helper function for starting/stoping the host controller driver.
  *
@@ -93,12 +95,12 @@ static int dwc3_otg_start_host(struct usb_otg *otg, int on)
 	if (on) {
 		dev_dbg(otg->phy->dev, "%s: turn on host\n", __func__);
 
+#ifdef CONFIG_MACH_FIND7OP
+		bq24196_wait_for_resume();
+#endif
 		dwc3_otg_notify_host_mode(otg, on);
 		ret = regulator_enable(dotg->vbus_otg);
-		#ifdef CONFIG_MACH_FIND7OP/*dengnw@bsp.drv  for OTG delay  20141226*/
-		pr_err("oppo_otg able to enable vbus_otg\n");
-		msleep(500);
-		#endif
+
 		if (ret) {
 			dev_err(otg->phy->dev, "unable to enable vbus_otg\n");
 			dwc3_otg_notify_host_mode(otg, 0);

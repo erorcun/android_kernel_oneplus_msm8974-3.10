@@ -1695,10 +1695,7 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 	if (on) {
 		msm_otg_notify_host_mode(motg, on);
 		ret = regulator_enable(vbus_otg);
-		#ifdef VENDOR_EDIT/*dengnw@bsp.drv  for OTG delay  20141226*/
-		pr_err("oppo_otg able to enable vbus_otg\n");
-		msleep(500);
-		#endif
+
 		if (ret) {
 			pr_err("unable to enable vbus_otg\n");
 			return;
@@ -1706,13 +1703,7 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 		vbus_is_on = true;
 	} else {
 		ret = regulator_disable(vbus_otg);
-		#ifdef VENDOR_EDIT/*dengnw@bsp.drv  for OTG delay  20141226*/
-		if (ret) {
-			msleep(10);
-			ret = regulator_disable(vbus_otg);
-			msleep(5);
-		}
-		#endif
+
 		if (ret) {
 			pr_err("unable to disable vbus_otg\n");
 			return;
