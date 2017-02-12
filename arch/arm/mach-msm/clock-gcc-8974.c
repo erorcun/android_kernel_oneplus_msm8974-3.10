@@ -1218,6 +1218,7 @@ static struct rcg_clk tsif_ref_clk_src = {
 };
 
 static struct clk_freq_tbl ftbl_gcc_usb30_mock_utmi_clk[] = {
+	F(48000000,  gpll0, 12.5,   0,   0),
 	F(60000000,  gpll0,   10,   0,   0),
 	F_END
 };
@@ -2569,6 +2570,8 @@ void msm8974_pro_clock_override(bool ac)
 	ce2_clk_src.c.fmax[VDD_DIG_LOW] = 75000000;
 	ce2_clk_src.c.fmax[VDD_DIG_NOMINAL] = 150000000;
 	ce2_clk_src.freq_tbl = ftbl_gcc_ce2_pro_clk;
+
+	gcc_usb30_mock_utmi_clk.max_div = 3;
 
 	sdcc1_apps_clk_src.c.fmax[VDD_DIG_LOW] = 200000000;
 	sdcc1_apps_clk_src.c.fmax[VDD_DIG_NOMINAL] = 400000000;
