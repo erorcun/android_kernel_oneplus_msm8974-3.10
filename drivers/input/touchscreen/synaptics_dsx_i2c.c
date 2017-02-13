@@ -2319,24 +2319,54 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 	return keyvalue;
 }
 
-static void vkey_simulate(int button)
+unsigned char vkey_finger[3] = {11, 11, 11};
+int pressed_vkey = 0;
+
+static void vkey_simulate(unsigned char finger, int button)
 {
-// There is no button backlight on X.
-#if 0 //def CONFIG_DONT_LIGHT_LED_ON_TOUCH
+	if(vkey_finger[button] != 11) return;
+
+#ifdef CONFIG_DONT_LIGHT_LED_ON_TOUCH
 	prevent_bl = 0;
 	enable_bttn_bl();
 #endif
 
-	input_report_key(syna_rmi4_data->input_dev, button, 1);
+	vkey_finger[button] = finger;
+	input_report_key(syna_rmi4_data->input_dev, (button == 0 ? KEY_MENU : (button == 1 ? KEY_HOMEPAGE : KEY_BACK)), 1);
 	input_sync(syna_rmi4_data->input_dev);
+	pressed_vkey++;
+}
+
+static int vkey_release(unsigned char finger)
+{
+	int button = -1;
+
+	if(!pressed_vkey) return 0;
+
+	for(int i=0; i<3; i++)
+	{
+		if(vkey_finger[i] == finger)
+		{
+			button = i;
+			vkey_finger[i] = 11;
+			break;
+		}
+	}
+
+	if(button == -1) return 0;
+
+	input_report_key(syna_rmi4_data->input_dev, (button == 0 ? KEY_MENU : (button == 1 ? KEY_HOMEPAGE : KEY_BACK)), 0);
+	input_sync(syna_rmi4_data->input_dev);
+	pressed_vkey--;
+	return 1;
 }
 
 #ifdef CONFIG_MACH_ONYX
-#define FIRSTKEY (atomic_read(&syna_rmi4_data->key_rep)?(KEY_BACK):(KEY_MENU))
-#define THIRDKEY (atomic_read(&syna_rmi4_data->key_rep)?(KEY_MENU):(KEY_BACK))
+#define FIRSTKEY (atomic_read(&syna_rmi4_data->key_rep)? 2 : 0)
+#define THIRDKEY (atomic_read(&syna_rmi4_data->key_rep)? 0 : 2)
 #else
-#define FIRSTKEY KEY_BACK
-#define THIRDKEY KEY_MENU
+#define FIRSTKEY 2
+#define THIRDKEY 0
 #endif
 
 /**
@@ -2480,15 +2510,18 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				} else if (atomic_read(&rmi4_data->key_rep)) {
 #endif
 					if(vkey == TP_VKEY_MENU) {
-						vkey_simulate(FIRSTKEY);
+						vkey_simulate(finger, FIRSTKEY);
+						finger_info |= 1;
 						continue;
 #ifdef CONFIG_MACH_ONYX
 					} else if(vkey == TP_VKEY_HOME) {
-						vkey_simulate(KEY_HOME);
+						vkey_simulate(finger, 1);
+						finger_info |= 1;
 						continue;
 #endif
 					} else if(vkey == TP_VKEY_BACK) {
-						vkey_simulate(THIRDKEY);
+						vkey_simulate(finger, THIRDKEY);
+						finger_info |= 1;
 						continue;
 					}
 				}
@@ -2548,9 +2581,11 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 	for (finger = 0; finger < fingers_to_process; finger++) {
 		finger_status = (finger_info >> (fingers_to_process-finger - 1)) & 1;
 		if (!finger_status) {
-			input_mt_slot(rmi4_data->input_dev, finger);
-			input_mt_report_slot_state(rmi4_data->input_dev,
-					MT_TOOL_FINGER, finger_status);
+			if(!vkey_release(finger)) {
+				input_mt_slot(rmi4_data->input_dev, finger);
+				input_mt_report_slot_state(rmi4_data->input_dev,
+						MT_TOOL_FINGER, finger_status);
+			}
 		}
 	}
 
@@ -4847,7 +4882,7 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 {
 	struct synaptics_rmi4_data *rmi4_data =
 			container_of(work, struct synaptics_rmi4_data, init_work);
-	int retval;
+//	int retval;
 	unsigned char val = 1;
 #ifdef CONFIG_MACH_ONYX
 	const struct synaptics_dsx_platform_data *platform_data =
