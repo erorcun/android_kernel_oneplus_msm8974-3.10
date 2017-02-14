@@ -324,8 +324,10 @@ static bool use_fake_chgvol = false;
 static int fake_chgvol = 0;
 
 static bool threea_charge = false;
+static bool fast_usb_charge = false;
 static bool disable_aicl = false;
 static int charge_limit = 100;
+static int max_aicl_rate = 2000;
 #endif
 /* OPPO 2013-06-08 wangjc Add end */
 
@@ -1256,6 +1258,7 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 static int
 qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 {
+	union power_supply_propval ret = {0,};
 /* OPPO 2013-08-19 wangjc Add begin for ftm test mode. */
 #ifdef CONFIG_VENDOR_EDIT
 	if(get_boot_mode() != MSM_BOOT_MODE__NORMAL)
@@ -1266,6 +1269,14 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 			|| mA > QPNP_CHG_I_MAX_MAX_MA) {
 		pr_err("bad mA=%d asked to set\n", mA);
 		return -EINVAL;
+	}
+	
+	if(!chip->dont_print_changes && fast_usb_charge) {
+		chip->usb_psy->get_property(chip->usb_psy,
+			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
+		if ((ret.intval / 1000) == 500 && mA == 500) {
+			mA = 900;
+		}
 	}
 
 	if(chip->last_iusbmax != mA) {
@@ -4162,6 +4173,7 @@ qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
 static int
 qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
 {
+	union power_supply_propval ret = {0,};
 	//wangjc add for authentication
 #ifdef CONFIG_BATTERY_BQ27541
 	if(!get_prop_authenticate(chip)) {
@@ -4170,6 +4182,14 @@ qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
 		}
 	}
 #endif
+
+	if(!chip->dont_print_changes && fast_usb_charge) {
+		chip->usb_psy->get_property(chip->usb_psy,
+			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
+		if ((ret.intval / 1000) == 500) {
+			chg_current = 1024;
+		}
+	}
 
 	if(chip->last_ibatmax != chg_current) {
 		if(!chip->dont_print_changes) pr_info("%d mA\n", chg_current);
@@ -6783,7 +6803,7 @@ static int set_prop_batt_health(struct qpnp_chg_chip *chip, int batt_health)
 #define MAX_COUNT	50
 #ifdef CONFIG_VENDOR_EDIT
 /* jingchun.wang@Onlinerd.Driver, 2014/01/02  Add for set soft aicl voltage to 4.4v */
-#define SOFT_AICL_VOL	4555
+int SOFT_AICL_VOL = 4465; // is OP2 value. 4555 in ColorOS, 4500 in LinOS 
 #endif /*CONFIG_VENDOR_EDIT*/
 /* jingchun.wang@Onlinerd.Driver, 2013/12/27  Add for auto adapt current by software. */
 static int soft_aicl(struct qpnp_chg_chip *chip)
@@ -6801,7 +6821,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	qpnp_chg_charge_en(chip, 1);
 	for (i = 0; i < MAX_COUNT / 5; i++) {
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < (SOFT_AICL_VOL - 50)) {
+		if (chg_vol < (SOFT_AICL_VOL - 50 || max_aicl_rate < 150)) {
 			chip->aicl_current = 100;
 			pr_info("soft aicl s1:%d\n", chg_vol);
 			qpnp_chg_iusbmax_set(chip, 100);
@@ -6814,13 +6834,14 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 		if (!chip->usb_present)
 			goto aicl_err;
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < (SOFT_AICL_VOL - 50)) {
+		if (chg_vol < (SOFT_AICL_VOL - 50 || max_aicl_rate < 500)) {
 			pr_info("soft aicl s2:%d\n", chg_vol);
 			qpnp_chg_iusbmax_set(chip, 150);
 			chip->aicl_current = 150;
 			goto end;
 		}
 	}
+
 
 	qpnp_chg_iusbmax_set(chip, 900);
 	for (i = 0; i < MAX_COUNT; i++) {
@@ -6831,7 +6852,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL) {
+		if (chg_vol < SOFT_AICL_VOL - 50 || max_aicl_rate < 900) {
 			qpnp_chg_iusbmax_set(chip, 500);
 			qpnp_chg_iusbmax_set(chip, 500);//set 2 times
 			chip->aicl_current = 500;
@@ -6851,7 +6872,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 			goto end;
 		}
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL + 50) {
+		if (chg_vol < SOFT_AICL_VOL - 50 || max_aicl_rate < 1200) {
 			qpnp_chg_iusbmax_set(chip, 900);
 			qpnp_chg_iusbmax_set(chip, 900);//set 2 times
 			chip->aicl_current = 900;
@@ -6880,7 +6901,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 		else if (i == 60)
 			qpnp_chg_ibatmax_set(chip, 1728);
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL) {
+		if (chg_vol < SOFT_AICL_VOL || max_aicl_rate < 1500) {
 			qpnp_chg_iusbmax_set(chip, 1200);
 			qpnp_chg_iusbmax_set(chip, 1200);
 			chip->aicl_current = 1200;
@@ -6909,7 +6930,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 		else if (i == 60)
 			qpnp_chg_ibatmax_set(chip, 2112);
 		chg_vol = get_prop_charger_voltage_now(chip);
-		if (chg_vol < SOFT_AICL_VOL - 30) {
+		if (chg_vol < SOFT_AICL_VOL - 30 || max_aicl_rate < 2000) {
 			if(chip->lcd_is_on) {
 			qpnp_chg_iusbmax_set(chip, 1200);
 			qpnp_chg_iusbmax_set(chip, 1200);
@@ -8245,6 +8266,63 @@ static ssize_t charge_limit_store(struct device *dev,
 }
 static DEVICE_ATTR(charge_limit, 0222, NULL, charge_limit_store);
 
+static ssize_t max_aicl_rate_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size) {
+
+	int val = simple_strtol(buf, NULL, 10);
+
+	if(val < 0 || val > 2000)
+		return 0;
+
+	if( val == 2000 )
+		max_aicl_rate = 2000;
+	else if( val >= 1500 )
+		max_aicl_rate = 1500;
+	else if( val >= 1200 )
+		max_aicl_rate = 1200;
+	else if( val >= 900 )
+		max_aicl_rate = 900;
+	else if( val >= 500 )
+		max_aicl_rate = 500;
+	else if( val >= 150 )
+		max_aicl_rate = 150;
+	else if( val >= 100 )
+		max_aicl_rate = 100;
+	else
+		return 0;
+		
+	return size;
+}
+static DEVICE_ATTR(max_aicl_rate, 0222, NULL, max_aicl_rate_store);
+
+static ssize_t fast_usb_charge_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size) {
+
+	int val = simple_strtol(buf, NULL, 10);
+
+	if(val < 0 || val > 1)
+		return 0;
+
+	fast_usb_charge = val;
+		
+	return size;
+}
+static DEVICE_ATTR(fast_usb_charge, 0222, NULL, fast_usb_charge_store);
+
+static ssize_t soft_aicl_vol_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size) {
+
+	int val = simple_strtol(buf, NULL, 10);
+
+	if(val < 4350 || val > 5000)
+		return 0;
+
+	SOFT_AICL_VOL = val;
+		
+	return size;
+}
+static DEVICE_ATTR(soft_aicl_vol, 0222, NULL, soft_aicl_vol_store);
+
 static ssize_t disable_aicl_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size) {
 
@@ -9006,6 +9084,18 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	rc = device_create_file(chip->dev, &dev_attr_disable_aicl);
 	if (rc < 0) {
 		device_remove_file(chip->dev, &dev_attr_disable_aicl);
+	}
+	rc = device_create_file(chip->dev, &dev_attr_max_aicl_rate);
+	if (rc < 0) {
+		device_remove_file(chip->dev, &dev_attr_max_aicl_rate);
+	}
+	rc = device_create_file(chip->dev, &dev_attr_fast_usb_charge);
+	if (rc < 0) {
+		device_remove_file(chip->dev, &dev_attr_fast_usb_charge);
+	}
+	rc = device_create_file(chip->dev, &dev_attr_soft_aicl_vol);
+	if (rc < 0) {
+		device_remove_file(chip->dev, &dev_attr_soft_aicl_vol);
 	}
 
 #if 0
