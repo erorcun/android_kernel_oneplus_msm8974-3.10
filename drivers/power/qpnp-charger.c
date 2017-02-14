@@ -323,9 +323,9 @@ static int fake_temp = 300;
 static bool use_fake_chgvol = false;
 static int fake_chgvol = 0;
 
-static bool threea_charge = false;
-static bool fast_usb_charge = false;
-static bool disable_aicl = false;
+static atomic_t threea_charge;
+static atomic_t fast_usb_charge;
+static atomic_t disable_aicl;
 static int charge_limit = 100;
 static int max_aicl_rate = 2000;
 #endif
@@ -1271,7 +1271,7 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 		return -EINVAL;
 	}
 	
-	if(!chip->dont_print_changes && fast_usb_charge) {
+	if(!chip->dont_print_changes && atomic_read(&fast_usb_charge)) {
 		chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 		if ((ret.intval / 1000) == 500 && mA == 500) {
@@ -2316,7 +2316,7 @@ static int get_max_input_current(void)
 {
 	int temp;
 
-	if(!threea_charge)
+	if(!atomic_read(&threea_charge))
 		return 2000;
 
 	temp = get_prop_batt_temp(g_chip);
@@ -4183,7 +4183,7 @@ qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
 	}
 #endif
 
-	if(!chip->dont_print_changes && fast_usb_charge) {
+	if(!chip->dont_print_changes && atomic_read(&fast_usb_charge)) {
 		chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 		if ((ret.intval / 1000) == 500) {
@@ -5770,7 +5770,7 @@ qpnp_dc_power_set_property(struct power_supply *psy,
 		if (!val->intval)
 			break;
 
-		if(threea_charge) {
+		if(atomic_read(&threea_charge)) {
 			if(val->intval == 2000 * 1000)
 				realvalue = 2500;
 		} else
@@ -6811,7 +6811,7 @@ static int soft_aicl(struct qpnp_chg_chip *chip)
 	int i, chg_vol;
 	chip->dont_print_changes = true;
 	chip->aicl_interrupt = false;
-	if(disable_aicl) {
+	if(atomic_read(&disable_aicl)) {
 		qpnp_chg_vinmin_set(chip, chip->min_voltage_mv + 280);
 		goto semiend;
 	}
@@ -8235,7 +8235,7 @@ static ssize_t threea_charge_store(struct device *dev,
 			}
 			g_chip->maxinput_dc_ma = 2500;
 		}
-		threea_charge = true;
+		atomic_set(&threea_charge,1);
 	} else {
 		if(g_chip->maxinput_dc_ma == 2500) {
 			rc = qpnp_chg_idcmax_set(g_chip, 2000);
@@ -8245,7 +8245,7 @@ static ssize_t threea_charge_store(struct device *dev,
 			}
 			g_chip->maxinput_dc_ma = 2000;
 		}
-		threea_charge = false;
+		atomic_set(&threea_charge,0);
 	}
 		
 	return size;
@@ -8303,7 +8303,7 @@ static ssize_t fast_usb_charge_store(struct device *dev,
 	if(val < 0 || val > 1)
 		return 0;
 
-	fast_usb_charge = val;
+	atomic_set(&fast_usb_charge, val);
 		
 	return size;
 }
@@ -8331,7 +8331,7 @@ static ssize_t disable_aicl_store(struct device *dev,
 	if(val < 0 || val > 1)
 		return 0;
 
-	disable_aicl = val;
+	atomic_set(&disable_aicl, val);
 		
 	return size;
 }
@@ -9051,6 +9051,10 @@ qpnp_charger_probe(struct spmi_device *spmi)
 	atomic_set(&chip->suspended, 0);
 	chip->usbin_counts = 0;
 #endif
+
+	atomic_set(&threea_charge, 0);
+	atomic_set(&disable_aicl, 0);
+	atomic_set(&fast_usb_charge, 0);
 	
 #if defined(CONFIG_FB)
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/14  Add for reset charge current when screen is off */
