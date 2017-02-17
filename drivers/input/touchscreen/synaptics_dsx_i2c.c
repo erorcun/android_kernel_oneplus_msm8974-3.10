@@ -419,9 +419,13 @@ static struct proc_dir_entry *prEntry_double_tap = NULL;
 static struct proc_dir_entry *prEntry_gesture = NULL;
 static struct proc_dir_entry *prEntry_vendor_id = NULL;
 static struct proc_dir_entry *prEntry_key_rep = NULL;
-static struct proc_dir_entry *prEntry_camera = NULL;
+static struct proc_dir_entry *prEntry_letter_o = NULL;
 static struct proc_dir_entry *prEntry_music = NULL;
-static struct proc_dir_entry *prEntry_flashlight = NULL;
+static struct proc_dir_entry *prEntry_down_arrow = NULL;
+static struct proc_dir_entry *prEntry_up_arrow = NULL;
+static struct proc_dir_entry *prEntry_double_swipe = NULL;
+static struct proc_dir_entry *prEntry_left_arrow = NULL;
+static struct proc_dir_entry *prEntry_right_arrow = NULL;
 static struct proc_dir_entry *prEntry_pdoze_mode = NULL;
 #ifdef CONFIG_MACH_FIND7OP
 static struct proc_dir_entry *prEntry_smartcover_mode = NULL;
@@ -965,14 +969,6 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define SYNA_ONE_FINGER_DIRECTION		0x0a
 #define SYNA_ONE_FINGER_W_OR_M			0x0b
 
-#define KEY_F3			61   //˫\BB\F7\BB\BD\D0\D1\C6\C1Ļ,
-#define KEY_F4			62   //\C6\F4\B6\AF\CF\E0\BB\FA\A3\AC\BB\AEȦ
-#define KEY_F5			63   // \C6\F4\B6\AF\CAֵ\E7Ͳ\A3\AC\D5\FDV
-#define KEY_F6			64   // \D4\DDͣ\B8\E8\C7\FA\A3\AC\C1\BDحح
-#define KEY_F7			65  // \C9\CFһ\CAף\AC<
-#define KEY_F8			66  // \CF\C2һ\CA\D7, >
-#define KEY_F9			67  // M or W
-
 #define UnknownGesture      0
 #define DouTap              1   // double tap
 #define UpVee               2   // V
@@ -1340,39 +1336,20 @@ static ssize_t synaptics_rmi4_pdoze_read(struct file *file, char __user *user_bu
 	return ret;
 }
 
-static ssize_t synaptics_rmi4_proc_double_tap_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+static void set_syna_use_gesture(bool enable)
 {
-	int ret = 0;
-	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->double_tap_enable));
-	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
-	return ret;
-}
-
-static ssize_t synaptics_rmi4_proc_double_tap_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
-{
-	int enable;
-	char buf[10];
-
-	if (count > 2)
-		return 0;
-
-	if (copy_from_user(buf, buffer, count)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return count;
+	if(enable)
+		atomic_set(&syna_rmi4_data->syna_use_gesture,1);
+	else {
+		atomic_set(&syna_rmi4_data->syna_use_gesture,
+			atomic_read(&syna_rmi4_data->double_tap_enable) || 
+			atomic_read(&syna_rmi4_data->double_swipe_enable) ||
+			atomic_read(&syna_rmi4_data->left_arrow_enable) ||
+			atomic_read(&syna_rmi4_data->right_arrow_enable) ||
+			atomic_read(&syna_rmi4_data->letter_o_enable) ||
+			atomic_read(&syna_rmi4_data->up_arrow_enable) ||
+			atomic_read(&syna_rmi4_data->down_arrow_enable) ? 1 : 0);
 	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->double_tap_enable, enable);
-
-	atomic_set(&syna_rmi4_data->syna_use_gesture,
-			enable ||
-			atomic_read(&syna_rmi4_data->camera_enable) ||
-			atomic_read(&syna_rmi4_data->music_enable) ||
-			atomic_read(&syna_rmi4_data->flashlight_enable) ? 1 : 0);
-
-	return count;
 }
 
 static ssize_t synaptics_rmi4_proc_gesture_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
@@ -1457,16 +1434,50 @@ static ssize_t synaptics_rmi4_proc_vendor_id_read(struct file *file, char __user
 	return ret;
 }
 
-static ssize_t synaptics_rmi4_proc_camera_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+#define TS_ENABLE_FOPS(type) \
+static ssize_t synaptics_rmi4_proc_##type##_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos) \
+{ \
+	int ret = 0; \
+	char page[PAGESIZE]; \
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->type##_enable)); \
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page)); \
+	return ret; \
+} \
+static ssize_t synaptics_rmi4_proc_##type##_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos) \
+{ \
+	int enable; \
+	char buf[10]; \
+	if (count > 2) \
+		return 0; \
+	if (copy_from_user(buf, buffer, count)) { \
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n"); \
+		return count; \
+	} \
+	enable = (buf[0] == '0') ? 0 : 1; \
+	atomic_set(&syna_rmi4_data->type##_enable, enable); \
+	set_syna_use_gesture(enable); \
+	return count; \
+}
+
+TS_ENABLE_FOPS(double_tap);
+TS_ENABLE_FOPS(double_swipe);
+TS_ENABLE_FOPS(up_arrow);
+TS_ENABLE_FOPS(down_arrow);
+TS_ENABLE_FOPS(left_arrow);
+TS_ENABLE_FOPS(right_arrow);
+TS_ENABLE_FOPS(letter_o);
+
+/*
+static ssize_t synaptics_rmi4_proc_double_tap_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
 	int ret = 0;
 	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->camera_enable));
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->double_tap_enable));
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 	return ret;
 }
 
-static ssize_t synaptics_rmi4_proc_camera_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+static ssize_t synaptics_rmi4_proc_double_tap_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int enable;
 	char buf[10];
@@ -1481,27 +1492,23 @@ static ssize_t synaptics_rmi4_proc_camera_write(struct file *file, const char __
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
-	atomic_set(&syna_rmi4_data->camera_enable, enable);
+	atomic_set(&syna_rmi4_data->double_tap_enable, enable);
 
-	atomic_set(&syna_rmi4_data->syna_use_gesture,
-			atomic_read(&syna_rmi4_data->double_tap_enable) ||
-			enable ||
-			atomic_read(&syna_rmi4_data->music_enable) ||
-			atomic_read(&syna_rmi4_data->flashlight_enable) ? 1 : 0);
+	set_syna_use_gesture(enable);
 
 	return count;
 }
 
-static ssize_t synaptics_rmi4_proc_music_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+static ssize_t synaptics_rmi4_proc_letter_o_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
 	int ret = 0;
 	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->music_enable));
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->letter_o_enable));
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 	return ret;
 }
 
-static ssize_t synaptics_rmi4_proc_music_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+static ssize_t synaptics_rmi4_proc_letter_o_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	int enable;
 	char buf[10];
@@ -1516,13 +1523,9 @@ static ssize_t synaptics_rmi4_proc_music_write(struct file *file, const char __u
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
-	atomic_set(&syna_rmi4_data->music_enable, enable);
+	atomic_set(&syna_rmi4_data->letter_o_enable, enable);
 
-	atomic_set(&syna_rmi4_data->syna_use_gesture,
-			atomic_read(&syna_rmi4_data->double_tap_enable) ||
-			atomic_read(&syna_rmi4_data->camera_enable) ||
-			enable ||
-			atomic_read(&syna_rmi4_data->flashlight_enable) ? 1 : 0);
+	set_syna_use_gesture(enable);
 
 	return count;
 }
@@ -1531,7 +1534,7 @@ static ssize_t synaptics_rmi4_proc_flashlight_read(struct file *file, char __use
 {
 	int ret = 0;
 	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->flashlight_enable));
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->down_arrow_enable));
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 	return ret;
 }
@@ -1551,16 +1554,46 @@ static ssize_t synaptics_rmi4_proc_flashlight_write(struct file *file, const cha
 
 	enable = (buf[0] == '0') ? 0 : 1;
 
-	atomic_set(&syna_rmi4_data->flashlight_enable, enable);
+	atomic_set(&syna_rmi4_data->down_arrow_enable, enable);
 
-	atomic_set(&syna_rmi4_data->syna_use_gesture,
-			atomic_read(&syna_rmi4_data->double_tap_enable) ||
-			atomic_read(&syna_rmi4_data->camera_enable) ||
-			atomic_read(&syna_rmi4_data->music_enable) ||
-			enable ? 1 : 0);
+	set_syna_use_gesture(enable);
 
 	return count;
 }
+*/
+static ssize_t synaptics_rmi4_proc_music_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int ret = 0;
+	char page[PAGESIZE];
+	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->left_arrow_enable) && atomic_read(&syna_rmi4_data->right_arrow_enable) && atomic_read(&syna_rmi4_data->double_swipe_enable));
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
+}
+
+static ssize_t synaptics_rmi4_proc_music_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+	int enable;
+	char buf[10];
+
+	if (count > 2)
+		return 0;
+
+	if (copy_from_user(buf, buffer, count)) {
+		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
+		return count;
+	}
+
+	enable = (buf[0] == '0') ? 0 : 1;
+
+	atomic_set(&syna_rmi4_data->left_arrow_enable, enable);
+	atomic_set(&syna_rmi4_data->right_arrow_enable, enable);
+	atomic_set(&syna_rmi4_data->double_swipe_enable, enable);
+
+	set_syna_use_gesture(enable);
+
+	return count;
+}
+
 #ifdef CONFIG_MACH_FIND7OP
 //smartcover proc read function
 static ssize_t synaptics_rmi4_proc_smartcover_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
@@ -1833,13 +1866,6 @@ static const struct file_operations glove_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
-static const struct file_operations double_tap_proc_fops = {
-	.write = synaptics_rmi4_proc_double_tap_write,
-	.read =  synaptics_rmi4_proc_double_tap_read,
-	.open = simple_open,
-	.owner = THIS_MODULE,
-};
-
 static const struct file_operations gesture_proc_fops = {
 	.write = synaptics_rmi4_proc_gesture_write,
 	.read =  synaptics_rmi4_proc_gesture_read,
@@ -1867,9 +1893,16 @@ static const struct file_operations tp_vendor_id_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
-static const struct file_operations camera_proc_fops = {
-	.write = synaptics_rmi4_proc_camera_write,
-	.read =  synaptics_rmi4_proc_camera_read,
+static const struct file_operations double_tap_proc_fops = {
+	.write = synaptics_rmi4_proc_double_tap_write,
+	.read =  synaptics_rmi4_proc_double_tap_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations letter_o_proc_fops = {
+	.write = synaptics_rmi4_proc_letter_o_write,
+	.read =  synaptics_rmi4_proc_letter_o_read,
 	.open = simple_open,
 	.owner = THIS_MODULE,
 };
@@ -1881,9 +1914,37 @@ static const struct file_operations music_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
-static const struct file_operations flashlight_proc_fops = {
-	.write = synaptics_rmi4_proc_flashlight_write,
-	.read =  synaptics_rmi4_proc_flashlight_read,
+static const struct file_operations down_arrow_proc_fops = {
+	.write = synaptics_rmi4_proc_down_arrow_write,
+	.read =  synaptics_rmi4_proc_down_arrow_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations up_arrow_proc_fops = {
+	.write = synaptics_rmi4_proc_up_arrow_write,
+	.read =  synaptics_rmi4_proc_up_arrow_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations right_arrow_proc_fops = {
+	.write = synaptics_rmi4_proc_right_arrow_write,
+	.read =  synaptics_rmi4_proc_right_arrow_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations left_arrow_proc_fops = {
+	.write = synaptics_rmi4_proc_left_arrow_write,
+	.read =  synaptics_rmi4_proc_left_arrow_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations double_swipe_proc_fops = {
+	.write = synaptics_rmi4_proc_double_swipe_write,
+	.read =  synaptics_rmi4_proc_double_swipe_read,
 	.open = simple_open,
 	.owner = THIS_MODULE,
 };
@@ -1957,8 +2018,14 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_camera = proc_create("camera_enable", 0666, procdir, &camera_proc_fops);
-	if(prEntry_camera == NULL){	   
+	prEntry_letter_o = proc_create("camera_enable", 0666, procdir, &letter_o_proc_fops);
+	if(prEntry_letter_o == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_letter_o = proc_create("letter_o_enable", 0666, procdir, &letter_o_proc_fops);
+	if(prEntry_letter_o == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
@@ -1969,8 +2036,38 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_flashlight = proc_create("flashlight_enable", 0666, procdir, &flashlight_proc_fops);
-	if(prEntry_flashlight == NULL){	   
+	prEntry_down_arrow = proc_create("flashlight_enable", 0666, procdir, &down_arrow_proc_fops);
+	if(prEntry_down_arrow == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_down_arrow = proc_create("down_arrow_enable", 0666, procdir, &down_arrow_proc_fops);
+	if(prEntry_down_arrow == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_up_arrow = proc_create("up_arrow_enable", 0666, procdir, &up_arrow_proc_fops);
+	if(prEntry_up_arrow == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_left_arrow = proc_create("left_arrow_enable", 0666, procdir, &left_arrow_proc_fops);
+	if(prEntry_up_arrow == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_right_arrow = proc_create("right_arrow_enable", 0666, procdir, &right_arrow_proc_fops);
+	if(prEntry_up_arrow == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_double_swipe = proc_create("double_swipe_enable", 0666, procdir, &double_swipe_proc_fops);
+	if(prEntry_up_arrow == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
@@ -2228,7 +2325,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 		unsigned char *gestureext)
 {
 	int i;
-	unsigned char keyvalue = 0;
+	unsigned int keyvalue = 0;
 	unsigned char gesturemode = UnknownGesture;
 	unsigned short points[16];
 
@@ -2244,7 +2341,7 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 	switch (gesture[0]) {
 		case SYNA_ONE_FINGER_CIRCLE:
 			gesturemode = Circle;
-			if (atomic_read(&syna_rmi4_data->camera_enable)) {
+			if (atomic_read(&syna_rmi4_data->letter_o_enable)) {
 				keyvalue = KEY_GESTURE_CIRCLE;
 			}
 			break;
@@ -2264,8 +2361,8 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 					gesturemode=UnknownGesture;
 			}
 			if (gesturemode == DouSwip) {
-				if (atomic_read(&syna_rmi4_data->music_enable))
-					keyvalue = KEY_GESTURE_SWIPE_DOWN;
+				if (atomic_read(&syna_rmi4_data->double_swipe_enable))
+					keyvalue = KEY_GESTURE_DOUBLE_SWIPE;
 			}
 			break;
 
@@ -2280,21 +2377,23 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 			switch (gesture[2]) {
 				case 0x01:  //UP
 					gesturemode = DownVee;
+					if (atomic_read(&syna_rmi4_data->up_arrow_enable))
+						keyvalue = KEY_GESTURE_UP_ARROW;
 					break;
 				case 0x02:  //DOWN
 					gesturemode = UpVee;
-					if (atomic_read(&syna_rmi4_data->flashlight_enable))
-						keyvalue = KEY_GESTURE_V;
+					if (atomic_read(&syna_rmi4_data->down_arrow_enable))
+						keyvalue = KEY_GESTURE_DOWN_ARROW;
 					break;
 				case 0x04:  //LEFT
 					gesturemode = RightVee;
-					if (atomic_read(&syna_rmi4_data->music_enable))
-						keyvalue = KEY_GESTURE_LTR;
+					if (atomic_read(&syna_rmi4_data->left_arrow_enable))
+						keyvalue = KEY_GESTURE_LEFT_ARROW;
 					break;
 				case 0x08:  //RIGHT
 					gesturemode = LeftVee;
-					if (atomic_read(&syna_rmi4_data->music_enable))
-						keyvalue = KEY_GESTURE_GTR;
+					if (atomic_read(&syna_rmi4_data->right_arrow_enable))
+						keyvalue = KEY_GESTURE_RIGHT_ARROW;
 					break;
 			}
 			break;
@@ -2429,7 +2528,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				sizeof(gestureext));
 		if (gesture[0]) {
 			keyvalue = synaptics_rmi4_update_gesture2(gesture,gestureext);
-			if (keyvalue && keyvalue != KEY_F9) {
+			if (keyvalue != 0) {
 				input_report_key(rmi4_data->input_dev, keyvalue, 1);
 				input_sync(rmi4_data->input_dev);
 				input_report_key(rmi4_data->input_dev, keyvalue, 0);
@@ -4330,13 +4429,13 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 	set_bit(KEY_BACK, rmi4_data->input_dev->keybit);
 	set_bit(KEY_MENU, rmi4_data->input_dev->keybit);
 	set_bit(KEY_HOMEPAGE, rmi4_data->input_dev->keybit);
-	set_bit(KEY_F3, rmi4_data->input_dev->keybit);
 	set_bit(KEY_WAKEUP, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_DOUBLE_SWIPE, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_UP_ARROW, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_DOWN_ARROW, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_LEFT_ARROW, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_RIGHT_ARROW, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_CIRCLE, rmi4_data->input_dev->keybit);
-	set_bit(KEY_GESTURE_SWIPE_DOWN, rmi4_data->input_dev->keybit);
-	set_bit(KEY_GESTURE_V, rmi4_data->input_dev->keybit);
-	set_bit(KEY_GESTURE_LTR, rmi4_data->input_dev->keybit);
-	set_bit(KEY_GESTURE_GTR, rmi4_data->input_dev->keybit);
 	synaptics_ts_init_virtual_key(rmi4_data);
 
 	input_set_abs_params(rmi4_data->input_dev,
@@ -4422,9 +4521,12 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 	atomic_set(&rmi4_data->syna_use_gesture, 1);
 	atomic_set(&rmi4_data->double_tap_enable, 1);
 	atomic_set(&rmi4_data->key_rep, 0);
-	atomic_set(&rmi4_data->camera_enable, 0);
-	atomic_set(&rmi4_data->music_enable, 0);
-	atomic_set(&rmi4_data->flashlight_enable, 0);
+	atomic_set(&rmi4_data->double_swipe_enable, 0);
+	atomic_set(&rmi4_data->up_arrow_enable, 0);
+	atomic_set(&rmi4_data->down_arrow_enable, 0);
+	atomic_set(&rmi4_data->left_arrow_enable, 0);
+	atomic_set(&rmi4_data->right_arrow_enable, 0);
+	atomic_set(&rmi4_data->letter_o_enable, 0);
 
 	rmi4_data->glove_enable = 0;
 	rmi4_data->pdoze_enable = 0;
