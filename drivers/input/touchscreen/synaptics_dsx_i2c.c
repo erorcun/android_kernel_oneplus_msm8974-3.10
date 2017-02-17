@@ -4986,14 +4986,6 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 			container_of(work, struct synaptics_rmi4_data, init_work);
 //	int retval;
 	unsigned char val = 1;
-#ifdef CONFIG_MACH_ONYX
-	const struct synaptics_dsx_platform_data *platform_data =
-		rmi4_data->board;
-
-	retval = platform_data->gpio_config(
-			platform_data->reset_gpio,
-			true);	
-#endif
 
 #ifdef CONFIG_MACH_FIND7OP
 	if (rmi4_data->smartcover_enable)
