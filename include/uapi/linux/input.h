@@ -479,10 +479,21 @@ struct input_keymap_entry {
 /* Oppo specific keycodes */
 #define KEY_GESTURE_CIRCLE		250
 #define KEY_GESTURE_DOUBLE_SWIPE	251
+
+#ifdef CONFIG_MACH_FIND7OP
 #define KEY_GESTURE_DOWN_ARROW		252
 #define KEY_GESTURE_LEFT_ARROW		253
 #define KEY_GESTURE_RIGHT_ARROW		254
 #define KEY_GESTURE_UP_ARROW		255
+#elif CONFIG_MACH_ONYX
+#define KEY_GESTURE_UP_ARROW		252
+#define KEY_GESTURE_DOWN_ARROW		253
+#define KEY_GESTURE_LEFT_ARROW		254
+#define KEY_GESTURE_RIGHT_ARROW		255
+#endif
+
+#define KEY_GESTURE_LETTER_W		256
+#define KEY_GESTURE_LETTER_M		257
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 

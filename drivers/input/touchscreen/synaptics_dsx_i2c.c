@@ -413,26 +413,7 @@ static struct device_attribute attrs[] = {
 			synaptics_rmi4_store_error),
 };
 
-static struct proc_dir_entry *prEntry_glove = NULL;
-static struct proc_dir_entry *prEntry_coodinate  = NULL; 
-static struct proc_dir_entry *prEntry_double_tap = NULL;
-static struct proc_dir_entry *prEntry_gesture = NULL;
-static struct proc_dir_entry *prEntry_vendor_id = NULL;
-static struct proc_dir_entry *prEntry_key_rep = NULL;
-static struct proc_dir_entry *prEntry_letter_o = NULL;
-static struct proc_dir_entry *prEntry_music = NULL;
-static struct proc_dir_entry *prEntry_down_arrow = NULL;
-static struct proc_dir_entry *prEntry_up_arrow = NULL;
-static struct proc_dir_entry *prEntry_double_swipe = NULL;
-static struct proc_dir_entry *prEntry_left_arrow = NULL;
-static struct proc_dir_entry *prEntry_right_arrow = NULL;
-static struct proc_dir_entry *prEntry_pdoze_mode = NULL;
-#ifdef CONFIG_MACH_FIND7OP
-static struct proc_dir_entry *prEntry_smartcover_mode = NULL;
-#endif
-static struct proc_dir_entry *prEntry_pdozedetect = NULL;
-static struct proc_dir_entry *prEntry_keypad = NULL;
-static struct proc_dir_entry *prEntry_dtap = NULL;
+static struct proc_dir_entry *prEntry_tmp = NULL;
 
 static ssize_t synaptics_rmi4_f01_reset_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -981,8 +962,8 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 #define Right2LeftSwip      9   // <--
 #define Up2DownSwip         10  // |v
 #define Down2UpSwip         11  // |^
-#define Mgestrue            12  // M
-#define Wgestrue            13  // W
+#define Mgesture            12  // M
+#define Wgesture            13  // W
 
 #define SYNA_SMARTCOVER_MIN	0
 #define SYNA_SMARTCOVER_MAN	750
@@ -1002,7 +983,7 @@ static int SYNA_ADDR_GESTURE_EXT = 0x402;
 #define SYNA_ADDR_SMARTCOVER_EXT     0x41f  //smartcover mode
 #define SYNA_ADDR_PDOZE_FLAG         0x07  //pdoze status register
 
-#elif CONFIG_MACH_ONYX
+#elif defined CONFIG_MACH_ONYX
 
 #define DRIVER_NAME "synaptics-rmi"
 #define SYNA_ADDR_GLOVE_FLAG         0x1e  //glove enable register
@@ -1082,7 +1063,7 @@ static void vk_calculate_area(void)  //added by liujun
 #ifdef CONFIG_MACH_FIND7OP
 	int margin_x = 85;
 	int margin_y = 10;
-#elif CONFIG_MACH_ONYX
+#elif defined CONFIG_MACH_ONYX
 	int margin_x = 80;
 	int margin_y = 15;
 #endif
@@ -1094,7 +1075,7 @@ static void vk_calculate_area(void)  //added by liujun
 
 	syna_ts_data->vk_prop_center_y = LCD_MULTI_RATIO(1974);
 	syna_ts_data->vk_prop_height = LCD_MULTI_RATIO(120);
-#elif CONFIG_MACH_ONYX
+#elif defined CONFIG_MACH_ONYX
 	syna_ts_data->vk_prop_width = 200;
 
 	syna_ts_data->vk_prop_center_y = 2021;
@@ -1346,7 +1327,9 @@ static void set_syna_use_gesture(bool enable)
 			atomic_read(&syna_rmi4_data->double_swipe_enable) ||
 			atomic_read(&syna_rmi4_data->left_arrow_enable) ||
 			atomic_read(&syna_rmi4_data->right_arrow_enable) ||
+			atomic_read(&syna_rmi4_data->letter_m_enable) ||
 			atomic_read(&syna_rmi4_data->letter_o_enable) ||
+			atomic_read(&syna_rmi4_data->letter_w_enable) ||
 			atomic_read(&syna_rmi4_data->up_arrow_enable) ||
 			atomic_read(&syna_rmi4_data->down_arrow_enable) ? 1 : 0);
 	}
@@ -1465,7 +1448,9 @@ TS_ENABLE_FOPS(up_arrow);
 TS_ENABLE_FOPS(down_arrow);
 TS_ENABLE_FOPS(left_arrow);
 TS_ENABLE_FOPS(right_arrow);
+TS_ENABLE_FOPS(letter_m);
 TS_ENABLE_FOPS(letter_o);
+TS_ENABLE_FOPS(letter_w);
 
 /*
 static ssize_t synaptics_rmi4_proc_double_tap_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
@@ -1900,9 +1885,23 @@ static const struct file_operations double_tap_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
+static const struct file_operations letter_m_proc_fops = {
+	.write = synaptics_rmi4_proc_letter_m_write,
+	.read =  synaptics_rmi4_proc_letter_m_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
 static const struct file_operations letter_o_proc_fops = {
 	.write = synaptics_rmi4_proc_letter_o_write,
 	.read =  synaptics_rmi4_proc_letter_o_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations letter_w_proc_fops = {
+	.write = synaptics_rmi4_proc_letter_w_write,
+	.read =  synaptics_rmi4_proc_letter_w_read,
 	.open = simple_open,
 	.owner = THIS_MODULE,
 };
@@ -1988,116 +1987,128 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 
 	struct proc_dir_entry *procdir = proc_mkdir( "touchpanel", NULL );
 
-	prEntry_dtap = proc_create("sleep_mode_enable", 0666, procdir, &sleep_mode_enable_proc_fops);
-	if( prEntry_dtap == NULL ){
+	prEntry_tmp = proc_create("sleep_mode_enable", 0666, procdir, &sleep_mode_enable_proc_fops);
+	if( prEntry_tmp == NULL ){
 		ret = -ENOMEM;
 		printk(KERN_INFO"init_synaptics_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_glove = proc_create("glove_mode_enable", 0666, procdir, &glove_proc_fops);
-	if(prEntry_glove == NULL){	   
+	prEntry_tmp = proc_create("glove_mode_enable", 0666, procdir, &glove_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_double_tap= proc_create("double_tap_enable", 0666, procdir, &double_tap_proc_fops);
-	if(prEntry_double_tap == NULL){	   
+	prEntry_tmp= proc_create("double_tap_enable", 0666, procdir, &double_tap_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_gesture= proc_create("gesture_enable", 0666, procdir, &gesture_proc_fops);
-	if(prEntry_gesture == NULL){	   
+	prEntry_tmp= proc_create("gesture_enable", 0666, procdir, &gesture_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_vendor_id= proc_create("vendor_id", 0666, procdir, &tp_vendor_id_proc_fops);
-	if(prEntry_vendor_id == NULL){	   
+	prEntry_tmp= proc_create("vendor_id", 0666, procdir, &tp_vendor_id_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_letter_o = proc_create("camera_enable", 0666, procdir, &letter_o_proc_fops);
-	if(prEntry_letter_o == NULL){	   
+	prEntry_tmp = proc_create("camera_enable", 0666, procdir, &letter_o_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_letter_o = proc_create("letter_o_enable", 0666, procdir, &letter_o_proc_fops);
-	if(prEntry_letter_o == NULL){	   
+	prEntry_tmp = proc_create("letter_m_enable", 0666, procdir, &letter_m_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_music = proc_create("music_enable", 0666, procdir, &music_proc_fops);
-	if(prEntry_music == NULL){	   
+	prEntry_tmp = proc_create("letter_o_enable", 0666, procdir, &letter_o_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_down_arrow = proc_create("flashlight_enable", 0666, procdir, &down_arrow_proc_fops);
-	if(prEntry_down_arrow == NULL){	   
+	prEntry_tmp = proc_create("letter_w_enable", 0666, procdir, &letter_w_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_down_arrow = proc_create("down_arrow_enable", 0666, procdir, &down_arrow_proc_fops);
-	if(prEntry_down_arrow == NULL){	   
+	prEntry_tmp = proc_create("music_enable", 0666, procdir, &music_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_up_arrow = proc_create("up_arrow_enable", 0666, procdir, &up_arrow_proc_fops);
-	if(prEntry_up_arrow == NULL){	   
+	prEntry_tmp = proc_create("flashlight_enable", 0666, procdir, &down_arrow_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_left_arrow = proc_create("left_arrow_enable", 0666, procdir, &left_arrow_proc_fops);
-	if(prEntry_up_arrow == NULL){	   
+	prEntry_tmp = proc_create("down_arrow_enable", 0666, procdir, &down_arrow_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_right_arrow = proc_create("right_arrow_enable", 0666, procdir, &right_arrow_proc_fops);
-	if(prEntry_up_arrow == NULL){	   
+	prEntry_tmp = proc_create("up_arrow_enable", 0666, procdir, &up_arrow_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_double_swipe = proc_create("double_swipe_enable", 0666, procdir, &double_swipe_proc_fops);
-	if(prEntry_up_arrow == NULL){	   
+	prEntry_tmp = proc_create("left_arrow_enable", 0666, procdir, &left_arrow_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_pdoze_mode = proc_create("pdoze_mode_enable", 0666, procdir, &pdoze_mode_proc_fops);
-	if(prEntry_pdoze_mode == NULL){	   
+	prEntry_tmp = proc_create("right_arrow_enable", 0666, procdir, &right_arrow_proc_fops);
+	if(prEntry_tmp == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_tmp = proc_create("double_swipe_enable", 0666, procdir, &double_swipe_proc_fops);
+	if(prEntry_tmp == NULL){	   
+		ret = -ENOMEM;	   
+		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
+	}
+
+	prEntry_tmp = proc_create("pdoze_mode_enable", 0666, procdir, &pdoze_mode_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 #ifdef CONFIG_MACH_FIND7OP
-	prEntry_smartcover_mode = proc_create("smartcover_mode_enable", 0666, procdir, &smartcover_mode_proc_fops);
-	if(prEntry_smartcover_mode == NULL){	   
+	prEntry_tmp = proc_create("smartcover_mode_enable", 0666, procdir, &smartcover_mode_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 #endif
-	prEntry_pdozedetect = proc_create("pdozedetect", 0444, procdir, &pdozedetect_proc_fops);
-	if(prEntry_pdozedetect == NULL){	   
+	prEntry_tmp = proc_create("pdozedetect", 0444, procdir, &pdozedetect_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_coodinate = proc_create("coordinate", 0444, procdir, &coordinate_proc_fops);
-	if(prEntry_coodinate == NULL){	   
+	prEntry_tmp = proc_create("coordinate", 0444, procdir, &coordinate_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_keypad = proc_create("keypad_enable", 0666, procdir, &keypad_proc_fops);
-	if(prEntry_keypad == NULL){	   
+	prEntry_tmp = proc_create("keypad_enable", 0666, procdir, &keypad_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
@@ -2108,8 +2119,8 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		printk(KERN_INFO"init_synaptics_proc: Couldn't create TP proc entry\n");
 	}
 
-	prEntry_key_rep= proc_create("key_rep", 0666, procdir, &key_rep_proc_fops);
-	if(prEntry_key_rep == NULL){	   
+	prEntry_tmp= proc_create("key_rep", 0666, procdir, &key_rep_proc_fops);
+	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
@@ -2400,11 +2411,20 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 
 		case SYNA_ONE_FINGER_W_OR_M:
 			gesturemode =
-				(gesture[2] == 0x77 && gesture[3] == 0x00) ? Wgestrue :
-				(gesture[2] == 0x6d && gesture[3] == 0x00) ? Mgestrue :
+				(gesture[2] == 0x77 && gesture[3] == 0x00) ? Wgesture :
+				(gesture[2] == 0x6d && gesture[3] == 0x00) ? Mgesture :
 				UnknownGesture;
 
-			keyvalue = KEY_F9;
+			switch (gesturemode) {
+				case Wgesture:
+					if (atomic_read(&syna_rmi4_data->letter_w_enable))
+						keyvalue = KEY_GESTURE_LETTER_W;
+					break;
+				case Mgesture:
+					if (atomic_read(&syna_rmi4_data->letter_m_enable))
+						keyvalue = KEY_GESTURE_LETTER_M;
+					break;
+			}
 			break;
 	}
 
@@ -2813,19 +2833,19 @@ static void synaptics_rmi4_f1a_report(struct synaptics_rmi4_data *rmi4_data,
  * fingers detected.
  */
 static void synaptics_rmi4_report_touch(struct synaptics_rmi4_data *rmi4_data,
-		struct synaptics_rmi4_fn *fhandler, const ktime_t timestamp)
+		struct synaptics_rmi4_fn *fhandler/*, const ktime_t timestamp*/)
 {
 	unsigned char touch_count_2d;
 
 	dev_dbg(&rmi4_data->i2c_client->dev,
 			"%s: Function %02x reporting\n",
 			__func__, fhandler->fn_number);
-
+/*
 	input_event(rmi4_data->input_dev, EV_SYN, SYN_TIME_SEC,
 			ktime_to_timespec(timestamp).tv_sec);
 	input_event(rmi4_data->input_dev, EV_SYN, SYN_TIME_NSEC,
 			ktime_to_timespec(timestamp).tv_nsec);
-
+*/
 	switch (fhandler->fn_number) {
 		case SYNAPTICS_RMI4_F11:
 			touch_count_2d = synaptics_rmi4_f11_abs_report(rmi4_data,
@@ -2899,7 +2919,7 @@ static int synaptics_rmi4_int_enable(struct synaptics_rmi4_data *rmi4_data,
  * and calls synaptics_rmi4_report_touch() with the appropriate
  * function handler for each function with valid data inputs.
  */
-static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, bool report, const ktime_t timestamp)
+static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, bool report/*, const ktime_t timestamp*/)
 {
 	int retval;
 	unsigned char data[MAX_INTR_REGISTERS + 1];
@@ -2951,7 +2971,7 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, 
 				if (fhandler->intr_mask &
 						intr[fhandler->intr_reg_num]) {
 					synaptics_rmi4_report_touch(rmi4_data,
-							fhandler, timestamp);
+							fhandler/*, timestamp*/);
 				}
 			}
 		}
@@ -2985,9 +3005,9 @@ static void synaptics_rmi4_sensor_report(struct synaptics_rmi4_data *rmi4_data, 
 static irqreturn_t synaptics_rmi4_irq(int irq, void *data)
 {
 	struct synaptics_rmi4_data *rmi4_data = data;
-	ktime_t timestamp = ktime_get();
+//	ktime_t timestamp = ktime_get();
 
-	synaptics_rmi4_sensor_report(rmi4_data, true, timestamp);
+	synaptics_rmi4_sensor_report(rmi4_data, true/*, timestamp*/);
 
 	return IRQ_HANDLED;
 }
@@ -3018,7 +3038,7 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 			return retval;
 
 		/* Process and clear interrupts */
-		synaptics_rmi4_sensor_report(rmi4_data, false, (ktime_t)((s64)0));
+		synaptics_rmi4_sensor_report(rmi4_data, false/*, (ktime_t)((s64)0)*/);
 		retval = request_threaded_irq(rmi4_data->irq, NULL,
 				synaptics_rmi4_irq, platform_data->irq_flags,
 				DRIVER_NAME, rmi4_data);
@@ -4436,6 +4456,8 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 	set_bit(KEY_GESTURE_LEFT_ARROW, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_RIGHT_ARROW, rmi4_data->input_dev->keybit);
 	set_bit(KEY_GESTURE_CIRCLE, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_LETTER_W, rmi4_data->input_dev->keybit);
+	set_bit(KEY_GESTURE_LETTER_M, rmi4_data->input_dev->keybit);
 	synaptics_ts_init_virtual_key(rmi4_data);
 
 	input_set_abs_params(rmi4_data->input_dev,
@@ -4526,7 +4548,9 @@ static int synaptics_rmi4_set_input_dev(struct synaptics_rmi4_data *rmi4_data)
 	atomic_set(&rmi4_data->down_arrow_enable, 0);
 	atomic_set(&rmi4_data->left_arrow_enable, 0);
 	atomic_set(&rmi4_data->right_arrow_enable, 0);
+	atomic_set(&rmi4_data->letter_m_enable, 0);
 	atomic_set(&rmi4_data->letter_o_enable, 0);
+	atomic_set(&rmi4_data->letter_w_enable, 0);
 
 	rmi4_data->glove_enable = 0;
 	rmi4_data->pdoze_enable = 0;
@@ -4862,7 +4886,7 @@ static void synaptics_rmi4_get_vendorid(struct synaptics_rmi4_data *rmi4_data) {
 	vendor_id = synaptics_rmi4_get_vendorid1(gpio_get_value(rmi4_data->id_gpio),
 			gpio_get_value(rmi4_data->wakeup_gpio), 0);
 	synaptics_rmi4_get_vendorstring(vendor_id, lcd_type_id);
-#elif CONFIG_MACH_ONYX
+#elif defined CONFIG_MACH_ONYX
 	vendor_id = TP_15055;
 #endif
 	rmi4_data->vendor_id = vendor_id;
@@ -4984,9 +5008,9 @@ static void synaptics_rmi4_init_work(struct work_struct *work)
 {
 	struct synaptics_rmi4_data *rmi4_data =
 			container_of(work, struct synaptics_rmi4_data, init_work);
-//	int retval;
 	unsigned char val = 1;
 #ifdef CONFIG_MACH_ONYX
+	int retval;
 	const struct synaptics_dsx_platform_data *platform_data =
 		rmi4_data->board;
 
@@ -5093,7 +5117,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 		rmi4_data->sensor_max_y = LCD_MAX_Y+120;
 		syna_lcd_ratio1 = 100;
 		syna_lcd_ratio2 = 100;
-	#elif CONFIG_MACH_ONYX
+	#elif defined CONFIG_MACH_ONYX
 		rmi4_data->virtual_key_height = 190;
 		rmi4_data->sensor_max_x = LCD_MAX_X;
 		rmi4_data->sensor_max_y = LCD_MAX_Y+200;
@@ -5189,7 +5213,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 		synaptics_id_str = rmi4_data->rmi4_mod_info.product_id_string;
 	else
 		synaptics_id_str = "UNKNOWN";
-#elif CONFIG_MACH_ONYX
+#elif defined CONFIG_MACH_ONYX
 	sprintf(synaptics_id_str, "%u\n",rmi4_data->firmware_id);
 	sprintf(synaptics_vendor_str, "SAMSUNG");
 	push_component_info(TP, synaptics_id_str,synaptics_vendor_str);
@@ -5551,7 +5575,7 @@ static struct i2c_driver synaptics_rmi4_driver = {
 #ifdef CONFIG_MACH_ONYX
 static void create_driver_files(void) {
 	if( driver_create_file(&synaptics_rmi4_driver.driver, &driver_attr_oppo_tp_delta_image) ){
-		print_ts(TS_ERROR,KERN_ERR "driver_create_file failt\n");
+		print_ts(TS_ERROR,KERN_ERR "driver_create_file fault\n");
 	}
 }
 #endif

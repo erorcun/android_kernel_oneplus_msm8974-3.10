@@ -287,7 +287,9 @@ struct synaptics_rmi4_data {
 	atomic_t down_arrow_enable;
 	atomic_t left_arrow_enable;
 	atomic_t right_arrow_enable;
+	atomic_t letter_m_enable;
 	atomic_t letter_o_enable;
+	atomic_t letter_w_enable;
 	unsigned char glove_enable;  //glove mode
 	unsigned char pdoze_enable;  //pdoze mode
 	unsigned char smartcover_enable;  //smartcover mode

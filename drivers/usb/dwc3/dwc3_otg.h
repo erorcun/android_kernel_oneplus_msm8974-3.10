@@ -25,7 +25,7 @@
 /* OPPO 2013-08-23 wangjc Add begin for set charge current. */
 #ifdef CONFIG_MACH_ONYX
 #define DWC3_IDEV_CHG_MAX 1800
-#elif CONFIG_MACH_FIND7OP
+#elif defined CONFIG_MACH_FIND7OP
 #define DWC3_IDEV_CHG_MAX 2000
 #define DWC3_IDEV_CHG_FLOATED	2000
 #endif

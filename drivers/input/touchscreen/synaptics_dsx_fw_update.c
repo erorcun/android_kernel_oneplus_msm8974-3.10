@@ -48,7 +48,7 @@ extern int lcd_type_id;
 #ifdef CONFIG_MACH_FIND7OP
 #define FW_IMAGE_NAME "synaptics/startup_fw_update.img"
 #define DO_STARTUP_FW_UPDATE
-#elif CONFIG_MACH_ONYX
+#elif defined CONFIG_MACH_ONYX
 #define FW_IMAGE_NAME "tp/15055/15055_FW_S3508_Tpk.img"
 #endif
 
@@ -2032,6 +2032,7 @@ exit:
 	return;
 }
 
+#ifdef CONFIG_MACH_FIND7OP
 static ssize_t synaptics_proc_write(struct file *filp, const char __user *buff, size_t len, loff_t *ppos)
 {
 	int copy_len = len;
@@ -2094,7 +2095,20 @@ static const struct file_operations synaptics_proc = {
 	.open = simple_open,
 	.owner = THIS_MODULE,
 };
-#ifdef CONFIG_MACH_ONYX
+
+static int init_synaptics_proc(void)
+{
+	int ret=0;
+
+	prEntry_write = proc_create("syna_write", 0222, NULL, &synaptics_proc);
+	if(prEntry_write == NULL){	   
+		ret = -ENOMEM;	   
+	  	printk(KERN_INFO"init_synaptics_proc: Couldn't create proc entry\n");
+	}
+
+	return ret;
+}
+#elif defined CONFIG_MACH_ONYX
 static ssize_t synaptics_update_fw_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
@@ -2123,18 +2137,6 @@ exit:
 	return retval;
 }
 #endif
-static int init_synaptics_proc(void)
-{
-	int ret=0;
-
-	prEntry_write = proc_create("syna_write", 0222, NULL, &synaptics_proc);
-	if(prEntry_write == NULL){	   
-		ret = -ENOMEM;	   
-	  	printk(KERN_INFO"init_synaptics_proc: Couldn't create proc entry\n");
-	}
-
-	return ret;
-}
 
 //init fw module
 int rmi4_fw_module_init(bool insert) {
@@ -2152,8 +2154,9 @@ static int __init rmi4_fw_update_module_init(void)
 			synaptics_rmi4_fwu_remove,
 			synaptics_rmi4_fwu_attn);
 
+#ifdef CONFIG_MACH_FIND7OP
     init_synaptics_proc();
-
+#endif
 	return 0;
 }
 
