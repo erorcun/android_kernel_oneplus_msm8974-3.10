@@ -972,7 +972,6 @@ static int synaptics_rmi4_f11_abs_report(struct synaptics_rmi4_data *rmi4_data,
 static int SYNA_ADDR_REPORT_FLAG = 0x1b; // 0x36 in X
 static int SYNA_ADDR_GESTURE_EXT = 0x402;
 
-//\D2\D4\CF¼Ĵ\E6\C6\F7\D7\DC\CA\C7\D0޸ģ\AC\D2\F2\B4˳\E9\B3\F6\C0\B4\B6\A8\D2\E5\D4\DA\D5\E2\C0\EF
 #ifdef CONFIG_MACH_FIND7OP
 
 #define DRIVER_NAME "synaptics-rmi-ts"
@@ -2226,7 +2225,7 @@ static int synaptics_init_gpio(struct synaptics_rmi4_data *ts)
 	};
 
 	for (i = 0;i < sizeof(synaptics_all_gpio)/sizeof(struct gpio); i++) {
-#ifdef CONFIG_MACH_FIND70P
+#ifdef CONFIG_MACH_FIND7OP
 		gpio_tlmm_config(synaptics_all_gpio[i].flags, GPIO_CFG_ENABLE);
 #endif
 		gpio_request(synaptics_all_gpio[i].gpio,synaptics_all_gpio[i].label);
@@ -4228,6 +4227,11 @@ static int synaptics_rmi4_query_device(struct synaptics_rmi4_data *rmi4_data)
 	struct synaptics_rmi4_fn_desc rmi_fd;
 	struct synaptics_rmi4_fn *fhandler;
 	struct synaptics_rmi4_device_info *rmi;
+#ifdef CONFIG_MACH_ONYX
+	uint8_t buf[4];
+	int count = 0;
+	unsigned short fw_id_addr;
+#endif
 
 	rmi = &(rmi4_data->rmi4_mod_info);
 
@@ -4242,12 +4246,58 @@ rescan_pdt:
 				pdt_entry_addr -= PDT_ENTRY_SIZE) {
 			pdt_entry_addr |= (page_number << 8);
 
+#ifdef CONFIG_MACH_ONYX
+			if(count == 5)
+				goto flash_prog_mode;
+ 
+			switch(pdt_entry_addr) {
+			case 0xdd:
+				rmi_fd.intr_src_count=F12_INTERRUPT_NUMBER;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F12;
+				break;
+			case 0xe3:
+				rmi_fd.intr_src_count=0;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F01;
+				break;
+			case 0xe9:
+				rmi_fd.intr_src_count=F34_INTERRUPT_NUMBER;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F34;
+				break;
+			case 0x4e9:
+				rmi_fd.intr_src_count=0;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F51;
+				break;
+			case 0x1e9:
+				rmi_fd.intr_src_count=0;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F54;
+				break;
+			default:
+				continue;
+			}
+
+			count++;
+
+			retval = synaptics_rmi4_i2c_read(rmi4_data,
+					pdt_entry_addr,
+					buf,
+					4);
+
+			if (retval < 0)
+				return retval;
+
+			rmi_fd.query_base_addr = buf[0];
+			rmi_fd.cmd_base_addr = buf[1];
+			rmi_fd.ctrl_base_addr = buf[2];
+			rmi_fd.data_base_addr = buf[3];
+#elif defined CONFIG_MACH_FIND7OP
 			retval = synaptics_rmi4_i2c_read(rmi4_data,
 					pdt_entry_addr,
 					(unsigned char *)&rmi_fd,
 					sizeof(rmi_fd));
+
 			if (retval < 0)
 				return retval;
+#endif
 
 			fhandler = NULL;
 
@@ -4316,7 +4366,7 @@ rescan_pdt:
 					retval = synaptics_rmi4_alloc_fh(&fhandler,
 							&rmi_fd, page_number);
 #ifdef CONFIG_MACH_ONYX
-					SYNA_ADDR_REPORT_FLAG = fhandler->full_addr.ctrl_base + 0x07;
+					SYNA_ADDR_REPORT_FLAG = rmi_fd.ctrl_base_addr + 0x07;
 #endif
 					if (retval < 0) {
 						dev_err(&rmi4_data->i2c_client->dev,
@@ -4351,9 +4401,12 @@ rescan_pdt:
 						return retval;
 					}
 					break;
-#ifdef CONFIF_MACH_ONYX
+#ifdef CONFIG_MACH_ONYX
+				case SYNAPTICS_RMI4_F34:
+					fw_id_addr = rmi_fd.ctrl_base_addr;
+					break;
 				case SYNAPTICS_RMI4_F51:
-					SYNA_ADDR_GESTURE_EXT = (rmi_fd.data_base_addr |(page_number << 8)) + 0x18;
+					SYNA_ADDR_GESTURE_EXT = ((rmi_fd.data_base_addr + 0x18) |(page_number << 8));
 					break;
 #endif
 				case SYNAPTICS_RMI4_F54:
@@ -4404,6 +4457,7 @@ flash_prog_mode:
 		(f01_query[10] & MASK_7BIT);
 	memcpy(rmi->product_id_string, &f01_query[11], 10);
 
+#ifdef CONFIG_MACH_FIND7OP
 	retval = synaptics_rmi4_i2c_read(rmi4_data,
 			rmi4_data->f01_query_base_addr + F01_BUID_ID_OFFSET,
 			rmi->build_id,
@@ -4414,7 +4468,16 @@ flash_prog_mode:
 	rmi4_data->firmware_id = (unsigned int)rmi->build_id[0] +
 		(unsigned int)rmi->build_id[1] * 0x100 +
 		(unsigned int)rmi->build_id[2] * 0x10000;
+#elif defined CONFIG_MACH_ONYX
+	retval = synaptics_rmi4_i2c_read(rmi4_data,
+			fw_id_addr,
+			buf,
+			4);
+	if (retval < 0)
+		return retval;
 
+	rmi4_data->firmware_id = (buf[0]<<24)|(buf[1]<<16)|(buf[2]<<8)|buf[3];
+#endif
 	memset(rmi4_data->intr_mask, 0x00, sizeof(rmi4_data->intr_mask));
 
 	/*

@@ -782,14 +782,49 @@ static int fwu_scan_pdt(void)
 	bool f01found = false;
 	bool f34found = false;
 	struct synaptics_rmi4_fn_desc rmi_fd;
+#ifdef CONFIG_MACH_ONYX
+	uint8_t buf[4];
+#endif
 
 	for (addr = PDT_START; addr > PDT_END; addr -= PDT_ENTRY_SIZE) {
+#ifdef CONFIG_MACH_ONYX
+			switch(addr) {
+			case 0xdd:
+				rmi_fd.intr_src_count=F12_INTERRUPT_NUMBER;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F12;
+				break;
+			case 0xe3:
+				rmi_fd.intr_src_count=0;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F01;
+				break;
+			case 0xe9:
+				rmi_fd.intr_src_count=F34_INTERRUPT_NUMBER;
+				rmi_fd.fn_number=SYNAPTICS_RMI4_F34;
+				break;
+			default:
+				continue;
+			}
+
+		retval = fwu->fn_ptr->read(fwu->rmi4_data,
+				addr,
+				&(buf[0x0]),
+				4);
+
+			if (retval < 0)
+				return retval;
+
+			rmi_fd.query_base_addr = buf[0];
+			rmi_fd.cmd_base_addr = buf[1];
+			rmi_fd.ctrl_base_addr = buf[2];
+			rmi_fd.data_base_addr = buf[3];
+#elif defined CONFIG_MACH_FIND7OP
 		retval = fwu->fn_ptr->read(fwu->rmi4_data,
 				addr,
 				(unsigned char *)&rmi_fd,
 				sizeof(rmi_fd));
 		if (retval < 0)
 			return retval;
+#endif
 
 		if (rmi_fd.fn_number) {
 			dev_dbg(&fwu->rmi4_data->i2c_client->dev,

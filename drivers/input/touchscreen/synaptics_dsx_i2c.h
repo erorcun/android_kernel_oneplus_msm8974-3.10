@@ -75,10 +75,15 @@
 #define TP_VENDOR_WINTEK	1	//胜华
 #define TP_VENDOR_TPK		2	//TPK
 #define TP_VENDOR_TRULY		3	//信利
-#define TP_VENDOR_YOUNGFAST 4   //洋华
-#define TP_15055 7   //洋华
+#define TP_VENDOR_YOUNGFAST 4   //洋华  
 
 #define TP_TYPE_MAX		2	//we only use wintek and tpk now.
+
+#ifdef CONFIG_MACH_ONYX
+#define TP_15055	7
+#define F12_INTERRUPT_NUMBER	1
+#define F34_INTERRUPT_NUMBER	0
+#endif
 
 enum LCD_TYPE {
 	LCD_VENDOR_JDI,
