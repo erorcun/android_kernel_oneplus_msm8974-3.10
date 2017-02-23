@@ -1898,6 +1898,13 @@ static const struct file_operations letter_o_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
+static const struct file_operations camera_enable_proc_fops = {
+	.write = synaptics_rmi4_proc_letter_o_write,
+	.read =  synaptics_rmi4_proc_letter_o_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
 static const struct file_operations letter_w_proc_fops = {
 	.write = synaptics_rmi4_proc_letter_w_write,
 	.read =  synaptics_rmi4_proc_letter_w_read,
@@ -1913,6 +1920,13 @@ static const struct file_operations music_proc_fops = {
 };
 
 static const struct file_operations down_arrow_proc_fops = {
+	.write = synaptics_rmi4_proc_down_arrow_write,
+	.read =  synaptics_rmi4_proc_down_arrow_read,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+static const struct file_operations flashlight_enable_proc_fops = {
 	.write = synaptics_rmi4_proc_down_arrow_write,
 	.read =  synaptics_rmi4_proc_down_arrow_read,
 	.open = simple_open,
@@ -2016,25 +2030,25 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("camera_enable", 0666, procdir, &letter_o_proc_fops);
+	prEntry_tmp = proc_create("camera_enable", 0666, procdir, &camera_enable_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("letter_m_enable", 0666, procdir, &letter_m_proc_fops);
+	prEntry_tmp = proc_create("letter_m_enable", 0664, procdir, &letter_m_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("letter_o_enable", 0666, procdir, &letter_o_proc_fops);
+	prEntry_tmp = proc_create("letter_o_enable", 0664, procdir, &letter_o_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("letter_w_enable", 0666, procdir, &letter_w_proc_fops);
+	prEntry_tmp = proc_create("letter_w_enable", 0664, procdir, &letter_w_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
@@ -2046,37 +2060,37 @@ static int synaptics_rmi4_init_touchpanel_proc(void)
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("flashlight_enable", 0666, procdir, &down_arrow_proc_fops);
+	prEntry_tmp = proc_create("flashlight_enable", 0666, procdir, &flashlight_enable_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("down_arrow_enable", 0666, procdir, &down_arrow_proc_fops);
+	prEntry_tmp = proc_create("down_arrow_enable", 0664, procdir, &down_arrow_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("up_arrow_enable", 0666, procdir, &up_arrow_proc_fops);
+	prEntry_tmp = proc_create("up_arrow_enable", 0664, procdir, &up_arrow_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("left_arrow_enable", 0666, procdir, &left_arrow_proc_fops);
+	prEntry_tmp = proc_create("left_arrow_enable", 0664, procdir, &left_arrow_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("right_arrow_enable", 0666, procdir, &right_arrow_proc_fops);
+	prEntry_tmp = proc_create("right_arrow_enable", 0664, procdir, &right_arrow_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
 	}
 
-	prEntry_tmp = proc_create("double_swipe_enable", 0666, procdir, &double_swipe_proc_fops);
+	prEntry_tmp = proc_create("double_swipe_enable", 0664, procdir, &double_swipe_proc_fops);
 	if(prEntry_tmp == NULL){	   
 		ret = -ENOMEM;	   
 		printk(KERN_INFO"synaptics_rmi4_init_touchpanel_proc: Couldn't create proc entry\n");
