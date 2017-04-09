@@ -1107,7 +1107,7 @@ qpnp_chg_is_ichg_loop_active(struct qpnp_chg_chip *chip)
 #define QPNP_CHG_I_MAX_MIN_100		100
 #define QPNP_CHG_I_MAX_MIN_150		150
 #define QPNP_CHG_I_MAX_MIN_MA		200
-#define QPNP_CHG_I_MAX_MAX_MA		2500
+#define QPNP_CHG_I_MAX_MAX_MA		3000 //2500
 #define QPNP_CHG_I_MAXSTEP_MA		100
 static int
 qpnp_chg_idcmax_set(struct qpnp_chg_chip *chip, int mA)
