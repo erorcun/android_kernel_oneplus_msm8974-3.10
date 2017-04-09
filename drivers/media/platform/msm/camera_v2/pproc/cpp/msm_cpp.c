@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -791,8 +791,11 @@ remap_failed:
 	msm_cam_clk_enable(&cpp_dev->pdev->dev, cpp_clk_info,
 		cpp_dev->cpp_clk, cpp_dev->num_clk, 0);
 clk_failed:
-	regulator_disable(cpp_dev->fs_cpp);
-	regulator_put(cpp_dev->fs_cpp);
+	if (cpp_dev->fs_cpp) {
+		regulator_disable(cpp_dev->fs_cpp);
+		regulator_put(cpp_dev->fs_cpp);
+		cpp_dev->fs_cpp = NULL;
++	}
 fs_failed:
 	msm_isp_deinit_bandwidth_mgr(ISP_CPP);
 bus_scale_register_failed:
@@ -2194,6 +2197,7 @@ static int cpp_probe(struct platform_device *pdev)
 	cpp_timer.data.cpp_dev = cpp_dev;
 	atomic_set(&cpp_timer.used, 0);
 	cpp_dev->fw_name_bin = NULL;
+	cpp_dev->fs_cpp = NULL;
 	if (rc == 0)
 		CPP_DBG("SUCCESS.");
 	else
