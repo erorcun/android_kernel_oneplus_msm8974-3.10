@@ -7532,7 +7532,7 @@ static int handle_batt_temp_warm(struct qpnp_chg_chip *chip)
 	if(qpnp_battery_temp_region_get(chip) != CV_BATTERY_TEMP_REGION__WARM)
 	{
 	    
-		pr_info("Battery temp. is between 45C and 55C, charge speed decreasing.\n");
+		pr_info("Battery temp. is between 45C and 55C, charge being capped to 60 percent and 900 mA.\n");
 		if(qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__HOT || 
 			qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__COLD)
 			qpnp_chg_charge_en(chip, !chip->charging_disabled);
@@ -8030,7 +8030,7 @@ static void update_heartbeat(struct work_struct *work)
 	cap = get_prop_capacity(chip);
 
 	if(is_there_charger) {
-		if(cap >= charge_limit) {
+		if(cap >= charge_limit || (qpnp_battery_temp_region_get(chip) == CV_BATTERY_TEMP_REGION__WARM && cap >= 60)) {
 			if(cap != 100 && !chip->chg_done) {
 				chip->limited = true;
 				qpnp_chg_charge_en(chip, 0);
