@@ -267,7 +267,7 @@ static unsigned long msm_cpp_queue_buffer_info(struct cpp_device *cpp_dev,
 	list_for_each_entry_safe(buff, save, buff_head, entry) {
 		if (buff->map_info.buff_info.index == buffer_info->index) {
 			pr_err("error buffer index already queued\n");
-			return -EINVAL;
+			goto error;
 		}
 	}
 
@@ -275,7 +275,7 @@ static unsigned long msm_cpp_queue_buffer_info(struct cpp_device *cpp_dev,
 		sizeof(struct msm_cpp_buffer_map_list_t), GFP_KERNEL);
 	if (!buff) {
 		pr_err("error allocating memory\n");
-		return -EINVAL;
+		goto error;
 	}
 
 	buff->map_info.buff_info = *buffer_info;
@@ -304,7 +304,7 @@ QUEUE_BUFF_ERROR2:
 QUEUE_BUFF_ERROR1:
 	buff->map_info.ion_handle = NULL;
 	kzfree(buff);
-
+error:
 	return 0;
 }
 
