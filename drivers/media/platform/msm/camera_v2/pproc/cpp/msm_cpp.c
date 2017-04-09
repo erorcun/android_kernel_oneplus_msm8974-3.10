@@ -795,7 +795,7 @@ clk_failed:
 		regulator_disable(cpp_dev->fs_cpp);
 		regulator_put(cpp_dev->fs_cpp);
 		cpp_dev->fs_cpp = NULL;
-+	}
+	}
 fs_failed:
 	msm_isp_deinit_bandwidth_mgr(ISP_CPP);
 bus_scale_register_failed:
