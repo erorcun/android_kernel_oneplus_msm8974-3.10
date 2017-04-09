@@ -210,16 +210,12 @@ close_time:
 int get_prop_pre_shutdown_soc(void)
 {
 	int soc_load;
-	soc_load = load_soc();	   //get the soc before reboot
-	if (soc_load == -1)
-	{
-		return 50;
-	}
-	else
-	{
-		return soc_load;
-	}
 
+	soc_load = load_soc();
+	if (soc_load == -1)
+		return 50;
+	else
+		return soc_load;
 }
 #endif
 /* OPPO 2013-08-24 wangjc Add end */
@@ -411,8 +407,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	static int charging_status = 0;//sjc1121
 	static int charging_status_pre = 0; /* yangfangbiao@oneplus.cn, 2015/01/06  Modify for  sync with KK charge standard  */
 	static bool first_enter=false;
-	int soc_load;
-	int soc_temp;
+	int temp_region, soc_load, soc_temp;
 	unsigned long	  soc_current_time,time_last;
 	if(false == first_enter)
 	{
@@ -461,36 +456,42 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 
 	soc_temp  = di->soc_pre;
 
-	if(di->batt_psy){
-		ret.intval = get_charging_status() ;
-		di->batt_vol_pre= bq27541_battery_voltage(di);
+	if(!di->batt_psy){
+		soc_calib = soc;
+		goto out;
+	}
+		
+	ret.intval = get_charging_status();
+	di->batt_vol_pre= bq27541_battery_voltage(di);
+	temp_region = fuelgauge_battery_temp_region_get();
 
-		if(ret.intval == POWER_SUPPLY_STATUS_CHARGING || ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
-			charging_status = 1;
-		} else {
-			charging_status = 0;
+	if(ret.intval == POWER_SUPPLY_STATUS_CHARGING || ret.intval == POWER_SUPPLY_STATUS_FULL) { // is charging
+		charging_status = 1;
+	} else {
+		charging_status = 0;
+	}
+
+	if (charging_status ^ charging_status_pre) {
+		if (charging_status_pre) {
+			get_current_time(&soc_current_time);
+			di->soc_store_time = soc_current_time - di->soc_pre_time;
 		}
-		if (charging_status ^ charging_status_pre) {
-			if (charging_status_pre) {
-				get_current_time(&soc_current_time);
-				di->soc_store_time = soc_current_time - di->soc_pre_time;
-			}
 
-			get_current_time(&di->soc_pre_time);
-			if (!charging_status_pre && di->soc_store_time)
-				di->soc_pre_time -= di->soc_store_time;
-
-			charging_status_pre = charging_status;
-			di->saltate_counter = 0;
-		}
-		get_current_time(&soc_current_time);
-		time_last= soc_current_time - di->soc_pre_time;
-		if (charging_status) { // is charging
-			if (ret.intval == POWER_SUPPLY_STATUS_FULL) {
-				soc_calib = di->soc_pre;
-				if (di->soc_pre < 100
-						&& (fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__LITTLE_COOL
-						|| fuelgauge_battery_temp_region_get() == CV_BATTERY_TEMP_REGION__NORMAL)) {
+		get_current_time(&di->soc_pre_time);
+		if (!charging_status_pre && di->soc_store_time)
+			di->soc_pre_time -= di->soc_store_time;
+		charging_status_pre = charging_status;
+		di->saltate_counter = 0;
+	}
+	
+	get_current_time(&soc_current_time);
+	time_last= soc_current_time - di->soc_pre_time;
+	if (charging_status) { // is charging
+		if (ret.intval == POWER_SUPPLY_STATUS_FULL) {
+			soc_calib = di->soc_pre;
+			if (di->soc_pre < 100
+						&& (temp_region == CV_BATTERY_TEMP_REGION__LITTLE_COOL
+						|| temp_region == CV_BATTERY_TEMP_REGION__NORMAL)) {
 					if (di->saltate_counter < CAPACITY_SALTATE_COUNTER_CHARGING_TERM) {
 						di->saltate_counter++;
 					} else {
@@ -522,6 +523,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 						else
 							counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING;//t>=40sec
 					}
+
 					/* when batt_vol is too low(and soc is jumping), decrease faster to avoid dead battery shutdown */
 					if(di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre <= 10) {
 						if (bq27541_battery_voltage(di) <= LOW_BATTERY_PROTECT_VOLTAGE && bq27541_battery_voltage(di) > 2500 * 1000) {//check again
@@ -552,72 +554,47 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 				else {
 					soc_calib = di->soc_pre;
 				}
-
-
 			}
-		} else { // not charging
-			if ((abs(soc - di->soc_pre) >  0)
+		} else { /* not charging */
+			if ((soc < di->soc_pre)
 					|| (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000)) {// add for batt_vol is too low but soc is not jumping
-				di->saltate_counter++;
-				counter_temp = CAPACITY_SALTATE_COUNTER_FULL;
-				if(di->soc_pre == 100) {
-					if((time_last >= FIVE_MINUTES) && (soc - di->soc_pre)<0)//t>=5min
-					{
-						counter_temp = 0;
-					}
-				} else if (di->soc_pre > 95) {
-					if((time_last >= TWO_POINT_FIVE_MINUTES) && (soc - di->soc_pre)<0)//t>=2.5min
-					{
-						counter_temp = 0;
-					}
-				} else if (di->soc_pre > 60) {
-					if((time_last >= ONE_MINUTE) && (soc - di->soc_pre)<0)//t>=1min
-					{
-						counter_temp = 0;
-					}
-				} else {
-					if(time_last >= CAPACITY_CALIBRATE_TIME_60_PERCENT && (soc - di->soc_pre)<0)
-					{
-						counter_temp = 0;
-					}
-					else
-						counter_temp = CAPACITY_SALTATE_COUNTER_NOT_CHARGING+ 20;//t>=40sec
-				}
-				/* when batt_vol is too low(and soc is jumping), decrease faster to avoid dead battery shutdown */
-				if (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre <= 10) {
-					if (bq27541_battery_voltage(di) <= LOW_BATTERY_PROTECT_VOLTAGE && bq27541_battery_voltage(di) > 2500 * 1000) {//check again
-						if(time_last > 9 )//about 9s
-						{
-							counter_temp = 0;
-						}
-					}
-				}
-
-				if(di->saltate_counter < counter_temp)
-					return di->soc_pre;
-				else
-					di->saltate_counter = 0;
+			if(di->soc_pre == 100){
+				counter_temp = FIVE_MINUTES;
 			}
-			else
-				di->saltate_counter = 0;
+			else if (di->soc_pre > 95){
+				counter_temp = TWO_POINT_FIVE_MINUTES;
+			}
+			else if (di->soc_pre > 60){
+				counter_temp = ONE_MINUTE;
+			}
+			else {
+				counter_temp = CAPACITY_CALIBRATE_TIME_60_PERCENT;
+			}
 
-			if(soc < di->soc_pre)
-				soc_calib = di->soc_pre - 1;
-			else if (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre > 0)// add for batt_vol is too low but soc is not jumping
-			{
-				if(time_last > 9 )
-				{
-					soc_calib = di->soc_pre - 1;
+			/* avoid dead battery shutdown */
+			if (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre <= 10) {
+				if (bq27541_battery_voltage(di) <= LOW_BATTERY_PROTECT_VOLTAGE && bq27541_battery_voltage(di) > 2500 * 1000) {//check again
+					if(time_last > 9 )//about 9s
+					{
+						counter_temp = 0;
+					}
 				}
 			}
-			else
-				soc_calib = di->soc_pre;
 
+			if (time_last < counter_temp)
+				return di->soc_pre;
 		}
-	} else {
 
-		soc_calib = soc;
+		if(soc < di->soc_pre)
+			soc_calib = di->soc_pre - 1;
+		else if (di->batt_vol_pre <= LOW_BATTERY_PROTECT_VOLTAGE && di->batt_vol_pre > 2500 * 1000 && di->soc_pre > 0 && time_last > 9)// add for batt_vol is too low but soc is not jumping
+		{
+			soc_calib = di->soc_pre - 1;
+		} else
+			soc_calib = di->soc_pre;
 	}
+
+out:
 	if(soc_calib > 100)
 		soc_calib = 100;
 	if(soc_calib < 0)
@@ -627,7 +604,7 @@ static int bq27541_soc_calibrate(struct bq27541_device_info *di, int soc)
 	if(soc_temp  !=  soc_calib) {
 		get_current_time(&di->soc_pre_time);
 		//store when soc changed
-		pr_info("soc:%d, soc_calib:%d,VOLT:%d,current:%d\n", soc, soc_calib,bq27541_battery_voltage(di),bq27541_average_current(di));
+		pr_info("soc:%d, soc_calib:%d,VOLT:%d,current:%d\n", soc, soc_calib,bq27541_battery_voltage(di)/1000,bq27541_average_current(di));
 	}
 
 	return soc_calib;
@@ -1988,7 +1965,10 @@ static int bq27541_battery_resume(struct i2c_client *client)
 //	pr_err("%s: suspend_time=%d\n", __func__,suspend_time);
 
 	/*update pre capacity when sleep time more than 1minutes*/
+	bq27541_set_alow_reading(true);
 	bq27541_battery_soc(bq27541_di, suspend_time);
+	bq27541_set_alow_reading(false);
+
 	return 0;
 }
 

@@ -2175,7 +2175,7 @@ qpnp_chg_set_appropriate_vddmax(struct qpnp_chg_chip *chip)
 		qpnp_chg_vddmax_set(chip,4000);
 	else if(chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__COOL)
 		qpnp_chg_vddmax_set(chip,chip->cool_bat_mv); /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
-	else if(chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__COOL)
+	else if(chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__LITTLE_COOL)
 		qpnp_chg_vddmax_set(chip,chip->little_cool_bat_mv); /* yangfangbiao@oneplus.cn, 2015/01/06  Add for  sync with KK charge standard  */
 	else if(chip->mBatteryTempRegion == CV_BATTERY_TEMP_REGION__WARM)
 		qpnp_chg_vddmax_set(chip,chip->warm_bat_mv);
@@ -8085,8 +8085,9 @@ static void update_heartbeat(struct work_struct *work)
 	qpnp_check_charge_timeout(chip);
 	qpnp_check_battery_uovp(chip);
 	qpnp_check_battery_temp(chip);
+	cap = get_prop_current_now(chip);
 
-	pr_debug("%s current:%d\n", __func__, get_prop_current_now(chip));
+	pr_debug("%s current:%d\n", __func__, cap);
 	
 #ifdef CONFIG_MACH_FIND7
 /* OPPO 2014-05-22 sjc Add for Find7s temp rising problem */
