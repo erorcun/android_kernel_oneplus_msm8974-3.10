@@ -17,7 +17,7 @@
 #include "msm_sensor_init.h"
 #include "msm_sensor_driver.h"
 #include "msm_sensor.h"
-#include "msm_sd.h"
+#include "../msm_sd.h"
 
 /* Logging macro */
 /*#define CONFIG_MSMB_CAMERA_DEBUG*/

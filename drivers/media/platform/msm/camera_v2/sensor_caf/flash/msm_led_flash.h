@@ -20,7 +20,7 @@
 #include <media/msm_cam_sensor.h>
 #include <soc/qcom/camera2.h>
 #include "../../sensor/io/msm_camera_i2c.h"
-#include "msm_sd.h"
+#include "../../msm_sd.h"
 
 #define MAX_LED_TRIGGERS 3
 

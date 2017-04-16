@@ -18,10 +18,10 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 #include <media/msm_isp.h>
-#include "msm_sd.h"
+#include "../../msm_sd.h"
 #include "msm_cci.h"
 #include "msm_cam_cci_hwreg.h"
-#include "msm_camera_io_util.h"
+#include "../../sensor/io/msm_camera_io_util.h"
 
 #define V4L2_IDENT_CCI 50005
 #define CCI_I2C_QUEUE_0_SIZE 64

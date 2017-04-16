@@ -17,8 +17,8 @@
 #include <linux/irqreturn.h>
 #include "msm_csid.h"
 #include "msm_csid_hwreg.h"
-#include "msm_sd.h"
-#include "msm_camera_io_util.h"
+#include "../../msm_sd.h"
+#include "../../sensor/io/msm_camera_io_util.h"
 
 #define V4L2_IDENT_CSID                            50002
 #define CSID_VERSION_V20                      0x02000011

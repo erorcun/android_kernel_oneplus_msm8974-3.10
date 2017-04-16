@@ -19,7 +19,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/msm_cam_sensor.h>
 #include <soc/qcom/camera2.h>
-#include "msm_sd.h"
+#include "../../msm_sd.h"
 /*Added by Jinshui.Liu@Camera 20140221 start for cci error*/
 #ifdef CONFIG_MACH_FIND7OP
 #include <linux/wakelock.h>

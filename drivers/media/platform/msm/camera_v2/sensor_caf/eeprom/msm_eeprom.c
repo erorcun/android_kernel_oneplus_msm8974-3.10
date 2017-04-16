@@ -14,7 +14,7 @@
 #include <linux/of_gpio.h>
 #include <linux/delay.h>
 #include <linux/crc32.h>
-#include "msm_sd.h"
+#include "../../msm_sd.h"
 #include "msm_cci.h"
 #include "msm_eeprom.h"
 

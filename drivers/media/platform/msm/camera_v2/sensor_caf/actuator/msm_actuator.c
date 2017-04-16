@@ -13,13 +13,13 @@
 #define pr_fmt(fmt) "%s:%d " fmt, __func__, __LINE__
 
 #include <linux/module.h>
-#include "msm_sd.h"
+#include "../../msm_sd.h"
 #include "msm_actuator.h"
-#include "msm_cci.h"
+#include "../cci/msm_cci.h"
 
 DEFINE_MSM_MUTEX(msm_actuator_mutex);
 
-/*#define MSM_ACUTUATOR_DEBUG*/
+#define MSM_ACUTUATOR_DEBUG
 #undef CDBG
 #ifdef MSM_ACUTUATOR_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)

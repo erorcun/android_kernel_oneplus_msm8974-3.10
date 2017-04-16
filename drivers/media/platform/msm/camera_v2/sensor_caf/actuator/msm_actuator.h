@@ -18,7 +18,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/msmb_camera.h>
 #include "../../sensor/io/msm_camera_i2c.h"
-#include "msm_camera_dt_util.h"
+#include "../io/msm_camera_dt_util.h"
 #include "../../sensor/io/msm_camera_io_util.h"
 
 

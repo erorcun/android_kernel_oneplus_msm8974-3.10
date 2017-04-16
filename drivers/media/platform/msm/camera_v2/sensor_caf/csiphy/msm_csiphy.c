@@ -19,9 +19,9 @@
 #include <linux/irqreturn.h>
 #include <mach/vreg.h>
 #include "msm_csiphy.h"
-#include "msm_sd.h"
+#include "../../msm_sd.h"
 #include "msm_csiphy_hwreg.h"
-#include "msm_camera_io_util.h"
+#include "../../sensor/io/msm_camera_io_util.h"
 #define DBG_CSIPHY 0
 
 #define V4L2_IDENT_CSIPHY                        50003
