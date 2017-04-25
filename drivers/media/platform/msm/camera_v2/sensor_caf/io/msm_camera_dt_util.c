@@ -838,7 +838,10 @@ int msm_camera2_get_dt_vreg_data(struct device_node *of_node,
 	uint32_t count = 0;
 	uint32_t *vreg_array = NULL;
 	struct camera_vreg_t *vreg = NULL;
-
+#ifdef CONFIG_OOS3_CAMERA_DRIVER
+	of_property_read_u32(of_node, "cell-index", &i);
+	if(i != 1) {
+#endif
 	count = of_property_count_strings(of_node, "qcom,cam-vreg-name");
 	CDBG("%s qcom,cam-vreg-name count %d\n", __func__, count);
 
@@ -918,7 +921,40 @@ int msm_camera2_get_dt_vreg_data(struct device_node *of_node,
 		CDBG("%s cam_vreg[%d].op_mode = %d\n", __func__, i,
 			vreg[i].op_mode);
 	}
+#ifdef CONFIG_OOS3_CAMERA_DRIVER
+	} else {
+		count = 3;
+		vreg = kzalloc(sizeof(*vreg) * count, GFP_KERNEL);
+		if (!vreg) {
+			pr_err("%s failed %d\n", __func__, __LINE__);
+			return -ENOMEM;
+		}
+		*cam_vreg = vreg;
+		*num_vreg = count;
 
+		vreg[0].reg_name = "vdig";
+		vreg[1].reg_name = "cam_vio";
+		vreg[2].reg_name = "cam_vana";
+
+		vreg[0].type = 0;
+		vreg[1].type = 1;
+		vreg[2].type = 0;
+
+		vreg[0].min_voltage = 1000000;
+		vreg[1].min_voltage = 0;
+		vreg[2].min_voltage = 2800000;
+
+		vreg[0].max_voltage = 1000000;
+		vreg[1].max_voltage = 0;
+		vreg[2].max_voltage = 2800000;
+
+		vreg[0].op_mode = 0;
+		vreg[1].op_mode = 0;
+		vreg[2].op_mode = 80000;
+
+		return rc;
+	}
+#endif
 	kfree(vreg_array);
 	return rc;
 ERROR2:

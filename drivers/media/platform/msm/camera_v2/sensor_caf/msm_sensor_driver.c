@@ -29,6 +29,9 @@
 
 #define	SENSOR_MAX_MOUNTANGLE (360)
 
+// static struct v4l2_file_operations msm_sensor_v4l2_subdev_fops;
+static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev);
+
 /* Static declaration */
 static struct msm_sensor_ctrl_t *g_sctrl[MAX_CAMERAS];
 
@@ -60,6 +63,16 @@ const struct of_device_id msm_sensor_driver_dt_match[] = {
 };
 
 MODULE_DEVICE_TABLE(of, msm_sensor_driver_dt_match);
+
+struct platform_driver msm_sensor_platform_driver = {
+	.probe = msm_sensor_driver_platform_probe,
+	.driver = {
+		.name = "qcom,camera",
+		.owner = THIS_MODULE,
+		.of_match_table = msm_sensor_driver_dt_match,
+	},
+	.remove = msm_sensor_platform_remove,
+};
 
 static struct v4l2_subdev_info msm_sensor_driver_subdev_info[] = {
 	{
@@ -98,7 +111,10 @@ static int32_t msm_sensor_driver_create_i2c_v4l_subdev
 	s_ctrl->sensordata->sensor_info->session_id = session_id;
 	s_ctrl->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x3;
 	msm_sd_register(&s_ctrl->msm_sd);
-	CDBG("%s:%d\n", __func__, __LINE__);
+/*	msm_sensor_v4l2_subdev_fops = v4l2_subdev_fops;
+	s_ctrl->msm_sd.sd.devnode->fops =		
+		&msm_sensor_v4l2_subdev_fops;
+*/	CDBG("%s:%d\n", __func__, __LINE__);
 	return rc;
 }
 
@@ -128,6 +144,10 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 	s_ctrl->msm_sd.sd.entity.name = s_ctrl->msm_sd.sd.name;
 	s_ctrl->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x3;
 	msm_sd_register(&s_ctrl->msm_sd);
+/*	msm_cam_copy_v4l2_subdev_fops(&msm_sensor_v4l2_subdev_fops);
+	s_ctrl->msm_sd.sd.devnode->fops =		
+			&msm_sensor_v4l2_subdev_fops;
+*/
 	return rc;
 }
 
@@ -926,6 +946,9 @@ static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev)
 	/* Initialize sensor device type */
 	s_ctrl->sensor_device_type = MSM_CAMERA_PLATFORM_DEVICE;
 	s_ctrl->of_node = pdev->dev.of_node;
+	
+	/*fill in platform device*/		
+	s_ctrl->pdev = pdev;
 
 	rc = msm_sensor_driver_parse(s_ctrl);
 	if (rc < 0) {
@@ -945,16 +968,6 @@ FREE_S_CTRL:
 	kfree(s_ctrl);
 	return rc;
 }
-
-struct platform_driver msm_sensor_platform_driver = {
-	.probe = msm_sensor_driver_platform_probe,
-	.driver = {
-		.name = "qcom,camera",
-		.owner = THIS_MODULE,
-		.of_match_table = msm_sensor_driver_dt_match,
-	},
-	.remove = msm_sensor_platform_remove,
-};
 
 static int32_t msm_sensor_driver_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
@@ -1040,8 +1053,7 @@ static int __init msm_sensor_driver_init(void)
 	int32_t rc = 0;
 
 	CDBG("Enter");
-	rc = platform_driver_probe(&msm_sensor_platform_driver,
-		msm_sensor_driver_platform_probe);
+	rc = platform_driver_register(&msm_sensor_platform_driver);
 	if (!rc) {
 		CDBG("probe success");
 		return rc;

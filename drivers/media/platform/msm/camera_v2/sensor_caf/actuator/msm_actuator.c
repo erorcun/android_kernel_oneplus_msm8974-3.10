@@ -19,7 +19,7 @@
 
 DEFINE_MSM_MUTEX(msm_actuator_mutex);
 
-#define MSM_ACUTUATOR_DEBUG
+/*#define MSM_ACUTUATOR_DEBUG*/
 #undef CDBG
 #ifdef MSM_ACUTUATOR_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
@@ -1157,6 +1157,7 @@ static const struct of_device_id msm_actuator_dt_match[] = {
 MODULE_DEVICE_TABLE(of, msm_actuator_dt_match);
 
 static struct platform_driver msm_actuator_platform_driver = {
+	.probe = msm_actuator_platform_probe,
 	.driver = {
 		.name = "qcom,actuator",
 		.owner = THIS_MODULE,
@@ -1168,10 +1169,10 @@ static int __init msm_actuator_init_module(void)
 {
 	int32_t rc = 0;
 	CDBG("Enter\n");
-	rc = platform_driver_probe(&msm_actuator_platform_driver,
-		msm_actuator_platform_probe);
+	rc = platform_driver_register(&msm_actuator_platform_driver);
 	if (!rc)
 		return rc;
+
 	CDBG("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return i2c_add_driver(&msm_actuator_i2c_driver);
 }
