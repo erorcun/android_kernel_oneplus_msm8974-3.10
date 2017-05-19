@@ -136,7 +136,7 @@ int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 		if ((freq < policy->min) || (freq > policy->max))
 			continue;
 		if (freq == target_freq) {
-			optimal.index = i;
+			optimal.driver_data = i;
 			break;
 		}
 		switch (relation) {
