@@ -44,6 +44,12 @@
 #include <linux/earlysuspend.h>
 #endif
 
+#define USE_LCD_NOTIFIER
+
+#ifdef USE_LCD_NOTIFIER
+#include <linux/lcd_notify.h>
+#endif
+
 #ifdef CONFIG_CPU_FREQ_GOV_SMARTMAX_TEGRA
 extern int tegra_input_boost (struct cpufreq_policy *policy,
 		       unsigned int target_freq,
@@ -291,6 +297,10 @@ static unsigned int min_sampling_rate;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static struct early_suspend smartmax_early_suspend_handler;
+#endif
+
+#ifdef USE_LCD_NOTIFIER
+static struct notifier_block smartmax_lcd_notif;
 #endif
 
 #define LATENCY_MULTIPLIER			(1000)
@@ -1274,7 +1284,32 @@ static void smartmax_late_resume(struct early_suspend *h)
 	smartmax_update_min_max_allcpus();
 }
 #endif
+#ifdef USE_LCD_NOTIFIER
+static int smartmax_lcd_notifier_callback(struct notifier_block *this,
+								unsigned long event, void *data)
+{
+	switch (event)
+	{
+		case LCD_EVENT_OFF_END:
+			dprintk(SMARTMAX_DEBUG_SUSPEND, "%s\n", __func__);
+			ideal_freq = suspend_ideal_freq;
+			is_suspended = true;
+			smartmax_update_min_max_allcpus();
+			break;
 
+		case LCD_EVENT_ON_START:
+			dprintk(SMARTMAX_DEBUG_SUSPEND, "%s\n", __func__);
+			ideal_freq = awake_ideal_freq;
+			is_suspended = false;
+			smartmax_update_min_max_allcpus();
+			break;
+
+		default:
+			break;
+	}
+	return 0;
+}
+#endif
 static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 		unsigned int event) {
 	unsigned int cpu = new_policy->cpu;
@@ -1352,6 +1387,9 @@ static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 #ifdef CONFIG_HAS_EARLYSUSPEND
 			register_early_suspend(&smartmax_early_suspend_handler);
 #endif
+#ifdef USE_LCD_NOTIFIER
+			lcd_register_client(&smartmax_lcd_notif);
+#endif
 			/* policy latency is in nS. Convert it to uS first */
 			latency = new_policy->cpuinfo.transition_latency / 1000;
 			if (latency == 0)
@@ -1406,6 +1444,9 @@ static int cpufreq_governor_smartmax(struct cpufreq_policy *new_policy,
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 			unregister_early_suspend(&smartmax_early_suspend_handler);
+#endif
+#ifdef USE_LCD_NOTIFIER
+			lcd_unregister_client(&smartmax_lcd_notif);
 #endif
 		}
 
@@ -1474,6 +1515,9 @@ static int __init cpufreq_smartmax_init(void) {
 	smartmax_early_suspend_handler.suspend = smartmax_early_suspend;
 	smartmax_early_suspend_handler.resume = smartmax_late_resume;
 	smartmax_early_suspend_handler.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 100;
+#endif
+#ifdef USE_LCD_NOTIFIER
+	smartmax_lcd_notif.notifier_call = smartmax_lcd_notifier_callback;
 #endif
 
 	return cpufreq_register_governor(&cpufreq_gov_smartmax);
