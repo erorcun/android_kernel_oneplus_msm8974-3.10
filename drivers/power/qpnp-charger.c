@@ -51,6 +51,7 @@
 #include <linux/pcb_version.h>
 #include <linux/uaccess.h>//sjc20150105
 #endif
+#include <linux/fastchg.h>
 
 /* Interrupt offsets */
 #define INT_RT_STS(base)			(base + 0x10)
@@ -324,7 +325,6 @@ static bool use_fake_chgvol = false;
 static int fake_chgvol = 0;
 
 static atomic_t threea_charge;
-static atomic_t fast_usb_charge;
 static atomic_t disable_aicl;
 static int charge_limit = 100;
 static int max_aicl_rate = 2000;
@@ -1271,7 +1271,7 @@ qpnp_chg_iusbmax_set(struct qpnp_chg_chip *chip, int mA)
 		return -EINVAL;
 	}
 	
-	if(!chip->dont_print_changes && atomic_read(&fast_usb_charge)) {
+	if(!chip->dont_print_changes && force_fast_charge) {
 		chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 		if ((ret.intval / 1000) == 500 && mA == 500) {
@@ -4183,7 +4183,7 @@ qpnp_chg_ibatmax_set(struct qpnp_chg_chip *chip, int chg_current)
 	}
 #endif
 
-	if(!chip->dont_print_changes && atomic_read(&fast_usb_charge)) {
+	if(!chip->dont_print_changes && force_fast_charge) {
 		chip->usb_psy->get_property(chip->usb_psy,
 			  POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
 		if ((ret.intval / 1000) == 500) {
@@ -8304,7 +8304,7 @@ static ssize_t fast_usb_charge_store(struct device *dev,
 	if(val < 0 || val > 1)
 		return 0;
 
-	atomic_set(&fast_usb_charge, val);
+	force_fast_charge = val;
 		
 	return size;
 }
@@ -9055,7 +9055,6 @@ qpnp_charger_probe(struct spmi_device *spmi)
 
 	atomic_set(&threea_charge, 0);
 	atomic_set(&disable_aicl, 0);
-	atomic_set(&fast_usb_charge, 0);
 	
 #if defined(CONFIG_FB)
 	/* jingchun.wang@Onlinerd.Driver, 2013/12/14  Add for reset charge current when screen is off */
