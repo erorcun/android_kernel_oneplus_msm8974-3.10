@@ -79,9 +79,6 @@ int force_fast_charge_init(void)
 	if (force_fast_charge_retval)
 		kobject_put(force_fast_charge_kobj);
 
-	if (force_fast_charge_retval)
-		kobject_put(force_fast_charge_kobj);
-
 	return (force_fast_charge_retval);
 }
 

@@ -34,6 +34,7 @@
 #include <mach/device_info.h>
 #include <linux/pcb_version.h>
 #include <linux/boot_mode.h>
+#include <linux/s2w.h>
 #include "synaptics_dsx.h"
 #include "synaptics_dsx_i2c.h"
 #ifdef CONFIG_MACH_FIND7OP  //for 14001's  tp
@@ -374,6 +375,8 @@ static ssize_t synaptics_attr_loglevel_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count);
 static ssize_t synaptics_attr_loglevel_show(struct device *dev,
 		struct device_attribute *attr, char *buf);
+static ssize_t synaptics_rmi4_s2w_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
 
 static struct device_attribute attrs[] = {
 #ifdef CONFIG_MACH_FIND7OP
@@ -411,6 +414,9 @@ static struct device_attribute attrs[] = {
 	__ATTR(vendor_id, (S_IRUGO),
 			synaptics_rmi4_vendor_show,
 			synaptics_rmi4_store_error),
+	__ATTR(s2w, 0222,
+			NULL,
+			synaptics_rmi4_s2w_store),
 };
 
 static struct proc_dir_entry *prEntry_tmp = NULL;
@@ -615,6 +621,22 @@ static ssize_t synaptics_rmi4_open_or_close_holster_mode_show(struct device *dev
 
 	synaptics_rmi4_i2c_read(rmi4_data, rmi4_data->holster_mode_control_addr, &databuf, 1);
 	return sprintf(buf, " holster mode is %s \n", databuf ? "open" : "close" );
+}
+
+static ssize_t synaptics_rmi4_s2w_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int input;
+
+	if (sscanf(buf, "%u", &input) != 1)
+		return -EINVAL;
+
+	if (input < 0 || input > 5)
+		return -EINVAL;
+
+	s2w = input;
+
+	return count;
 }
 
 /**
@@ -1318,20 +1340,17 @@ static ssize_t synaptics_rmi4_pdoze_read(struct file *file, char __user *user_bu
 
 static void set_syna_use_gesture(bool enable)
 {
-	if(enable)
-		atomic_set(&syna_rmi4_data->syna_use_gesture,1);
-	else {
-		atomic_set(&syna_rmi4_data->syna_use_gesture,
-			atomic_read(&syna_rmi4_data->double_tap_enable) || 
-			atomic_read(&syna_rmi4_data->double_swipe_enable) ||
-			atomic_read(&syna_rmi4_data->left_arrow_enable) ||
-			atomic_read(&syna_rmi4_data->right_arrow_enable) ||
-			atomic_read(&syna_rmi4_data->letter_m_enable) ||
-			atomic_read(&syna_rmi4_data->letter_o_enable) ||
-			atomic_read(&syna_rmi4_data->letter_w_enable) ||
-			atomic_read(&syna_rmi4_data->up_arrow_enable) ||
-			atomic_read(&syna_rmi4_data->down_arrow_enable) ? 1 : 0);
-	}
+	atomic_set(&syna_rmi4_data->syna_use_gesture, enable ||
+		atomic_read(&syna_rmi4_data->double_tap_enable) || 
+		atomic_read(&syna_rmi4_data->double_swipe_enable) ||
+		atomic_read(&syna_rmi4_data->left_arrow_enable) ||
+		atomic_read(&syna_rmi4_data->right_arrow_enable) ||
+		atomic_read(&syna_rmi4_data->letter_m_enable) ||
+		atomic_read(&syna_rmi4_data->letter_o_enable) ||
+		atomic_read(&syna_rmi4_data->letter_w_enable) ||
+		atomic_read(&syna_rmi4_data->up_arrow_enable) ||
+		atomic_read(&syna_rmi4_data->down_arrow_enable) ? 1 : 0);
+
 }
 
 static ssize_t synaptics_rmi4_proc_gesture_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
@@ -1451,100 +1470,6 @@ TS_ENABLE_FOPS(letter_m);
 TS_ENABLE_FOPS(letter_o);
 TS_ENABLE_FOPS(letter_w);
 
-/*
-static ssize_t synaptics_rmi4_proc_double_tap_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
-{
-	int ret = 0;
-	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->double_tap_enable));
-	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
-	return ret;
-}
-
-static ssize_t synaptics_rmi4_proc_double_tap_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
-{
-	int enable;
-	char buf[10];
-
-	if (count > 2)
-		return 0;
-
-	if (copy_from_user(buf, buffer, count)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return count;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->double_tap_enable, enable);
-
-	set_syna_use_gesture(enable);
-
-	return count;
-}
-
-static ssize_t synaptics_rmi4_proc_letter_o_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
-{
-	int ret = 0;
-	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->letter_o_enable));
-	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
-	return ret;
-}
-
-static ssize_t synaptics_rmi4_proc_letter_o_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
-{
-	int enable;
-	char buf[10];
-
-	if (count > 2)
-		return 0;
-
-	if (copy_from_user(buf, buffer, count)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return count;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->letter_o_enable, enable);
-
-	set_syna_use_gesture(enable);
-
-	return count;
-}
-
-static ssize_t synaptics_rmi4_proc_flashlight_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
-{
-	int ret = 0;
-	char page[PAGESIZE];
-	ret = sprintf(page, "%d\n", atomic_read(&syna_rmi4_data->down_arrow_enable));
-	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
-	return ret;
-}
-
-static ssize_t synaptics_rmi4_proc_flashlight_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
-{
-	int enable;
-	char buf[10];
-
-	if (count > 2)
-		return 0;
-
-	if (copy_from_user(buf, buffer, count)) {
-		print_ts(TS_DEBUG, KERN_ERR "Read proc input error.\n");
-		return count;
-	}
-
-	enable = (buf[0] == '0') ? 0 : 1;
-
-	atomic_set(&syna_rmi4_data->down_arrow_enable, enable);
-
-	set_syna_use_gesture(enable);
-
-	return count;
-}
-*/
 static ssize_t synaptics_rmi4_proc_music_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
 	int ret = 0;
@@ -2378,15 +2303,27 @@ static unsigned char synaptics_rmi4_update_gesture2(unsigned char *gesture,
 				(gestureext[24] == 0x48) ? Down2UpSwip      :
 				(gestureext[24] == 0x80) ? DouSwip          :
 				UnknownGesture;
-			if (gesturemode == DouSwip ||
-					gesturemode == Down2UpSwip ||
-					gesturemode == Up2DownSwip) {
+			if (gesturemode == DouSwip) {
 				if (abs(points[3] - points[1]) <= 800)
 					gesturemode=UnknownGesture;
-			}
-			if (gesturemode == DouSwip) {
-				if (atomic_read(&syna_rmi4_data->double_swipe_enable))
+				else if (atomic_read(&syna_rmi4_data->double_swipe_enable))
 					keyvalue = KEY_GESTURE_DOUBLE_SWIPE;
+			}
+			if (gesturemode == Left2RightSwip) {
+				if (s2w == 1 || s2w == 5)
+					keyvalue = KEY_WAKEUP;
+			}
+			if (gesturemode == Right2LeftSwip) {
+				if (s2w == 2 || s2w == 5)
+					keyvalue = KEY_WAKEUP;
+			}
+			if (gesturemode == Down2UpSwip) {
+				if (s2w == 3 || s2w == 5)
+					keyvalue = KEY_WAKEUP;
+			}
+			if (gesturemode == Up2DownSwip) {
+				if (s2w == 4 || s2w == 5)
+					keyvalue = KEY_WAKEUP;
 			}
 			break;
 
@@ -2634,12 +2571,12 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				prevent_bl = 0;
 #endif
 				vkey = get_virtual_key_button(x, y);
-				if (vkey == TP_VKEY_NONE) {
+				if (vkey == TP_VKEY_NONE)
 					continue;
 #ifdef CONFIG_MACH_ONYX
-				} else {
+				else {
 #else
-				} else if (atomic_read(&rmi4_data->key_rep)) {
+				else if (atomic_read(&rmi4_data->key_rep)) {
 #endif
 					if(vkey == TP_VKEY_MENU) {
 						vkey_simulate(finger, FIRSTKEY);
@@ -4124,7 +4061,7 @@ static int synaptics_rmi4_check_status(struct synaptics_rmi4_data *rmi4_data,
 		if (timeout > 0)
 			msleep(20);
 		else
-			return -1;
+			return -EINVAL;
 
 		retval = synaptics_rmi4_i2c_read(rmi4_data,
 				rmi4_data->f01_data_base_addr,
@@ -4560,7 +4497,7 @@ static void synaptics_rmi4_set_params(struct synaptics_rmi4_data *rmi4_data)
 
 #ifdef TYPE_B_PROTOCOL
 	input_mt_init_slots(rmi4_data->input_dev,
-			rmi4_data->num_of_fingers, 0);
+			rmi4_data->num_of_fingers, INPUT_MT_DIRECT);
 #endif
 
 	f1a = NULL;
@@ -5297,7 +5234,6 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 #endif
 	register_device_proc("tp",synaptics_id_str,synaptics_vendor_str);
 
-	synaptics_ts_init_virtual_key(rmi4_data);
 	synaptics_rmi4_init_touchpanel_proc();
 
 	retval = synaptics_rmi4_irq_enable(rmi4_data, true);
@@ -5310,12 +5246,17 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 	mutex_init(&suspended_mutex);
 
 	exp_data.workqueue = create_singlethread_workqueue("dsx_exp_workqueue");
+	if (!exp_data.workqueue) {
+		retval = -ENOMEM;
+		goto err_exp_data_workqueue;
+	}
 	INIT_DELAYED_WORK(&exp_data.work, synaptics_rmi4_exp_fn_work);
 	exp_data.rmi4_data = rmi4_data;
 	exp_data.queue_work = true;
 	queue_delayed_work(exp_data.workqueue,
 			&exp_data.work,
 			msecs_to_jiffies(EXP_FN_WORK_DELAY_MS));
+#ifdef CONFIG_MACH_FIND7OP
 	rmi4_fw_module_init(true);
 	while(1) {
 		msleep(50);
@@ -5324,6 +5265,7 @@ static int synaptics_rmi4_probe(struct i2c_client *client,
 			break;
 		}
 	}
+#endif
 
 	INIT_WORK(&rmi4_data->init_work, synaptics_rmi4_init_work);
 
@@ -5349,15 +5291,16 @@ err_sysfs:
 	}
 
 	cancel_work_sync(&rmi4_data->init_work);
+
 	cancel_delayed_work_sync(&exp_data.work);
 	flush_workqueue(exp_data.workqueue);
 	destroy_workqueue(exp_data.workqueue);
 
+err_exp_data_workqueue:
 	synaptics_rmi4_irq_enable(rmi4_data, false);
-
-err_enable_irq:
-	if (platform_data->gpio_config && (platform_data->reset_gpio >= 0))
-		platform_data->gpio_config(platform_data->reset_gpio, false);
+#ifdef CONFIG_MACH_ONYX
+	reset_component_info(TP);
+#endif
 
 err_gpio_reset:
 /*	if (platform_data->gpio_config)
@@ -5368,6 +5311,10 @@ err_gpio_attn:
 
 	input_unregister_device(rmi4_data->input_dev);
 	rmi4_data->input_dev = NULL;
+
+err_enable_irq:
+	if (platform_data->gpio_config && (platform_data->reset_gpio >= 0))
+		platform_data->gpio_config(platform_data->reset_gpio, false);
 
 err_set_input_dev:
 	if (platform_data->regulator_en) {
